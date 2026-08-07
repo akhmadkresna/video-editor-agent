@@ -15,8 +15,9 @@ editing rules.
 - Run the CLI as `uv run ae <cmd>` (console script defined in `pyproject.toml`). Health
   check: `uv run ae doctor` (exits non-zero only if ffmpeg/ffprobe are missing).
 - Lint: `uv run ruff check .` (there is no `[tool.ruff]` config; the repo currently has
-  pre-existing findings — do not treat those as environment breakage). Tests:
-  `uv run pytest` (no test suite exists yet). TS build: `pnpm -r run build`.
+ pre-existing findings — do not treat those as environment breakage). Tests:
+ `uv run pytest` (a pytest suite exists under `tests/` and passes). TS build:
+ `pnpm -r run build`.
 
 ### AGENTIC_EDITOR_HOME (non-obvious)
 - When you run `ae` from *inside* the framework repo, it auto-resolves the framework
