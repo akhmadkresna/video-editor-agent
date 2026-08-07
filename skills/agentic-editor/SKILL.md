@@ -54,6 +54,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Gaps ~50s chapter / ~10s emphasis; density ~1 sting / 32s keep; same-label min gap ~45s
     (keeps “Roadmap” etc. from spam). Quiet keep stretches >55s get gap-fill. Emphasis
     `bottomCqh` default **28** (was too low vs PIP).
+12. **Series YouTube thumbnails:** if `project.yaml` has `series: odoo-studio-agentic-ai` (or the
+    episode is clearly that series), lock to
+    `styles/series/odoo-studio-agentic-ai/thumbnail.md` + `refs/*-canonical.png`. Host RIGHT,
+    copy LEFT, Odoo UI darken/blur bg, PART badge + 2-line title + payoff + 3 chips, accent
+    `#3dbff3`, export **exactly 1280×720** (never ship 3:2). Do not redesign per episode.
 
 ## Process
 
