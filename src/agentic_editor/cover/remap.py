@@ -250,3 +250,73 @@ def build_timeline_overlays(
             )
         instances.append(inst)
     return finalize_overlays(instances, timeline_dur=timeline_dur, dwell=dwell)
+
+
+def build_timeline_sfx(
+    edl: dict[str, Any],
+    cover: dict[str, Any] | None,
+    *,
+    style_name: str = "tutorial",
+    sfx_cfg: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Remap cover.sfx[] (source-time) → timeline.sfx[] (output fromSec)."""
+    from agentic_editor.cover.sfx_suggest import SFX_KINDS, FORBIDDEN, resolve_sfx_file
+    from agentic_editor.cover.style_load import load_sfx
+
+    if not cover:
+        return []
+    cfg = sfx_cfg or load_sfx(style_name)
+    if not bool(cfg.get("enabled", True)):
+        return []
+    vols = cfg.get("volumes") or {}
+    shutter_max = float((cfg.get("shutter") or {}).get("max_sec", 0.22))
+    click_max = float((cfg.get("click") or {}).get("max_sec", 0.18))
+    out: list[dict[str, Any]] = []
+    for i, item in enumerate(cover.get("sfx") or []):
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or "").lower().strip()
+        if kind in FORBIDDEN or kind not in SFX_KINDS:
+            continue
+        try:
+            start = float(item["start"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        end_raw = item.get("end")
+        if end_raw is None:
+            end = start + (shutter_max if kind == "shutter" else click_max)
+        else:
+            try:
+                end = float(end_raw)
+            except (TypeError, ValueError):
+                continue
+        if end <= start:
+            continue
+        slices = remap_source_window(edl, start, end, source=str(item.get("source") or "cam"))
+        sl = _pick_best_slice(slices)
+        if not sl:
+            continue
+        src_name = resolve_sfx_file(
+            kind,
+            style_name=style_name,
+            bank_index=i,
+            explicit=str(item["src"]) if item.get("src") else None,
+        )
+        dur = float(sl["durationSec"])
+        if kind in ("shutter", "click"):
+            max_sec = shutter_max if kind == "shutter" else click_max
+            dur = min(dur, max_sec)
+        entry: dict[str, Any] = {
+            "id": str(item.get("id") or f"sfx-{kind}-{i}"),
+            "kind": kind,
+            "fromSec": round(float(sl["fromSec"]), 3),
+            "durationSec": round(max(0.05, dur), 3),
+            "src": f"ae-media/sfx/{src_name}",
+            "volume": float(item.get("volume") if item.get("volume") is not None else vols.get(kind, 0.4)),
+            "tile": kind == "typing",
+        }
+        if item.get("note"):
+            entry["note"] = str(item["note"])
+        out.append(entry)
+    out.sort(key=lambda x: float(x["fromSec"]))
+    return out

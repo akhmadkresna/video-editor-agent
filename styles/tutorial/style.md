@@ -60,6 +60,27 @@ overlays:
 punch_in:
   scale: 1.28
   defaultDurationSec: 1.35
+# Modern-tech SFX under cam VO (ae sfx-suggest). No whoosh.
+sfx:
+  enabled: true
+  no_whoosh: true
+  pack: styles/tutorial/sfx
+  volumes:
+    typing: 0.38
+    shutter: 0.42
+    click: 0.36
+  density:
+    sec_per_sfx: 30
+    min_gap_sec: 1.2
+    shutter_click_min_gap_sec: 0.4
+    typing_merge_gap_sec: 1.5
+  typing:
+    min_hold_sec: 4.0
+    tile_sec: 1.2
+  shutter:
+    max_sec: 0.22
+  click:
+    max_sec: 0.18
 # Fake multicam defaults (ae cover / example_cover). Close must read as cam B.
 camera_play:
   snap_on_cuts: true

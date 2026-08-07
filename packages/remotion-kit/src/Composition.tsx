@@ -10,6 +10,7 @@ import {
 import { SourceClip } from "./components/SourceClip";
 import { CaptionLayer } from "./components/CaptionLayer";
 import { OverlayLayer } from "./components/OverlayLayer";
+import { SfxLayer } from "./components/SfxLayer";
 import { MissingTimelineBanner } from "./components/MissingTimelineBanner";
 import { DEFAULT_OVERLAY_STYLE, DEFAULT_SCREEN_EXPLAINER, type TimelineProps } from "./types";
 
@@ -160,6 +161,7 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
         overlays={timeline.overlays || []}
         styleTokens={timeline.presentation?.overlays || DEFAULT_OVERLAY_STYLE}
       />
+      <SfxLayer sfx={timeline.sfx || []} />
     </AbsoluteFill>
   );
 };

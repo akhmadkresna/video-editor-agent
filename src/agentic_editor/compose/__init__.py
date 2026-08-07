@@ -101,6 +101,45 @@ def stage_sources_for_remotion(
     return staged
 
 
+def stage_sfx_for_remotion(
+    timeline_sfx: list[dict[str, Any]],
+    *,
+    style_name: str = "tutorial",
+    verbose: bool = True,
+) -> list[dict[str, Any]]:
+    """Copy referenced style-pack SFX into public/ae-media/sfx/ and normalize src."""
+    from agentic_editor.cover.style_load import sfx_pack_dir
+
+    if not timeline_sfx:
+        return []
+    pack = sfx_pack_dir(style_name)
+    dest_root = remotion_kit_dir() / "public" / "ae-media" / "sfx"
+    dest_root.mkdir(parents=True, exist_ok=True)
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in timeline_sfx:
+        if not isinstance(item, dict):
+            continue
+        entry = dict(item)
+        name = Path(str(entry.get("src") or "")).name
+        if not name:
+            continue
+        src_file = pack / name
+        if not src_file.is_file():
+            if verbose:
+                print(f"• sfx missing in pack, skipped: {name}")
+            continue
+        dest = dest_root / name
+        if name not in seen:
+            shutil.copy2(src_file, dest)
+            seen.add(name)
+            if verbose:
+                print(f"• staged sfx → public/ae-media/sfx/{name}")
+        entry["src"] = f"ae-media/sfx/{name}"
+        out.append(entry)
+    return out
+
+
 def validate_timeline_for_studio(timeline: dict[str, Any], props_path: Path) -> list[str]:
     """Return human-readable errors if Studio would show black/empty media."""
     errors: list[str] = []
@@ -186,6 +225,11 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
         episode=episode,
     )
     timeline["sources"] = staged_sources
+    timeline["sfx"] = stage_sfx_for_remotion(
+        list(timeline.get("sfx") or []),
+        style_name=style_name,
+        verbose=verbose,
+    )
     # absolute paths for tooling: compose media + raw masters
     timeline["sourcePaths"] = compose_sources
     timeline["rawSourcePaths"] = abs_sources

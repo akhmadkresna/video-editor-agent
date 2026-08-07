@@ -1,0 +1,25 @@
+# Modern tech SFX pack — dry one-shots only. No whoosh / riser / swoosh.
+theme: modern_tech
+no_whoosh: true
+typing:
+  file: typing-thock.mp3
+  volume: 0.38
+  tile_sec: 1.2
+  min_hold_sec: 4.0
+shutter:
+  file: shutter.mp3
+  volume: 0.42
+  max_sec: 0.22
+click:
+  files:
+    - click_01.mp3
+    - click_02.mp3
+    - click_03.mp3
+    - click_04.mp3
+  volume: 0.36
+  max_sec: 0.18
+density:
+  sec_per_sfx: 30
+  min_gap_sec: 1.2
+  shutter_click_min_gap_sec: 0.4
+  typing_merge_gap_sec: 1.5

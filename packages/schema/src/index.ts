@@ -111,6 +111,21 @@ export const CoverOverlaySchema = z.object({
   note: z.string().optional(),
 });
 
+/** Modern-tech SFX under cam VO — no whoosh. Source-time on cover. */
+export const SfxKindSchema = z.enum(["typing", "shutter", "click"]);
+
+export const CoverSfxSchema = z.object({
+  id: z.string().optional(),
+  kind: SfxKindSchema,
+  start: z.number(),
+  /** Required for typing holds; optional for one-shots (defaults short). */
+  end: z.number().optional(),
+  src: z.string().optional(),
+  bank: z.string().optional(),
+  volume: z.number().optional(),
+  note: z.string().optional(),
+});
+
 export const CameraPlaySchema = z.object({
   /** Alternate home/alt framing at each EDL join when no framing event wins. */
   snap_on_cuts: z.boolean().default(true),
@@ -132,6 +147,8 @@ export const CoverSchema = z.object({
   events: z.array(CoverEventSchema).default([]),
   /** Sparse MG creatives in cam source time — confirm before write. */
   overlays: z.array(CoverOverlaySchema).default([]),
+  /** Additive SFX under cam VO (source-time). */
+  sfx: z.array(CoverSfxSchema).default([]),
   captions: z
     .array(
       z.object({
@@ -209,6 +226,18 @@ export const TimelineOverlaySchema = z.object({
   note: z.string().optional(),
 });
 
+/** Output-timeline SFX (after EDL remap). src is staged under ae-media/sfx/. */
+export const TimelineSfxSchema = z.object({
+  id: z.string(),
+  kind: SfxKindSchema,
+  fromSec: z.number(),
+  durationSec: z.number(),
+  src: z.string(),
+  volume: z.number().default(0.4),
+  tile: z.boolean().optional(),
+  note: z.string().optional(),
+});
+
 export const TimelineSchema = z.object({
   fps: z.number(),
   width: z.number(),
@@ -237,6 +266,7 @@ export const TimelineSchema = z.object({
     )
     .default([]),
   overlays: z.array(TimelineOverlaySchema).default([]),
+  sfx: z.array(TimelineSfxSchema).default([]),
   presentation: z
     .object({
       screenExplainer: ScreenExplainerSchema.optional(),
@@ -254,3 +284,6 @@ export type Framing = z.infer<typeof FramingSchema>;
 export type FramingMotion = z.infer<typeof FramingMotionSchema>;
 export type CoverOverlay = z.infer<typeof CoverOverlaySchema>;
 export type TimelineOverlay = z.infer<typeof TimelineOverlaySchema>;
+export type CoverSfx = z.infer<typeof CoverSfxSchema>;
+export type TimelineSfx = z.infer<typeof TimelineSfxSchema>;
+export type SfxKind = z.infer<typeof SfxKindSchema>;

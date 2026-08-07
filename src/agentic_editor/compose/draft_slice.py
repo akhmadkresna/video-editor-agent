@@ -52,7 +52,7 @@ def slice_timeline(timeline: dict[str, Any], limit_sec: float) -> dict[str, Any]
     out["durationSec"] = float(limit_sec)
     out["durationInFrames"] = max(1, int(round(limit_sec * fps)))
 
-    for key in ("clips", "effects", "overlays", "captions"):
+    for key in ("clips", "effects", "overlays", "captions", "sfx"):
         trimmed: list[dict[str, Any]] = []
         for item in timeline.get(key) or []:
             if not isinstance(item, dict):

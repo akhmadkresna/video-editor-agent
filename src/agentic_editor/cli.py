@@ -1,4 +1,4 @@
-"""ae CLI — doctor, new, ingest, edl-suggest, cut, cover, cover-suggest, overlay-suggest, mezzanine, draft, compose, qa, promote-check."""
+"""ae CLI — doctor, new, ingest, edl-suggest, cut, cover, cover-suggest, overlay-suggest, sfx-suggest, mezzanine, draft, compose, qa, promote-check."""
 
 from __future__ import annotations
 
@@ -27,6 +27,11 @@ from agentic_editor.cover import example_cover, write_timeline
 from agentic_editor.cover import build_timeline_from_edl_and_cover
 from agentic_editor.cover.suggest import suggest_cover, write_cover_suggest
 from agentic_editor.cover.overlay_suggest import suggest_overlays, write_overlay_suggest
+from agentic_editor.cover.sfx_suggest import (
+    merge_sfx_into_cover,
+    suggest_sfx,
+    write_sfx_suggest,
+)
 from agentic_editor.cover.style_load import load_overlays, load_screen_explainer
 from agentic_editor.editor.edl import example_edl, load_edl
 from agentic_editor.editor.qa import qa_episode_preview
@@ -398,6 +403,77 @@ def cmd_overlay_suggest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sfx_suggest(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    suggestion = suggest_sfx(episode)
+    out = write_sfx_suggest(episode, suggestion)
+    meta = suggestion.get("_meta") or {}
+    counts = meta.get("counts") or {}
+    sfx = suggestion.get("sfx") or []
+    print(
+        f"Wrote {out.relative_to(episode)} "
+        f"({counts.get('total', len(sfx))} sfx: "
+        f"typing={counts.get('typing', 0)}, "
+        f"shutter={counts.get('shutter', 0)}, "
+        f"click={counts.get('click', 0)}; "
+        f"no_whoosh={meta.get('no_whoosh', True)})"
+    )
+    print("Propose/adjust with the user, then confirm before writing cover.json.")
+    print("After confirm: ae sfx-suggest . --apply")
+    if args.apply and sfx:
+        cover_path = episode / "edit" / "cover.json"
+        if cover_path.is_file():
+            cover = json.loads(cover_path.read_text(encoding="utf-8"))
+        else:
+            cover = example_cover()
+        cover["sfx"] = merge_sfx_into_cover(cover, list(sfx))
+        cover_path.write_text(json.dumps(cover, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"Wrote {len(cover['sfx'])} sfx into {cover_path.relative_to(episode)} (--apply)"
+        )
+        edl_path = episode / "edit" / "edl.json"
+        if edl_path.is_file():
+            cfg = load_project(episode)
+            edl = load_edl(edl_path)
+            sources: dict[str, str] = {}
+            for name, rel in (cfg.get("sources") or {}).items():
+                p = Path(rel)
+                sources[name] = str(
+                    (episode / p).resolve() if not p.is_absolute() else p
+                )
+            edit = episode / "edit"
+            for name, rel in edl["sources"].items():
+                sources.setdefault(
+                    name,
+                    str(
+                        (edit / rel).resolve()
+                        if not Path(rel).is_absolute()
+                        else rel
+                    ),
+                )
+            edl["sources"] = sources
+            style_name = str(cfg.get("style") or "tutorial")
+            timeline = build_timeline_from_edl_and_cover(
+                edl,
+                cover,
+                fps=int(cfg.get("fps", 30)),
+                width=int(cfg.get("width", 1920)),
+                height=int(cfg.get("height", 1080)),
+                screen_explainer=load_screen_explainer(style_name),
+                overlays=load_overlays(style_name),
+                episode=episode,
+            )
+            tl_path = edit / "timeline.json"
+            write_timeline(tl_path, timeline)
+            print(
+                f"Rebuilt {tl_path.relative_to(episode)} "
+                f"({len(timeline.get('sfx') or [])} timeline sfx)"
+            )
+        else:
+            print("Note: no edit/edl.json — skipped timeline rebuild")
+    return 0
+
+
 def cmd_mezzanine(args: argparse.Namespace) -> int:
     """Encode deliverable-sized proxies into edit/mezzanine/ (raw stays read-only)."""
     episode = resolve_episode(args.episode)
@@ -600,6 +676,21 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     osug.set_defaults(func=cmd_overlay_suggest)
+
+    ssug = sub.add_parser(
+        "sfx-suggest",
+        help=(
+            "Suggest modern-tech SFX (typing/shutter/click — no whoosh) "
+            "from camera_play, punches, screen, and deixis"
+        ),
+    )
+    ssug.add_argument("episode", nargs="?", default=".")
+    ssug.add_argument(
+        "--apply",
+        action="store_true",
+        help="Merge suggested sfx[] into edit/cover.json (after user confirm)",
+    )
+    ssug.set_defaults(func=cmd_sfx_suggest)
 
     mez = sub.add_parser(
         "mezzanine",

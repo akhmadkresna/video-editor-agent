@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -140,3 +141,40 @@ def load_screen_explainer(style_name: str = "tutorial") -> dict[str, Any]:
     if isinstance(se, dict):
         cfg = _deep_merge(cfg, se)
     return cfg
+
+
+DEFAULT_SFX: dict[str, Any] = {
+    "enabled": True,
+    "no_whoosh": True,
+    "pack": "styles/tutorial/sfx",
+    "volumes": {"typing": 0.38, "shutter": 0.42, "click": 0.36},
+    "density": {
+        "sec_per_sfx": 30,
+        "min_gap_sec": 1.2,
+        "shutter_click_min_gap_sec": 0.4,
+        "typing_merge_gap_sec": 1.5,
+    },
+    "typing": {"min_hold_sec": 4.0, "tile_sec": 1.2},
+    "shutter": {"max_sec": 0.22},
+    "click": {"max_sec": 0.18},
+}
+
+
+def load_sfx(style_name: str = "tutorial") -> dict[str, Any]:
+    """Return sfx pack config (modern tech — no whoosh)."""
+    cfg = _deep_merge({}, DEFAULT_SFX)
+    parsed = _load_style_yaml(style_name)
+    sfx = parsed.get("sfx")
+    if isinstance(sfx, dict):
+        cfg = _deep_merge(cfg, sfx)
+    return cfg
+
+
+def sfx_pack_dir(style_name: str = "tutorial") -> Path:
+    """Absolute path to styles/<style>/sfx (or pack override)."""
+    cfg = load_sfx(style_name)
+    pack = str(cfg.get("pack") or f"styles/{style_name}/sfx")
+    p = Path(pack)
+    if p.is_absolute():
+        return p
+    return framework_home() / p

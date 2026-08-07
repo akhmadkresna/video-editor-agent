@@ -49,6 +49,8 @@ export type Caption = {
 
 export type OverlayKind = "chapter" | "emphasis" | "diagram" | "chip";
 
+export type SfxKind = "typing" | "shutter" | "click";
+
 export type TimelineOverlay = {
   id: string;
   kind: OverlayKind;
@@ -64,6 +66,20 @@ export type TimelineOverlay = {
   stepMotion?: "speech" | "even" | "manual";
   /** Local second when fade-out begins (after list hold). */
   exitStartSec?: number;
+  note?: string;
+};
+
+/** Additive SFX under cam VO (output time after EDL remap). */
+export type TimelineSfx = {
+  id: string;
+  kind: SfxKind;
+  fromSec: number;
+  durationSec: number;
+  /** Staged path under public/, e.g. ae-media/sfx/shutter.mp3 */
+  src: string;
+  volume: number;
+  /** When true, Remotion tiles the clip across durationSec (typing). */
+  tile?: boolean;
   note?: string;
 };
 
@@ -157,6 +173,7 @@ export type Timeline = {
   effects: PunchEffect[];
   captions: Caption[];
   overlays?: TimelineOverlay[];
+  sfx?: TimelineSfx[];
   presentation?: {
     screenExplainer?: ScreenExplainerStyle;
     overlays?: OverlayStyle;
@@ -178,6 +195,7 @@ export const emptyTimeline: Timeline = {
   effects: [],
   captions: [],
   overlays: [],
+  sfx: [],
 };
 
 /** Locked cozy + cool mist defaults (mirror styles/tutorial). */

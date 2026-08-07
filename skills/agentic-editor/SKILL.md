@@ -37,6 +37,8 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
    Never start `remotion studio` bare — that shows a black empty timeline. Absolute `/Users/...`
    media paths will not load in the browser.
 9. **Audio always from cam.** Screen is visual-only (muted). Prefer `screen_with_cam` for UI demos.
+    SFX (typing / shutter / click) is additive under cam VO via `cover.sfx[]` — modern tech only,
+    **no whoosh**. Run `ae sfx-suggest .` after cover; confirm then `--apply`.
 10. **Locked look (`style: tutorial`):** A-roll MG = **Bold** type + accent `#7dd3fc` (cool mist sky).
     Screen stage = cool-mist canvas. No full/karaoke captions. Do not invent episode-local
     colors/fonts — change `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
@@ -69,6 +71,10 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     - Propose dense Bold-mist plan synced to cover + zoom/punch → **wait for confirm**
    - Write `cover.json` `overlays[]` + merge companion `framing` into `events[]`
      (source-time, word-snapped) → `ae cover .` / `ae compose .`
+6c. **SFX (modern tech)** — typing / shutter / click under cam VO:
+   - Run `ae sfx-suggest .` → `edit/sfx.suggest.json`
+   - Couples shutter→punch/framing/cut snap, click→screen-enter/deixis, typing→screen demos
+   - **No whoosh.** Confirm → `ae sfx-suggest . --apply` → `ae cover .` / compose
 7. **Compose** — `ae compose . --studio` or render
 8. **QA** — `ae qa .` inspect `edit/verify/` cut frames
 9. **Iterate** — natural language; never re-transcribe casually

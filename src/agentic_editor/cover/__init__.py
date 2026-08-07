@@ -205,8 +205,9 @@ def build_timeline_from_edl_and_cover(
         (se.get("screen") or {}).get("presentation") or "float_centered"
     )
 
-    from agentic_editor.cover.remap import build_timeline_overlays
+    from agentic_editor.cover.remap import build_timeline_overlays, build_timeline_sfx
     from agentic_editor.cover.suggest import load_cam_words
+    from agentic_editor.cover.style_load import load_sfx
 
     cam_words = words
     if cam_words is None and episode is not None:
@@ -219,6 +220,15 @@ def build_timeline_from_edl_and_cover(
     timeline_overlays = build_timeline_overlays(
         edl, cover, words=cam_words, dwell=dwell
     )
+    style_name = "tutorial"
+    if episode is not None:
+        try:
+            from agentic_editor.project import load_project
+
+            style_name = str(load_project(Path(episode)).get("style") or "tutorial")
+        except Exception:
+            style_name = "tutorial"
+    timeline_sfx = build_timeline_sfx(edl, cover, style_name=style_name, sfx_cfg=load_sfx(style_name))
 
     out_t = 0.0
     global_clip_i = 0
@@ -337,6 +347,7 @@ def build_timeline_from_edl_and_cover(
         "effects": effects,
         "captions": captions,
         "overlays": timeline_overlays,
+        "sfx": timeline_sfx,
         "camera_play": {
             "snap_on_cuts": snap,
             "home": camera_play.get("home", "medium"),
@@ -389,4 +400,5 @@ def example_cover() -> dict[str, Any]:
         ],
         "captions": [],
         "overlays": [],
+        "sfx": [],
     }
