@@ -437,52 +437,30 @@ def run_studio(episode: Path) -> None:
     subprocess.run(cmd, cwd=str(kit), env=env, check=True)
 
 
-def find_nvenc_ffmpeg_bin_dir() -> Path | None:
-    """Directory containing an ffmpeg.exe that lists h264_nvenc (Windows/Linux)."""
-    candidates: list[Path] = []
-    which = shutil.which("ffmpeg")
-    if which:
-        candidates.append(Path(which).resolve().parent)
-    # Common WinGet full_build (has NVENC); Remotion's bundled ffmpeg often does not
-    local = os.environ.get("LOCALAPPDATA") or ""
-    if local:
-        winget = Path(local) / "Microsoft" / "WinGet" / "Packages"
-        if winget.is_dir():
-            candidates.extend(winget.glob("Gyan.FFmpeg*/ffmpeg-*-full_build/bin"))
-    env_bin = os.environ.get("AE_FFMPEG_BIN_DIR") or os.environ.get("REMOTION_FFMPEG_BINARIES")
-    if env_bin:
-        candidates.insert(0, Path(env_bin))
+def _ffmpeg_encoders_blob(ffmpeg_exe: Path) -> str:
+    try:
+        proc = subprocess.run(
+            [str(ffmpeg_exe), "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return (proc.stdout or "") + (proc.stderr or "")
 
-    seen: set[Path] = set()
-    for d in candidates:
-        try:
-            d = d.resolve()
-        except OSError:
-            continue
-        if d in seen or not d.is_dir():
-            continue
-        seen.add(d)
-        exe = d / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
-        if not exe.is_file():
-            continue
-        try:
-            proc = subprocess.run(
-                [str(exe), "-hide_banner", "-encoders"],
-                capture_output=True,
-                text=True,
-                timeout=20,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        blob = (proc.stdout or "") + (proc.stderr or "")
-        if "h264_nvenc" in blob:
-            return d
-    return None
+
+def _ffmpeg_has_encoder(bin_dir: Path, encoder: str) -> bool:
+    name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    exe = bin_dir / name
+    if not exe.is_file():
+        return False
+    return encoder in _ffmpeg_encoders_blob(exe)
 
 
 def find_remotion_compositor_dir() -> Path | None:
-    """Locate ``@remotion/compositor-*`` package dir (contains ``remotion[.exe]``)."""
+    """Locate `@remotion/compositor-*` package dir (contains `remotion[.exe]`)."""
     env = os.environ.get("AE_REMOTION_COMPOSITOR_DIR")
     if env:
         p = Path(env)
@@ -512,6 +490,40 @@ def find_remotion_compositor_dir() -> Path | None:
     return None
 
 
+def find_nvenc_ffmpeg_bin_dir() -> Path | None:
+    """Directory containing an ffmpeg that lists h264_nvenc (Windows/Linux)."""
+    candidates: list[Path] = []
+    # Prefer Remotion compositor ffmpeg when it has NVENC — also ships libfdk_aac
+    # (Gyan full builds usually lack libfdk_aac, which Remotion requires for AAC).
+    compositor = find_remotion_compositor_dir()
+    if compositor is not None:
+        candidates.append(compositor)
+    which = shutil.which("ffmpeg")
+    if which:
+        candidates.append(Path(which).resolve().parent)
+    local = os.environ.get("LOCALAPPDATA") or ""
+    if local:
+        winget = Path(local) / "Microsoft" / "WinGet" / "Packages"
+        if winget.is_dir():
+            candidates.extend(winget.glob("Gyan.FFmpeg*/ffmpeg-*-full_build/bin"))
+    env_bin = os.environ.get("AE_FFMPEG_BIN_DIR") or os.environ.get("REMOTION_FFMPEG_BINARIES")
+    if env_bin:
+        candidates.insert(0, Path(env_bin))
+
+    seen: set[Path] = set()
+    for d in candidates:
+        try:
+            d = d.resolve()
+        except OSError:
+            continue
+        if d in seen or not d.is_dir():
+            continue
+        seen.add(d)
+        if _ffmpeg_has_encoder(d, "h264_nvenc"):
+            return d
+    return None
+
+
 def _link_or_copy(src: Path, dest: Path) -> None:
     """Prefer hardlink, then symlink, then copy (cross-volume safe)."""
     if dest.exists() or dest.is_symlink():
@@ -534,28 +546,54 @@ def stage_nvenc_remotion_binaries(
     *,
     verbose: bool = True,
 ) -> Path | None:
-    """Build a Remotion ``--binaries-directory`` that has compositor + NVENC ffmpeg.
+    """Resolve a Remotion binaries dir with compositor + NVENC + libfdk_aac.
 
-    Remotion resolves *all* of ``remotion`` / ``ffmpeg`` / ``ffprobe`` from the
-    same directory. Pointing ``--binaries-directory`` at a Gyan FFmpeg folder
-    alone fails with ``ENOENT …/remotion.exe``. We merge Remotion's compositor
-    package with an NVENC-capable ffmpeg/ffprobe into ``.ae-cache/``.
+    Remotion resolves remotion/ffmpeg/ffprobe from one directory and maps AAC to
+    `libfdk_aac`. Prefer the compositor package when its ffmpeg already has
+    NVENC. Only overlay an external ffmpeg if it also provides libfdk_aac.
     """
     compositor = find_remotion_compositor_dir()
     if compositor is None:
         if verbose:
             print(
                 "• NVENC: Remotion compositor package not found — "
-                "cannot stage binaries-directory; falling back to software encode"
+                "falling back to software encode"
             )
         return None
 
+    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
     ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
-    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
+
+    try:
+        same = ffmpeg_bin_dir.resolve() == compositor.resolve()
+    except OSError:
+        same = False
+    if same or (
+        _ffmpeg_has_encoder(compositor, "h264_nvenc")
+        and _ffmpeg_has_encoder(compositor, "libfdk_aac")
+    ):
+        if verbose:
+            print(f"• NVENC: using Remotion compositor binaries → {compositor}")
+        return compositor.resolve()
+
     src_ffmpeg = ffmpeg_bin_dir / ffmpeg_name
     src_ffprobe = ffmpeg_bin_dir / ffprobe_name
     if not src_ffmpeg.is_file():
+        return None
+    if not _ffmpeg_has_encoder(ffmpeg_bin_dir, "libfdk_aac"):
+        if verbose:
+            print(
+                "• NVENC: external ffmpeg lacks libfdk_aac (required by Remotion AAC) — "
+                "cannot overlay; "
+                + (
+                    "using compositor binaries"
+                    if _ffmpeg_has_encoder(compositor, "h264_nvenc")
+                    else "falling back to software encode"
+                )
+            )
+        if _ffmpeg_has_encoder(compositor, "h264_nvenc"):
+            return compositor.resolve()
         return None
 
     cache = framework_home() / ".ae-cache" / "remotion-nvenc-binaries"
@@ -573,11 +611,9 @@ def stage_nvenc_remotion_binaries(
         and (cache / ffmpeg_name).is_file()
     )
     if not ready:
-        # Copy compositor payloads (remotion + companion DLLs), then overlay NVENC ffmpeg.
         for item in compositor.iterdir():
             if item.name in {ffmpeg_name, ffprobe_name}:
                 continue
-            # Skip package metadata — Remotion only needs binaries/libs.
             if item.suffix in {".md", ".ts", ".js", ".mjs", ".json"} or item.name in {
                 "README.md",
                 "package.json",
@@ -607,11 +643,11 @@ def remotion_render_accel_args(
     gl: str | None = None,
     verbose: bool = True,
 ) -> list[str]:
-    """Extra ``remotion render`` flags for GPU encode / Chrome GL.
+    """Extra `remotion render` flags for GPU encode / Chrome GL.
 
     NVENC only speeds *encoding* (muxing frames → mp4). Frame rasterization still
-    runs in Chrome; ``--gl`` helps that path more on NVIDIA (``angle`` on Windows).
-    NVENC is a nice win on long encodes, not required for short drafts.
+    runs in Chrome; `--gl` helps that path more on NVIDIA (`angle` on Windows).
+    NVENC is useful on long encodes, not required for short drafts.
     """
     args: list[str] = []
     if gl:
@@ -624,33 +660,27 @@ def remotion_render_accel_args(
         if verbose:
             print(
                 "• NVENC requested but no h264_nvenc ffmpeg found — "
-                "install Gyan full FFmpeg or set AE_FFMPEG_BIN_DIR; "
                 "falling back to software encode"
             )
         return args
 
-    # Windows Remotion needs compositor + NVENC ffmpeg in ONE binaries-directory.
     bin_dir = stage_nvenc_remotion_binaries(ffmpeg_bin, verbose=verbose)
     if bin_dir is None:
         if verbose:
-            print("• NVENC: staging failed — falling back to software encode")
+            print("• NVENC: no usable binaries — falling back to software encode")
         return args
 
-    args.extend(
-        [
-            "--hardware-acceleration",
-            "if-possible",
-            "--binaries-directory",
-            str(bin_dir),
-            # CRF incompatible with NVENC — bitrate mode
-            "--video-bitrate",
-            "8M",
-        ]
-    )
+    compositor = find_remotion_compositor_dir()
+    use_explicit = compositor is None or bin_dir.resolve() != compositor.resolve()
+    # CRF incompatible with NVENC — bitrate mode
+    args.extend(["--hardware-acceleration", "if-possible", "--video-bitrate", "8M"])
+    if use_explicit:
+        args.extend(["--binaries-directory", str(bin_dir)])
     if verbose:
-        print(f"• NVENC: binaries-directory → {bin_dir}")
+        print(f"• NVENC: binaries → {bin_dir}")
         print("• Remotion --hardware-acceleration if-possible (--video-bitrate 8M)")
     return args
+
 
 
 def render_compose(

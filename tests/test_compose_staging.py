@@ -105,8 +105,16 @@ def test_stage_nvenc_binaries_includes_remotion(
         "agentic_editor.compose.find_remotion_compositor_dir",
         lambda: compositor,
     )
+    # Compositor lacks NVENC; external ffmpeg has NVENC + libfdk_aac
+    monkeypatch.setattr(
+        "agentic_editor.compose._ffmpeg_has_encoder",
+        lambda bin_dir, enc: (
+            (enc == "h264_nvenc" and bin_dir != compositor)
+            or (enc == "libfdk_aac" and bin_dir != compositor)
+        ),
+    )
 
-    ffmpeg_bin = tmp_path / "gyan-bin"
+    ffmpeg_bin = tmp_path / "custom-bin"
     ffmpeg_bin.mkdir()
     (ffmpeg_bin / ffmpeg_name).write_bytes(b"nvenc-ffmpeg")
     (ffmpeg_bin / ffprobe_name).write_bytes(b"nvenc-ffprobe")
@@ -119,11 +127,60 @@ def test_stage_nvenc_binaries_includes_remotion(
     assert (staged / ffprobe_name).read_bytes() == b"nvenc-ffprobe"
 
 
+def test_stage_prefers_compositor_when_it_has_nvenc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    compositor = tmp_path / "compositor"
+    compositor.mkdir()
+    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
+    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    (compositor / remotion_name).write_bytes(b"r")
+    (compositor / ffmpeg_name).write_bytes(b"ff")
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_remotion_compositor_dir",
+        lambda: compositor,
+    )
+    monkeypatch.setattr(
+        "agentic_editor.compose._ffmpeg_has_encoder",
+        lambda bin_dir, enc: enc in ("h264_nvenc", "libfdk_aac"),
+    )
+    gyan = tmp_path / "gyan"
+    gyan.mkdir()
+    (gyan / ffmpeg_name).write_bytes(b"gyan")
+    staged = stage_nvenc_remotion_binaries(gyan, verbose=False)
+    assert staged == compositor.resolve()
+
+
+def test_nvenc_accel_args_skip_binaries_dir_for_compositor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    compositor = tmp_path / "compositor"
+    compositor.mkdir()
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_nvenc_ffmpeg_bin_dir",
+        lambda: compositor,
+    )
+    monkeypatch.setattr(
+        "agentic_editor.compose.stage_nvenc_remotion_binaries",
+        lambda *_a, **_k: compositor,
+    )
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_remotion_compositor_dir",
+        lambda: compositor,
+    )
+    args = remotion_render_accel_args(nvenc=True, gl="angle", verbose=False)
+    assert "--hardware-acceleration" in args
+    assert "--binaries-directory" not in args
+    assert "--gl" in args
+
+
 def test_nvenc_accel_args_use_staged_dir_not_raw_ffmpeg(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     staged = tmp_path / "staged"
     staged.mkdir()
+    compositor = tmp_path / "compositor"
+    compositor.mkdir()
     monkeypatch.setattr(
         "agentic_editor.compose.find_nvenc_ffmpeg_bin_dir",
         lambda: tmp_path / "gyan",
@@ -132,11 +189,11 @@ def test_nvenc_accel_args_use_staged_dir_not_raw_ffmpeg(
         "agentic_editor.compose.stage_nvenc_remotion_binaries",
         lambda *_a, **_k: staged,
     )
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_remotion_compositor_dir",
+        lambda: compositor,
+    )
     args = remotion_render_accel_args(nvenc=True, gl="angle", verbose=False)
     assert "--binaries-directory" in args
-    assert str(staged) in args
-    assert "--hardware-acceleration" in args
-    assert "--gl" in args
-    # Must not point at a bare ffmpeg folder path from the stub
     idx = args.index("--binaries-directory")
     assert args[idx + 1] == str(staged)
