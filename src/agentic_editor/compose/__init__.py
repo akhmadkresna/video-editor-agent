@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -480,6 +481,126 @@ def find_nvenc_ffmpeg_bin_dir() -> Path | None:
     return None
 
 
+def find_remotion_compositor_dir() -> Path | None:
+    """Locate ``@remotion/compositor-*`` package dir (contains ``remotion[.exe]``)."""
+    env = os.environ.get("AE_REMOTION_COMPOSITOR_DIR")
+    if env:
+        p = Path(env)
+        if (p / ("remotion.exe" if os.name == "nt" else "remotion")).is_file():
+            return p.resolve()
+
+    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
+    if os.name == "nt":
+        patterns = ("@remotion+compositor-win32-*/node_modules/@remotion/compositor-*",)
+    elif sys.platform == "darwin":
+        patterns = ("@remotion+compositor-darwin-*/node_modules/@remotion/compositor-*",)
+    else:
+        patterns = ("@remotion+compositor-linux-*/node_modules/@remotion/compositor-*",)
+
+    roots = [
+        framework_home() / "node_modules" / ".pnpm",
+        remotion_kit_dir() / "node_modules" / ".pnpm",
+        framework_home() / "node_modules",
+    ]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for pattern in patterns:
+            for hit in sorted(root.glob(pattern)):
+                if hit.is_dir() and (hit / remotion_name).is_file():
+                    return hit.resolve()
+    return None
+
+
+def _link_or_copy(src: Path, dest: Path) -> None:
+    """Prefer hardlink, then symlink, then copy (cross-volume safe)."""
+    if dest.exists() or dest.is_symlink():
+        dest.unlink()
+    try:
+        os.link(src, dest)
+        return
+    except OSError:
+        pass
+    try:
+        dest.symlink_to(src)
+        return
+    except OSError:
+        pass
+    shutil.copy2(src, dest)
+
+
+def stage_nvenc_remotion_binaries(
+    ffmpeg_bin_dir: Path,
+    *,
+    verbose: bool = True,
+) -> Path | None:
+    """Build a Remotion ``--binaries-directory`` that has compositor + NVENC ffmpeg.
+
+    Remotion resolves *all* of ``remotion`` / ``ffmpeg`` / ``ffprobe`` from the
+    same directory. Pointing ``--binaries-directory`` at a Gyan FFmpeg folder
+    alone fails with ``ENOENT …/remotion.exe``. We merge Remotion's compositor
+    package with an NVENC-capable ffmpeg/ffprobe into ``.ae-cache/``.
+    """
+    compositor = find_remotion_compositor_dir()
+    if compositor is None:
+        if verbose:
+            print(
+                "• NVENC: Remotion compositor package not found — "
+                "cannot stage binaries-directory; falling back to software encode"
+            )
+        return None
+
+    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
+    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
+    src_ffmpeg = ffmpeg_bin_dir / ffmpeg_name
+    src_ffprobe = ffmpeg_bin_dir / ffprobe_name
+    if not src_ffmpeg.is_file():
+        return None
+
+    cache = framework_home() / ".ae-cache" / "remotion-nvenc-binaries"
+    cache.mkdir(parents=True, exist_ok=True)
+    marker = cache / ".stage-id"
+    stage_id = (
+        f"{compositor}:{src_ffmpeg.stat().st_mtime_ns}:"
+        f"{src_ffmpeg.stat().st_size}:"
+        f"{(compositor / remotion_name).stat().st_mtime_ns}"
+    )
+    ready = (
+        marker.is_file()
+        and marker.read_text(encoding="utf-8") == stage_id
+        and (cache / remotion_name).is_file()
+        and (cache / ffmpeg_name).is_file()
+    )
+    if not ready:
+        # Copy compositor payloads (remotion + companion DLLs), then overlay NVENC ffmpeg.
+        for item in compositor.iterdir():
+            if item.name in {ffmpeg_name, ffprobe_name}:
+                continue
+            # Skip package metadata — Remotion only needs binaries/libs.
+            if item.suffix in {".md", ".ts", ".js", ".mjs", ".json"} or item.name in {
+                "README.md",
+                "package.json",
+                "index.js",
+                "index.mjs",
+                "index.d.ts",
+            }:
+                continue
+            dest = cache / item.name
+            if item.is_file():
+                shutil.copy2(item, dest)
+        _link_or_copy(src_ffmpeg, cache / ffmpeg_name)
+        if src_ffprobe.is_file():
+            _link_or_copy(src_ffprobe, cache / ffprobe_name)
+        marker.write_text(stage_id, encoding="utf-8")
+        if verbose:
+            print(f"• NVENC: staged remotion+ffmpeg → {cache}")
+
+    if not (cache / remotion_name).is_file() or not (cache / ffmpeg_name).is_file():
+        return None
+    return cache.resolve()
+
+
 def remotion_render_accel_args(
     *,
     nvenc: bool = False,
@@ -488,8 +609,9 @@ def remotion_render_accel_args(
 ) -> list[str]:
     """Extra ``remotion render`` flags for GPU encode / Chrome GL.
 
-    NVENC only speeds *encoding*. Frame render still runs in Chrome; ``--gl``
-    can help that path on NVIDIA machines (``angle`` is the usual Windows pick).
+    NVENC only speeds *encoding* (muxing frames → mp4). Frame rasterization still
+    runs in Chrome; ``--gl`` helps that path more on NVIDIA (``angle`` on Windows).
+    NVENC is a nice win on long encodes, not required for short drafts.
     """
     args: list[str] = []
     if gl:
@@ -497,8 +619,8 @@ def remotion_render_accel_args(
     if not nvenc:
         return args
 
-    bin_dir = find_nvenc_ffmpeg_bin_dir()
-    if bin_dir is None:
+    ffmpeg_bin = find_nvenc_ffmpeg_bin_dir()
+    if ffmpeg_bin is None:
         if verbose:
             print(
                 "• NVENC requested but no h264_nvenc ffmpeg found — "
@@ -507,7 +629,13 @@ def remotion_render_accel_args(
             )
         return args
 
-    # Remotion: hardwareAcceleration + binariesDirectory (Windows needs external ffmpeg)
+    # Windows Remotion needs compositor + NVENC ffmpeg in ONE binaries-directory.
+    bin_dir = stage_nvenc_remotion_binaries(ffmpeg_bin, verbose=verbose)
+    if bin_dir is None:
+        if verbose:
+            print("• NVENC: staging failed — falling back to software encode")
+        return args
+
     args.extend(
         [
             "--hardware-acceleration",
@@ -520,7 +648,7 @@ def remotion_render_accel_args(
         ]
     )
     if verbose:
-        print(f"• NVENC: ffmpeg binaries → {bin_dir}")
+        print(f"• NVENC: binaries-directory → {bin_dir}")
         print("• Remotion --hardware-acceleration if-possible (--video-bitrate 8M)")
     return args
 

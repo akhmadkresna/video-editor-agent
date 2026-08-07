@@ -624,7 +624,10 @@ def build_parser() -> argparse.ArgumentParser:
     com.add_argument(
         "--nvenc",
         action="store_true",
-        help="Use NVIDIA NVENC encode if ffmpeg with h264_nvenc is available",
+        help=(
+            "Use NVIDIA NVENC for Remotion *encode* only (not Chrome frame render). "
+            "On Windows stages remotion.exe + Gyan ffmpeg into .ae-cache/"
+        ),
     )
     com.add_argument(
         "--gl",
@@ -660,7 +663,10 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument(
         "--nvenc",
         action="store_true",
-        help="Use NVIDIA NVENC encode when rendering draft",
+        help=(
+            "NVENC encode only (Windows: stages remotion.exe + Gyan ffmpeg). "
+            "Frame render still uses Chrome; prefer --gl angle for speed"
+        ),
     )
     dr.add_argument(
         "--gl",

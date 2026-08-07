@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
-from agentic_editor.compose import stage_sources_for_remotion
+from agentic_editor.compose import (
+    remotion_render_accel_args,
+    stage_nvenc_remotion_binaries,
+    stage_sources_for_remotion,
+)
 from agentic_editor.compose.mezzanine import (
     oversized_for_deliverable,
     resolve_compose_sources,
@@ -78,3 +83,60 @@ def test_deliverable_size_not_oversized() -> None:
     assert not oversized_for_deliverable(
         probe, width=1920, height=1080, fps=30
     )
+
+
+def test_stage_nvenc_binaries_includes_remotion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Remotion --binaries-directory needs remotion.exe + NVENC ffmpeg together."""
+    home = tmp_path / "fw"
+    home.mkdir()
+    monkeypatch.setattr("agentic_editor.compose.framework_home", lambda: home)
+
+    compositor = tmp_path / "compositor"
+    compositor.mkdir()
+    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
+    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
+    (compositor / remotion_name).write_bytes(b"compositor-bin")
+    (compositor / "helper.dll").write_bytes(b"dll")
+    (compositor / ffmpeg_name).write_bytes(b"bundled-no-nvenc")
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_remotion_compositor_dir",
+        lambda: compositor,
+    )
+
+    ffmpeg_bin = tmp_path / "gyan-bin"
+    ffmpeg_bin.mkdir()
+    (ffmpeg_bin / ffmpeg_name).write_bytes(b"nvenc-ffmpeg")
+    (ffmpeg_bin / ffprobe_name).write_bytes(b"nvenc-ffprobe")
+
+    staged = stage_nvenc_remotion_binaries(ffmpeg_bin, verbose=False)
+    assert staged is not None
+    assert (staged / remotion_name).read_bytes() == b"compositor-bin"
+    assert (staged / "helper.dll").read_bytes() == b"dll"
+    assert (staged / ffmpeg_name).read_bytes() == b"nvenc-ffmpeg"
+    assert (staged / ffprobe_name).read_bytes() == b"nvenc-ffprobe"
+
+
+def test_nvenc_accel_args_use_staged_dir_not_raw_ffmpeg(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    monkeypatch.setattr(
+        "agentic_editor.compose.find_nvenc_ffmpeg_bin_dir",
+        lambda: tmp_path / "gyan",
+    )
+    monkeypatch.setattr(
+        "agentic_editor.compose.stage_nvenc_remotion_binaries",
+        lambda *_a, **_k: staged,
+    )
+    args = remotion_render_accel_args(nvenc=True, gl="angle", verbose=False)
+    assert "--binaries-directory" in args
+    assert str(staged) in args
+    assert "--hardware-acceleration" in args
+    assert "--gl" in args
+    # Must not point at a bare ffmpeg folder path from the stub
+    idx = args.index("--binaries-directory")
+    assert args[idx + 1] == str(staged)
