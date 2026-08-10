@@ -2,6 +2,7 @@ import React from "react";
 import {
   AbsoluteFill,
   Easing,
+  Img,
   OffthreadVideo,
   interpolate,
   staticFile,
@@ -29,6 +30,12 @@ type Props = {
   windowCrop?: WindowCropNorm;
   screenExplainer?: ScreenExplainerStyle;
 };
+
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i;
+
+function isImageSrc(src: string): boolean {
+  return IMAGE_EXT.test(src);
+}
 
 /** Resolve public-relative paths via staticFile; leave http(s) alone. */
 function resolveSrc(src: string): string {
@@ -111,20 +118,25 @@ function CroppedVideo({
   objectFit?: string;
   objectPosition?: string;
 }) {
+  const mediaStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    objectFit: objectFit as React.CSSProperties["objectFit"],
+    objectPosition,
+    transform: `scale(${liveScale})`,
+    transformOrigin,
+  };
+
   if (!windowCrop || windowCrop.w <= 0 || windowCrop.h <= 0) {
+    if (isImageSrc(src)) {
+      return <Img src={src} style={mediaStyle} />;
+    }
     return (
       <OffthreadVideo
         src={src}
         startFrom={startFrom}
         volume={volume}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: objectFit as React.CSSProperties["objectFit"],
-          objectPosition,
-          transform: `scale(${liveScale})`,
-          transformOrigin,
-        }}
+        style={mediaStyle}
       />
     );
   }
@@ -135,24 +147,29 @@ function CroppedVideo({
   const heightPct = (1 / h) * 100;
   const leftPct = (-x / w) * 100;
   const topPct = (-y / h) * 100;
+  const cropStyle: React.CSSProperties = {
+    position: "absolute",
+    width: `${widthPct}%`,
+    height: `${heightPct}%`,
+    left: `${leftPct}%`,
+    top: `${topPct}%`,
+    objectFit: "fill",
+    transform: `scale(${liveScale})`,
+    transformOrigin,
+  };
 
   return (
     <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative" }}>
-      <OffthreadVideo
-        src={src}
-        startFrom={startFrom}
-        volume={volume}
-        style={{
-          position: "absolute",
-          width: `${widthPct}%`,
-          height: `${heightPct}%`,
-          left: `${leftPct}%`,
-          top: `${topPct}%`,
-          objectFit: "fill",
-          transform: `scale(${liveScale})`,
-          transformOrigin,
-        }}
-      />
+      {isImageSrc(src) ? (
+        <Img src={src} style={cropStyle} />
+      ) : (
+        <OffthreadVideo
+          src={src}
+          startFrom={startFrom}
+          volume={volume}
+          style={cropStyle}
+        />
+      )}
     </div>
   );
 }

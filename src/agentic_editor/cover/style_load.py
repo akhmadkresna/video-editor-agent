@@ -54,6 +54,13 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "maxWidthCqw": 40,
         "stepSizeCqh": 3.6,
     },
+    "callout": {
+        "leftCqw": 4.5,
+        "bottomCqh": 22,
+        "valueSizeCqh": 14,
+        "sourceSizeCqh": 2.8,
+        "maxWidthCqw": 48,
+    },
     "chip": {
         "leftCqw": 4.5,
         "topCqh": 10,

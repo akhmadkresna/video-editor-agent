@@ -63,7 +63,7 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         kind = str(item.get("kind") or item.get("type") or "").lower().strip()
-        if kind not in ("chapter", "emphasis", "diagram", "chip"):
+        if kind not in ("chapter", "emphasis", "diagram", "chip", "callout"):
             continue
         try:
             start = float(item["start"])
@@ -86,6 +86,14 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         steps = item.get("steps")
         if isinstance(steps, list):
             entry["steps"] = [str(s).strip() for s in steps if str(s).strip()]
+        value = str(item.get("value") or "").strip()
+        if value:
+            entry["value"] = value
+        source_label = str(
+            item.get("sourceLabel") or item.get("source_label") or ""
+        ).strip()
+        if source_label:
+            entry["sourceLabel"] = source_label
         # Optional manual source-time cues for diagram steps (cam seconds).
         raw_starts = item.get("stepStarts") or item.get("step_starts")
         if isinstance(raw_starts, list):
@@ -239,6 +247,10 @@ def build_timeline_overlays(
             inst["steps"] = ov["steps"]
         if ov.get("note"):
             inst["note"] = ov["note"]
+        if ov.get("value"):
+            inst["value"] = ov["value"]
+        if ov.get("sourceLabel"):
+            inst["sourceLabel"] = ov["sourceLabel"]
         if kind == "diagram" and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell

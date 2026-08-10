@@ -1,4 +1,4 @@
-"""ae CLI — doctor, new, ingest, edl-suggest, cut, cover, cover-suggest, overlay-suggest, sfx-suggest, mezzanine, draft, compose, qa, promote-check."""
+"""ae CLI — doctor, new, ingest, edl-suggest, cut, cover, cover-suggest, overlay-suggest, sfx-suggest, evidence-suggest, mezzanine, draft, compose, qa, promote-check."""
 
 from __future__ import annotations
 
@@ -31,6 +31,10 @@ from agentic_editor.cover.sfx_suggest import (
     merge_sfx_into_cover,
     suggest_sfx,
     write_sfx_suggest,
+)
+from agentic_editor.cover.evidence_suggest import (
+    apply_evidence_events,
+    suggest_evidence_events,
 )
 from agentic_editor.cover.style_load import load_overlays, load_screen_explainer
 from agentic_editor.editor.edl import example_edl, load_edl
@@ -474,6 +478,39 @@ def cmd_sfx_suggest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_evidence_suggest(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    suggestion = suggest_evidence_events(episode)
+    edit = episode / "edit"
+    edit.mkdir(parents=True, exist_ok=True)
+    out = edit / "evidence.suggest.json"
+    out.write_text(json.dumps(suggestion, indent=2) + "\n", encoding="utf-8")
+    events = suggestion.get("events") or []
+    files = suggestion.get("files") or []
+    print(
+        f"Wrote {out.relative_to(episode)} "
+        f"({len(events)} evidence event(s) from {len(files)} file(s); "
+        f"hits={suggestion.get('hit_phrases') or []})"
+    )
+    if not files:
+        print(
+            "No stills in raw/evidence/ or edit/evidence/ — "
+            "drop real website/YouTube screenshots there first.",
+            file=sys.stderr,
+        )
+        return 1
+    print(suggestion.get("rule") or "")
+    print("Propose/adjust with the user, then confirm before writing cover.json.")
+    print("After confirm: ae evidence-suggest . --apply")
+    if args.apply and events:
+        cover_path = apply_evidence_events(episode, suggestion, replace=True)
+        print(
+            f"Wrote {len(events)} evidence event(s) into "
+            f"{cover_path.relative_to(episode)} (--apply)"
+        )
+    return 0
+
+
 def cmd_mezzanine(args: argparse.Namespace) -> int:
     """Encode deliverable-sized proxies into edit/mezzanine/ (raw stays read-only)."""
     episode = resolve_episode(args.episode)
@@ -691,6 +728,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Merge suggested sfx[] into edit/cover.json (after user confirm)",
     )
     ssug.set_defaults(func=cmd_sfx_suggest)
+
+    esug = sub.add_parser(
+        "evidence-suggest",
+        help=(
+            "Suggest evidence still holds (raw/evidence/*.png) from transcript "
+            "deixis — real captures only; confirm before --apply"
+        ),
+    )
+    esug.add_argument("episode", nargs="?", default=".")
+    esug.add_argument(
+        "--apply",
+        action="store_true",
+        help="Merge suggested evidence events into edit/cover.json (after confirm)",
+    )
+    esug.set_defaults(func=cmd_evidence_suggest)
 
     mez = sub.add_parser(
         "mezzanine",

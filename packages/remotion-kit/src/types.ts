@@ -47,7 +47,12 @@ export type Caption = {
   end: number;
 };
 
-export type OverlayKind = "chapter" | "emphasis" | "diagram" | "chip";
+export type OverlayKind =
+  | "chapter"
+  | "emphasis"
+  | "diagram"
+  | "chip"
+  | "callout";
 
 export type SfxKind = "typing" | "shutter" | "click";
 
@@ -60,6 +65,10 @@ export type TimelineOverlay = {
   kicker?: string;
   title?: string;
   steps?: string[];
+  /** Callout big number (e.g. Rp24 jt). */
+  value?: string;
+  /** Callout estimator source (e.g. SocialCounts). */
+  sourceLabel?: string;
   /** Seconds relative to overlay start when each diagram step should appear. */
   stepAtSec?: number[];
   /** `speech` = transcript-aligned; `even` = paced fallback; `manual` = cover stepStarts. */
@@ -138,6 +147,13 @@ export type OverlayStyle = {
     maxWidthCqw?: number;
     stepSizeCqh?: number;
   };
+  callout?: {
+    leftCqw?: number;
+    bottomCqh?: number;
+    valueSizeCqh?: number;
+    sourceSizeCqh?: number;
+    maxWidthCqw?: number;
+  };
   chip?: {
     leftCqw?: number;
     topCqh?: number;
@@ -159,6 +175,13 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
   chapter: { leftCqw: 4.5, topCqh: 12, maxWidthCqw: 42 },
   emphasis: { leftCqw: 4.5, bottomCqh: 28, sizeCqh: 16, underline: true },
   diagram: { leftCqw: 4.5, topCqh: 10, maxWidthCqw: 40 },
+  callout: {
+    leftCqw: 4.5,
+    bottomCqh: 22,
+    valueSizeCqh: 14,
+    sourceSizeCqh: 2.8,
+    maxWidthCqw: 48,
+  },
   chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4 },
 };
 

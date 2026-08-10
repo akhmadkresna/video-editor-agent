@@ -194,6 +194,14 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
             p = (edit / p).resolve()
         abs_sources.setdefault(name, str(p))
 
+    cover_path = edit / "cover.json"
+    cover = None
+    if cover_path.is_file():
+        cover = json.loads(cover_path.read_text(encoding="utf-8"))
+        from agentic_editor.cover.evidence import collect_evidence_sources_from_cover
+
+        abs_sources.update(collect_evidence_sources_from_cover(episode, cover))
+
     # Prefer edit/mezzanine/* (deliverable size) over multi-GB raw masters.
     compose_sources = resolve_compose_sources(
         episode, abs_sources, cfg, verbose=verbose
@@ -202,11 +210,6 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
 
     edl_abs = dict(edl)
     edl_abs["sources"] = staged_sources
-
-    cover_path = edit / "cover.json"
-    cover = None
-    if cover_path.is_file():
-        cover = json.loads(cover_path.read_text(encoding="utf-8"))
 
     from agentic_editor.cover.style_load import load_overlays, load_screen_explainer
 

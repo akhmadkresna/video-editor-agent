@@ -78,6 +78,8 @@ export const CoverEventSchema = z.object({
     "cam_pip",
     "pip",
     "screen_pip",
+    "evidence",
+    "evidence_with_cam",
     "punch_in",
     "punch",
     "punch_out",
@@ -86,6 +88,13 @@ export const CoverEventSchema = z.object({
   source: z.string().optional(),
   /** Overlay source for screen_with_cam (default cam). */
   pip_source: z.string().optional(),
+  /**
+   * Evidence still filename or relative path under raw/evidence/ (or edit/evidence/).
+   * Required for evidence / evidence_with_cam.
+   */
+  src: z.string().optional(),
+  /** Evidence layout: float (cozy canvas) or full bleed. */
+  layout: z.enum(["float", "full"]).optional(),
   start: z.number(),
   end: z.number(),
   duration: z.number().optional(),
@@ -96,7 +105,13 @@ export const CoverEventSchema = z.object({
 });
 
 /** A-roll MG creatives (source-time). Locked look: Bold + cool mist. */
-export const OverlayKindSchema = z.enum(["chapter", "emphasis", "diagram", "chip"]);
+export const OverlayKindSchema = z.enum([
+  "chapter",
+  "emphasis",
+  "diagram",
+  "chip",
+  "callout",
+]);
 
 export const CoverOverlaySchema = z.object({
   id: z.string().optional(),
@@ -108,6 +123,10 @@ export const CoverOverlaySchema = z.object({
   kicker: z.string().optional(),
   title: z.string().optional(),
   steps: z.array(z.string()).optional(),
+  /** Callout: big value line (e.g. Rp24 jt). */
+  value: z.string().optional(),
+  /** Callout: estimator source label (e.g. SocialCounts). */
+  sourceLabel: z.string().optional(),
   note: z.string().optional(),
 });
 

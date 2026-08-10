@@ -21,6 +21,7 @@ EMPHASIS_NOTE_RE = re.compile(
 SCREEN_WITH_CAM_TYPES = frozenset({"screen_with_cam", "cam_pip"})
 SCREEN_FULL_TYPES = frozenset({"screen", "screen_full"})
 PIP_TYPES = frozenset({"pip", "screen_pip"})
+EVIDENCE_TYPES = frozenset({"evidence", "evidence_with_cam"})
 
 
 def _scales(camera_play: dict[str, Any]) -> dict[str, float]:
@@ -100,42 +101,70 @@ def _clip_muted(source: str) -> bool:
     return str(source) != "cam"
 
 
-def _screen_intervals_in_range(
+def _cover_broll_intervals_in_range(
     cover_events: list[dict[str, Any]],
     range_start: float,
     range_end: float,
-) -> list[tuple[float, float, str]]:
-    """Merged screen-intent intervals clipped to ``[range_start, range_end]``.
+) -> list[dict[str, Any]]:
+    """Merged screen/evidence intervals clipped to ``[range_start, range_end]``.
 
-    Returns list of (start, end, mode) where mode is ``screen_with_cam`` or ``screen``.
+    Each item: start, end, mode, and optional evidence meta (src_key, layout).
     """
-    raw: list[tuple[float, float, str]] = []
+    from agentic_editor.cover.evidence import evidence_source_key
+
+    raw: list[dict[str, Any]] = []
     for ev in cover_events:
         kind = str(ev.get("type") or "").lower()
+        meta: dict[str, Any] = {}
         if kind in SCREEN_WITH_CAM_TYPES:
             mode = "screen_with_cam"
         elif kind in SCREEN_FULL_TYPES:
             mode = "screen"
+        elif kind in EVIDENCE_TYPES:
+            src = str(ev.get("src") or "").strip()
+            if not src:
+                continue
+            mode = (
+                "evidence_with_cam"
+                if kind == "evidence_with_cam"
+                else "evidence"
+            )
+            layout = str(ev.get("layout") or "float").lower()
+            if layout not in ("float", "full"):
+                layout = "float"
+            meta = {
+                "src_key": evidence_source_key(src),
+                "layout": layout,
+            }
         else:
             continue
         s = max(float(ev.get("start", 0)), range_start)
         e = min(float(ev.get("end", 0)), range_end)
         if e - s >= 0.15:
-            raw.append((s, e, mode))
+            raw.append({"start": s, "end": e, "mode": mode, **meta})
     if not raw:
         return []
-    raw.sort(key=lambda x: x[0])
-    merged: list[tuple[float, float, str]] = [raw[0]]
-    for s, e, mode in raw[1:]:
-        ps, pe, pm = merged[-1]
-        if s <= pe + 0.05:
-            # Prefer screen_with_cam when either side wants PIP
-            m = "screen_with_cam" if "with_cam" in (pm + mode) or pm == "screen_with_cam" or mode == "screen_with_cam" else mode
-            if pm == "screen_with_cam" or mode == "screen_with_cam":
-                m = "screen_with_cam"
-            merged[-1] = (ps, max(pe, e), m)
+    raw.sort(key=lambda x: float(x["start"]))
+    merged: list[dict[str, Any]] = [dict(raw[0])]
+    for item in raw[1:]:
+        prev = merged[-1]
+        if float(item["start"]) <= float(prev["end"]) + 0.05:
+            # Prefer PIP variants when either side wants cam overlay.
+            pm = str(prev["mode"])
+            mode = str(item["mode"])
+            if "with_cam" in pm or "with_cam" in mode:
+                if "evidence" in pm or "evidence" in mode:
+                    prev["mode"] = "evidence_with_cam"
+                else:
+                    prev["mode"] = "screen_with_cam"
+            elif mode.startswith("evidence") or pm.startswith("evidence"):
+                # Keep evidence identity when merging adjacent evidence holds.
+                if "src_key" in item:
+                    prev["src_key"] = item["src_key"]
+                    prev["layout"] = item.get("layout", prev.get("layout", "float"))
+            prev["end"] = max(float(prev["end"]), float(item["end"]))
         else:
-            merged.append((s, e, mode))
+            merged.append(dict(item))
     return merged
 
 
@@ -144,28 +173,28 @@ def partition_range_by_cover(
     range_end: float,
     cover_events: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Split one EDL keep into full-cam vs screen(+PIP) subclips.
+    """Split one EDL keep into full-cam vs screen/evidence(+PIP) subclips.
 
-    Critical: a short screen event must NOT force the whole keep to float.
-    PIP (cam audio + face) must cover the entire screen subclip, not just the
+    Critical: a short screen/evidence event must NOT force the whole keep to float.
+    PIP (cam audio + face) must cover the entire B-roll subclip, not just the
     original short event window.
     """
-    screens = _screen_intervals_in_range(cover_events, range_start, range_end)
-    if not screens:
+    broll = _cover_broll_intervals_in_range(cover_events, range_start, range_end)
+    if not broll:
         return [{"start": range_start, "end": range_end, "mode": "full_cam"}]
 
     parts: list[dict[str, Any]] = []
     cursor = range_start
-    for s, e, mode in screens:
+    for item in broll:
+        s = float(item["start"])
+        e = float(item["end"])
         if s > cursor + 0.05:
             parts.append({"start": cursor, "end": s, "mode": "full_cam"})
-        parts.append(
-            {
-                "start": s,
-                "end": e,
-                "mode": "screen_with_cam" if mode == "screen_with_cam" else "screen",
-            }
-        )
+        part = {"start": s, "end": e, "mode": str(item["mode"])}
+        if "src_key" in item:
+            part["src_key"] = item["src_key"]
+            part["layout"] = item.get("layout", "float")
+        parts.append(part)
         cursor = e
     if range_end > cursor + 0.05:
         parts.append({"start": cursor, "end": range_end, "mode": "full_cam"})
@@ -261,10 +290,21 @@ def build_timeline_from_edl_and_cover(
             seg_end = float(part["end"])
             mode = str(part["mode"])
             screen_visual = mode in ("screen_with_cam", "screen")
-            visual_src = "screen" if screen_visual else str(r["source"])
-            layout = float_presentation if screen_visual else "full"
+            evidence_visual = mode in ("evidence", "evidence_with_cam")
+            broll_visual = screen_visual or evidence_visual
+            if evidence_visual:
+                visual_src = str(part.get("src_key") or "cam")
+                ev_layout = str(part.get("layout") or "float")
+                layout = float_presentation if ev_layout == "float" else "full"
+            elif screen_visual:
+                visual_src = "screen"
+                layout = float_presentation
+            else:
+                visual_src = str(r["source"])
+                layout = "full"
+            wants_pip = mode in ("screen_with_cam", "evidence_with_cam")
 
-            if screen_visual:
+            if broll_visual:
                 segments = [(seg_start, seg_end)]
             else:
                 do_snap = snap and layout == "full"
@@ -277,7 +317,7 @@ def build_timeline_from_edl_and_cover(
             part_out_start = out_t
             for seg_s, seg_e in segments:
                 seg_dur = seg_e - seg_s
-                if screen_visual:
+                if broll_visual:
                     framing, motion, scale = "wide", "hold", 1.0
                 else:
                     framing, motion = _pick_base_framing(
@@ -315,8 +355,8 @@ def build_timeline_from_edl_and_cover(
                 out_t += seg_dur
                 global_clip_i += 1
 
-            # PIP covers the entire screen subclip (face + cam audio)
-            if screen_visual:
+            # PIP covers the entire B-roll subclip (face + cam audio)
+            if wants_pip:
                 part_dur = seg_end - seg_start
                 clips.append(
                     {

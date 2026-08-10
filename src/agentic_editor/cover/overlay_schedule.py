@@ -15,6 +15,7 @@ DEFAULT_DWELL: dict[str, float] = {
     "chapter_sec": 5.5,
     "diagram_sec": 10.0,
     "emphasis_sec": 2.4,
+    "callout_sec": 3.6,
     "min_sec": 1.8,
     "diagram_hold_after_last_sec": 2.6,
     "diagram_sec_per_step": 1.45,
@@ -31,6 +32,7 @@ def dwell_for(kind: str, dwell: dict[str, Any] | None = None) -> float:
             "chapter": d["chapter_sec"],
             "diagram": d["diagram_sec"],
             "emphasis": d["emphasis_sec"],
+            "callout": d.get("callout_sec", d["emphasis_sec"]),
         }.get(kind, d["min_sec"])
     )
 

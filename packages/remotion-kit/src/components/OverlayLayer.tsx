@@ -25,6 +25,7 @@ function useStyle(style?: OverlayStyle) {
     chapter: { ...DEFAULT_OVERLAY_STYLE.chapter, ...style?.chapter },
     emphasis: { ...DEFAULT_OVERLAY_STYLE.emphasis, ...style?.emphasis },
     diagram: { ...DEFAULT_OVERLAY_STYLE.diagram, ...style?.diagram },
+    callout: { ...DEFAULT_OVERLAY_STYLE.callout, ...style?.callout },
     chip: { ...DEFAULT_OVERLAY_STYLE.chip, ...style?.chip },
   };
 }
@@ -353,6 +354,73 @@ const Chip: React.FC<{
   );
 };
 
+const Callout: React.FC<{
+  ov: TimelineOverlay;
+  style: ReturnType<typeof useStyle>;
+  h: number;
+}> = ({ ov, style, h }) => {
+  const left = style.callout?.leftCqw ?? 4.5;
+  const bottom = style.callout?.bottomCqh ?? 22;
+  const valueSize = style.callout?.valueSizeCqh ?? 14;
+  const sourceSize = style.callout?.sourceSizeCqh ?? 2.8;
+  const maxW = style.callout?.maxWidthCqw ?? 48;
+  const value = ov.value || ov.text || "";
+  const sourceLabel = ov.sourceLabel || ov.kicker || "";
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}%`,
+        bottom: `${bottom}%`,
+        maxWidth: `${maxW}%`,
+        color: style.ink,
+        textShadow: "0 8px 28px rgba(0,0,0,0.55)",
+      }}
+    >
+      <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
+        {sourceLabel ? (
+          <div
+            style={{
+              fontFamily: UI,
+              fontWeight: 600,
+              fontSize: Math.round(h * (sourceSize / 100)),
+              color: style.accent,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: Math.round(h * 0.012),
+            }}
+          >
+            {sourceLabel}
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontFamily: DISPLAY,
+            fontWeight: 800,
+            fontSize: Math.round(h * (valueSize / 100)),
+            lineHeight: 1.05,
+          }}
+        >
+          {value}
+        </div>
+        {ov.title ? (
+          <div
+            style={{
+              fontFamily: UI,
+              fontWeight: 500,
+              fontSize: Math.round(h * 0.028),
+              color: style.dim,
+              marginTop: Math.round(h * 0.012),
+            }}
+          >
+            {ov.title}
+          </div>
+        ) : null}
+      </EnterExit>
+    </div>
+  );
+};
+
 const OneOverlay: React.FC<{
   ov: TimelineOverlay;
   styleTokens?: OverlayStyle;
@@ -363,6 +431,7 @@ const OneOverlay: React.FC<{
   if (ov.kind === "emphasis")
     return <Emphasis ov={ov} style={style} h={height} w={width} />;
   if (ov.kind === "diagram") return <Diagram ov={ov} style={style} h={height} />;
+  if (ov.kind === "callout") return <Callout ov={ov} style={style} h={height} />;
   if (ov.kind === "chip") return <Chip ov={ov} style={style} h={height} />;
   return null;
 };

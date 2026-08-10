@@ -39,9 +39,16 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 9. **Audio always from cam.** Screen is visual-only (muted). Prefer `screen_with_cam` for UI demos.
     SFX (typing / shutter / click) is additive under cam VO via `cover.sfx[]` — modern tech only,
     **no whoosh**. Run `ae sfx-suggest .` after cover; confirm then `--apply`.
-10. **Locked look (`style: tutorial`):** A-roll MG = **Bold** type + accent `#7dd3fc` (cool mist sky).
-    Screen stage = cool-mist canvas. No full/karaoke captions. Do not invent episode-local
-    colors/fonts — change `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
+10. **Locked look (`style: tutorial`):** house default for Odoo/tech screen demos.
+    A-roll MG = **Bold** type + accent `#7dd3fc` (cool mist sky). Screen stage = cool-mist
+    canvas. No full/karaoke captions. Do not invent episode-local colors/fonts — change
+    `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
+10b. **Evidence episodes (`style: evidence`):** talking-head + **real** website/YouTube
+    screenshots in `raw/evidence/` (never AI-generated dashboards). Cover events
+    `evidence` / `evidence_with_cam`; MG may use `callout` (value + sourceLabel).
+    Run `ae evidence-suggest .` → confirm → `--apply`. Do **not** change tutorial defaults
+    for this series — promote knobs into `styles/evidence/style.md`.
+    Docs: `docs/catalog/features/evidence-style.md`.
 11. **MG overlays:** after EDL (and preferably cover) is confirmed, run `ae overlay-suggest .`,
     propose the plan, **wait for confirm**, then write `cover.json` `overlays[]` **and** any
     companion `framing` events (or `ae overlay-suggest . --apply` only after confirm).
@@ -54,11 +61,13 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Gaps ~50s chapter / ~10s emphasis; density ~1 sting / 32s keep; same-label min gap ~45s
     (keeps “Roadmap” etc. from spam). Quiet keep stretches >55s get gap-fill. Emphasis
     `bottomCqh` default **28** (was too low vs PIP).
-12. **Series YouTube thumbnails:** if `project.yaml` has `series: odoo-studio-agentic-ai` (or the
-    episode is clearly that series), lock to
-    `styles/series/odoo-studio-agentic-ai/thumbnail.md` + `refs/*-canonical.png`. Host RIGHT,
-    copy LEFT, Odoo UI darken/blur bg, PART badge + 2-line title + payoff + 3 chips, accent
-    `#3dbff3`, export **exactly 1280×720** (never ship 3:2). Do not redesign per episode.
+12. **Series YouTube thumbnails:**
+    - `series: odoo-studio-agentic-ai` → `styles/series/odoo-studio-agentic-ai/thumbnail.md`
+      (+ `refs/*-canonical.png`). Accent `#3dbff3`, export **1280×720**.
+    - `series: ai-youtube-idr` → `styles/series/ai-youtube-idr/thumbnail.md`. Accent
+      `#7dd3fc`, Rp title from public estimators (SocialCounts-high preferred), evidence
+      screenshot background, export **1280×720**.
+    Agents must not redesign per episode.
 
 ## Process
 
@@ -71,7 +80,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
    - Run `ae cover-suggest .` → review `edit/cover.suggest.json`
    - Propose full-cam vs `screen_with_cam` ranges (formula below) → **wait for confirm**
    - Write `edit/cover.json` → `ae cover .`
-6b. **Overlays (A-roll MG)** — chapter / emphasis / diagram / chip:
+6a. **Evidence** (if `style: evidence` and stills in `raw/evidence/`):
+   - Drop real website/YouTube screenshots into `raw/evidence/`
+   - Run `ae evidence-suggest .` → review `edit/evidence.suggest.json`
+   - Propose still holds + callout numbers → **wait for confirm** → `--apply`
+6b. **Overlays (A-roll MG)** — chapter / emphasis / diagram / chip / callout:
    - Run `ae overlay-suggest .` → `edit/overlays.suggest.json` (includes `framing_events`)
     - Propose dense Bold-mist plan synced to cover + zoom/punch → **wait for confirm**
    - Write `cover.json` `overlays[]` + merge companion `framing` into `events[]`
