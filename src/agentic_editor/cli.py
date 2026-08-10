@@ -549,7 +549,7 @@ def cmd_brief(args: argparse.Namespace) -> int:
     for err in research.get("errors") or []:
         print(f"! research: {err}", file=sys.stderr)
     print("Next: ae evidence-gather .   # capture real screenshots")
-    print("Then record cam using edit/script.md → raw/cam.mp4 → ae ingest .")
+    print("Then record cam using edit/script.md -> raw/cam.mp4 -> ae ingest .")
     return 0
 
 
@@ -568,7 +568,7 @@ def cmd_evidence_gather(args: argparse.Namespace) -> int:
         f"ok={len(ok)} skipped={len(skipped)} failed={len(failed)}"
     )
     for item in ok:
-        print(f"  + {item.get('src')} ← {item.get('url')}")
+        print(f"  + {item.get('src')} <- {item.get('url')}")
     for item in failed:
         print(f"  x {item.get('id')}: {item.get('error')}", file=sys.stderr)
     if report.get("backend") == "none":
@@ -580,7 +580,7 @@ def cmd_evidence_gather(args: argparse.Namespace) -> int:
     if failed and not ok:
         return 1
     print("Stills in raw/evidence/. Provenance: edit/evidence.json")
-    print("Next: record A-roll from edit/script.md → raw/cam.mp4")
+    print("Next: record A-roll from edit/script.md -> raw/cam.mp4")
     return 0
 
 

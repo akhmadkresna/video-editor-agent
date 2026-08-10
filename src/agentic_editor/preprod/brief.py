@@ -81,7 +81,7 @@ def build_brief(
             "Review edit/script.md (teleprompter)",
             "ae evidence-gather .   # framework captures real screenshots",
             "Record cam A-roll reading script.md (speak cue lines aloud)",
-            "Drop raw/cam.mp4 → ae ingest . → EDL → evidence-suggest / cover / compose",
+            "Drop raw/cam.mp4 -> ae ingest . -> EDL -> evidence-suggest / cover / compose",
         ],
     }
     return {
