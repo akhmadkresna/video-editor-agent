@@ -4,87 +4,71 @@ Additional style pack for **talking-head + real evidence stills** (channel-break
 
 Not the house default — that remains [`styles/tutorial/`](../../styles/tutorial/style.md).
 
-## Select
+## Full flow (pre-prod → record → edit)
+
+```mermaid
+flowchart LR
+  brief["ae brief"] --> gather["ae evidence-gather"]
+  gather --> record["Human records A-roll"]
+  record --> ingest["ae ingest"]
+  ingest --> edl["EDL confirm"]
+  edl --> esug["ae evidence-suggest"]
+  esug --> compose["ae cover / compose"]
+```
+
+### 1. Episode setup
 
 ```yaml
 # project.yaml
+id: part01-theaigrid
 style: evidence
-series: ai-youtube-idr   # optional thumb lock
+series: ai-youtube-idr
+brief:
+  channel: TheAIGRID
+  # optional overrides:
+  # handle: "@theaigrid"
+  # youtube_id: UCbY9xX3_jW5c2fjlZVBI4cg
 sources:
   cam: raw/cam.mp4
 ```
 
-| Field | Role |
-|-------|------|
-| `style: evidence` | Video grammar: cam A-roll + `evidence` / `evidence_with_cam` cover events |
-| `series: ai-youtube-idr` | Thumbnail brand lock only ([`styles/series/ai-youtube-idr/`](../../styles/series/ai-youtube-idr/)) |
-
-## Assets
-
-Put **real** screenshots in `raw/evidence/` (PNG/JPG/WebP). No AI-generated fake dashboards.
-
-Optional provenance:
-
-```json
-// edit/evidence.json
-[
-  {
-    "src": "sc-socialcounts.png",
-    "url": "https://socialcounts.org/youtube-channel-analytics/...",
-    "captured_at": "2026-08-10",
-    "note": "last 28d revenue estimate"
-  }
-]
-```
-
-## Cover events
-
-```json
-{
-  "type": "evidence_with_cam",
-  "start": 42.0,
-  "end": 48.0,
-  "src": "sc-socialcounts.png",
-  "layout": "float",
-  "note": "SocialCounts estimate"
-}
-```
-
-- `evidence` — still only (cool-mist float or full)
-- `evidence_with_cam` — still + cam PIP (default for talking-head)
-- Audio always from cam
-
-## Overlays
-
-Same Bold-mist MG as tutorial, plus **`callout`**:
-
-```json
-{
-  "kind": "callout",
-  "start": 42.0,
-  "end": 45.5,
-  "value": "Rp24 jt",
-  "sourceLabel": "SocialCounts",
-  "title": "last 28 days high"
-}
-```
-
-## Commands
+### 2. Framework guides you + gathers evidence
 
 ```bash
-# After EDL + stills dropped:
-ae evidence-suggest .
-# review edit/evidence.suggest.json → confirm →
-ae evidence-suggest . --apply
+ae brief . --channel TheAIGRID
+# → edit/script.md        A-roll teleprompter with [[EVIDENCE:]] cues
+# → edit/record.md        human checklist
+# → edit/research.json    SocialCounts / vidIQ public numbers
+# → edit/evidence.plan.json
+# → edit/brief.json
+
+uv sync --extra evidence && uv run playwright install chromium   # once
+ae evidence-gather .
+# → raw/evidence/*.png    real page screenshots
+# → edit/evidence.json    provenance
+```
+
+### 3. You record
+
+Read `edit/script.md`. At each `[[EVIDENCE:]]` cue, say the site name + number aloud (so ASR can tie stills later). Save as `raw/cam.mp4`.
+
+### 4. Post-record (existing pipeline)
+
+```bash
+ae ingest .
+# confirm radio-edit → edl.json
+ae cut .
+ae evidence-suggest .      # uses plan + ASR deixis
+ae evidence-suggest . --apply   # after confirm
+# add callout overlays as needed
 ae cover .
 ae compose . --studio
 ```
 
-## vs tutorial
+## Why not house-default
 
-| | tutorial | evidence |
-|--|----------|----------|
-| House default | yes | no |
-| B-roll | screen recording | website/YouTube screenshots |
-| Suggest | `ae cover-suggest` | `ae evidence-suggest` |
-| Extra MG | — | `callout` |
+Tutorial stays cam+screen Odoo grammar. Evidence adds pre-prod brief/gather + still B-roll without polluting tutorial defaults.
+
+## Cover / overlays
+
+See prior sections: `evidence` / `evidence_with_cam` events; `callout` overlay for Rp honesty beats.

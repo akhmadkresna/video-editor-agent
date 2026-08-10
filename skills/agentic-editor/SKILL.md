@@ -43,11 +43,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     A-roll MG = **Bold** type + accent `#7dd3fc` (cool mist sky). Screen stage = cool-mist
     canvas. No full/karaoke captions. Do not invent episode-local colors/fonts — change
     `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
-10b. **Evidence episodes (`style: evidence`):** talking-head + **real** website/YouTube
-    screenshots in `raw/evidence/` (never AI-generated dashboards). Cover events
-    `evidence` / `evidence_with_cam`; MG may use `callout` (value + sourceLabel).
-    Run `ae evidence-suggest .` → confirm → `--apply`. Do **not** change tutorial defaults
-    for this series — promote knobs into `styles/evidence/style.md`.
+10b. **Evidence episodes (`style: evidence`):** start with **`ae brief`** (script + research)
+    then **`ae evidence-gather`** (real screenshots into `raw/evidence/`). Never AI-generate
+    fake dashboards. Host records from `edit/script.md` speaking `[[EVIDENCE:]]` cues aloud.
+    After ingest: `ae evidence-suggest` ties ASR to stills. Cover events `evidence` /
+    `evidence_with_cam`; MG may use `callout`. Promote knobs into `styles/evidence/style.md`.
     Docs: `docs/catalog/features/evidence-style.md`.
 11. **MG overlays:** after EDL (and preferably cover) is confirmed, run `ae overlay-suggest .`,
     propose the plan, **wait for confirm**, then write `cover.json` `overlays[]` **and** any
@@ -71,6 +71,24 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 
 ## Process
 
+### Evidence series (`style: evidence`) — start here
+
+0. **Brief (pre-prod)** — `ae brief . --channel TheAIGRID`
+   - Writes `edit/script.md` (A-roll teleprompter with `[[EVIDENCE:]]` cues),
+     `edit/record.md`, `edit/research.json` (public estimators), `edit/evidence.plan.json`.
+   - Title Rp prefers SocialCounts last-28d **high** (question-mark honesty in script).
+1. **Gather evidence** — `ae evidence-gather .`
+   - Framework captures **real** screenshots into `raw/evidence/` (Playwright).
+   - Never AI-generate fake dashboards. Install once:
+     `uv sync --extra evidence && uv run playwright install chromium`
+2. **Record** — host reads `edit/script.md`; at each cue speak site name + number; save `raw/cam.mp4`
+3. **Inventory** — `ae ingest .` → `edit/takes_packed.md`
+4. **Propose** radio-edit → **wait for confirm** → `edit/edl.json` → `ae cut .`
+5. **Evidence cover** — `ae evidence-suggest .` (plan + ASR) → confirm → `--apply`
+6. **Overlays / SFX / compose** — as below (callout for estimator numbers)
+
+### Default / tutorial path
+
 1. **Inventory** — `ae ingest .` → `edit/takes_packed.md`
 2. **Converse** — describe material; ask shaped questions
 3. **Propose** radio-edit strategy (4–8 sentences) → **wait for confirm**
@@ -80,10 +98,9 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
    - Run `ae cover-suggest .` → review `edit/cover.suggest.json`
    - Propose full-cam vs `screen_with_cam` ranges (formula below) → **wait for confirm**
    - Write `edit/cover.json` → `ae cover .`
-6a. **Evidence** (if `style: evidence` and stills in `raw/evidence/`):
-   - Drop real website/YouTube screenshots into `raw/evidence/`
-   - Run `ae evidence-suggest .` → review `edit/evidence.suggest.json`
-   - Propose still holds + callout numbers → **wait for confirm** → `--apply`
+6a. **Evidence** (if `style: evidence` and stills already in `raw/evidence/`):
+   - Prefer the brief→gather path above; manual drops still OK
+   - Run `ae evidence-suggest .` → review → confirm → `--apply`
 6b. **Overlays (A-roll MG)** — chapter / emphasis / diagram / chip / callout:
    - Run `ae overlay-suggest .` → `edit/overlays.suggest.json` (includes `framing_events`)
     - Propose dense Bold-mist plan synced to cover + zoom/punch → **wait for confirm**

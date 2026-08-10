@@ -1,4 +1,4 @@
-"""ae CLI — doctor, new, ingest, edl-suggest, cut, cover, cover-suggest, overlay-suggest, sfx-suggest, evidence-suggest, mezzanine, draft, compose, qa, promote-check."""
+"""ae CLI — doctor, new, ingest, brief, evidence-gather, edl-suggest, cut, cover, cover-suggest, overlay-suggest, sfx-suggest, evidence-suggest, mezzanine, draft, compose, qa, promote-check."""
 
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ from agentic_editor.cover.evidence_suggest import (
     apply_evidence_events,
     suggest_evidence_events,
 )
+from agentic_editor.preprod import build_brief, gather_evidence, write_brief_bundle
 from agentic_editor.cover.style_load import load_overlays, load_screen_explainer
 from agentic_editor.editor.edl import example_edl, load_edl
 from agentic_editor.editor.qa import qa_episode_preview
@@ -495,7 +496,7 @@ def cmd_evidence_suggest(args: argparse.Namespace) -> int:
     if not files:
         print(
             "No stills in raw/evidence/ or edit/evidence/ — "
-            "drop real website/YouTube screenshots there first.",
+            "run ae brief + ae evidence-gather first (or drop screenshots manually).",
             file=sys.stderr,
         )
         return 1
@@ -508,6 +509,78 @@ def cmd_evidence_suggest(args: argparse.Namespace) -> int:
             f"Wrote {len(events)} evidence event(s) into "
             f"{cover_path.relative_to(episode)} (--apply)"
         )
+    return 0
+
+
+def cmd_brief(args: argparse.Namespace) -> int:
+    """Pre-prod: research estimators → A-roll script → evidence plan → record guide."""
+    episode = resolve_episode(args.episode)
+    cfg = load_project(episode)
+    style = str(cfg.get("style") or "")
+    if style and style != "evidence" and not args.force_style:
+        print(
+            f"Note: project style is {style!r}; brief is designed for style: evidence "
+            "(pass --force-style to proceed anyway).",
+            file=sys.stderr,
+        )
+    try:
+        bundle = build_brief(
+            episode,
+            subject=args.channel,
+            usd_idr=args.usd_idr,
+            fetch=not args.offline,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"brief failed: {exc}", file=sys.stderr)
+        return 1
+    paths = write_brief_bundle(episode, bundle)
+    brief = bundle["brief"]
+    research = bundle["research"]
+    print(f"Wrote {paths['script'].relative_to(episode)} (A-roll teleprompter)")
+    print(f"Wrote {paths['record'].relative_to(episode)} (record checklist)")
+    print(f"Wrote {paths['plan'].relative_to(episode)} ({len(bundle['plan'].get('shots') or [])} shots)")
+    print(f"Wrote {paths['research'].relative_to(episode)}")
+    print(f"Wrote {paths['brief'].relative_to(episode)}")
+    if research.get("title_rp"):
+        print(
+            f"Title number: {research['title_rp']} "
+            f"(basis={research.get('title_basis')})"
+        )
+    for err in research.get("errors") or []:
+        print(f"! research: {err}", file=sys.stderr)
+    print("Next: ae evidence-gather .   # capture real screenshots")
+    print("Then record cam using edit/script.md → raw/cam.mp4 → ae ingest .")
+    return 0
+
+
+def cmd_evidence_gather(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    try:
+        report = gather_evidence(episode, force=bool(args.force))
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    ok = report.get("ok") or []
+    skipped = report.get("skipped") or []
+    failed = report.get("failed") or []
+    print(
+        f"evidence-gather backend={report.get('backend')} "
+        f"ok={len(ok)} skipped={len(skipped)} failed={len(failed)}"
+    )
+    for item in ok:
+        print(f"  + {item.get('src')} ← {item.get('url')}")
+    for item in failed:
+        print(f"  x {item.get('id')}: {item.get('error')}", file=sys.stderr)
+    if report.get("backend") == "none":
+        print(
+            "Install capture: uv sync --extra evidence && uv run playwright install chromium",
+            file=sys.stderr,
+        )
+        return 1
+    if failed and not ok:
+        return 1
+    print("Stills in raw/evidence/. Provenance: edit/evidence.json")
+    print("Next: record A-roll from edit/script.md → raw/cam.mp4")
     return 0
 
 
@@ -743,6 +816,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="Merge suggested evidence events into edit/cover.json (after confirm)",
     )
     esug.set_defaults(func=cmd_evidence_suggest)
+
+    br = sub.add_parser(
+        "brief",
+        help=(
+            "Pre-prod for evidence episodes: fetch estimators, write A-roll script, "
+            "evidence plan, and record checklist"
+        ),
+    )
+    br.add_argument("episode", nargs="?", default=".")
+    br.add_argument(
+        "--channel",
+        default=None,
+        help="Channel subject (e.g. TheAIGRID). Or set brief.channel in project.yaml",
+    )
+    br.add_argument("--usd-idr", type=float, default=None, help="FX rate override")
+    br.add_argument(
+        "--offline",
+        action="store_true",
+        help="Skip HTTP research fetch (script template only)",
+    )
+    br.add_argument(
+        "--force-style",
+        action="store_true",
+        help="Allow brief even if project style is not evidence",
+    )
+    br.set_defaults(func=cmd_brief)
+
+    eg = sub.add_parser(
+        "evidence-gather",
+        help="Capture real screenshots from edit/evidence.plan.json into raw/evidence/",
+    )
+    eg.add_argument("episode", nargs="?", default=".")
+    eg.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-capture even if still files already exist",
+    )
+    eg.set_defaults(func=cmd_evidence_gather)
 
     mez = sub.add_parser(
         "mezzanine",

@@ -100,7 +100,11 @@ def suggest_evidence_events(
     *,
     style_name: str | None = None,
 ) -> dict[str, Any]:
-    """Build evidence event suggestions from files + transcript deixis."""
+    """Build evidence event suggestions from files + transcript deixis.
+
+    Prefers ``edit/evidence.plan.json`` shot order / speak phrases when present
+    (from ``ae brief``), so pre-prod cues survive into post-record cover.
+    """
     cfg = load_project(episode)
     style = style_name or str(cfg.get("style") or "tutorial")
     cover_cfg = _cover_cfg(style)
@@ -110,30 +114,69 @@ def suggest_evidence_events(
     with_pip = bool(ev_cfg.get("default_pip", True))
     event_type = "evidence_with_cam" if with_pip else "evidence"
 
+    plan_path = episode / "edit" / "evidence.plan.json"
+    plan_shots: list[dict[str, Any]] = []
+    if plan_path.is_file():
+        try:
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan_shots = [s for s in (plan.get("shots") or []) if isinstance(s, dict)]
+        except (OSError, json.JSONDecodeError):
+            plan_shots = []
+
     files = list_evidence_files(episode)
     words = load_cam_words(episode / "edit")
     phrases = _phrases(style)
+    # Prefer speak tokens from the brief plan (what the host was told to say).
+    for s in plan_shots:
+        speak = str(s.get("speak") or s.get("label") or "").strip().lower()
+        if speak and speak not in phrases:
+            phrases.insert(0, speak)
     hits = _word_hits(words, phrases)
+
+    # Prefer plan order matched to existing files by src name.
+    ordered: list[Path] = []
+    by_name = {p.name.lower(): p for p in files}
+    for s in plan_shots:
+        name = str(s.get("src") or "").lower()
+        if name in by_name:
+            ordered.append(by_name.pop(name))
+    ordered.extend(sorted(by_name.values(), key=lambda p: p.name))
 
     events: list[dict[str, Any]] = []
     used_files: list[str] = []
-    for i, f in enumerate(files):
-        if i < len(hits):
-            start = float(hits[i][0])
-            phrase = hits[i][2]
+    for i, f in enumerate(ordered):
+        plan_meta = next(
+            (s for s in plan_shots if str(s.get("src") or "").lower() == f.name.lower()),
+            {},
+        )
+        speak = str(plan_meta.get("speak") or "").lower()
+        hit = None
+        if speak:
+            hit = next((h for h in hits if speak in h[2] or h[2] in speak), None)
+        if hit is None and i < len(hits):
+            hit = hits[i]
+        if hit is not None:
+            start = float(hit[0])
+            phrase = hit[2]
         else:
-            # Spread leftover stills after last hit or from 8s
             base = hits[-1][0] + 8.0 if hits else 8.0 + i * 10.0
             start = base
-            phrase = "evidence-file"
+            phrase = speak or "evidence-file"
         end = start + min_hold
+        shot_layout = str(plan_meta.get("layout") or layout)
+        pip = plan_meta.get("pip")
+        etype = event_type
+        if pip is False:
+            etype = "evidence"
+        elif pip is True:
+            etype = "evidence_with_cam"
         events.append(
             {
-                "type": event_type,
+                "type": etype,
                 "start": round(start, 3),
                 "end": round(end, 3),
                 "src": f.name,
-                "layout": layout if layout in ("float", "full") else "float",
+                "layout": shot_layout if shot_layout in ("float", "full") else "float",
                 "note": f"evidence still ({phrase})",
             }
         )
@@ -145,6 +188,7 @@ def suggest_evidence_events(
         "files": used_files,
         "hit_phrases": [h[2] for h in hits],
         "events": events,
+        "from_plan": bool(plan_shots),
         "rule": "Real captures only — no AI-generated dashboards. Confirm before --apply.",
     }
 
