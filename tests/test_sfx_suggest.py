@@ -57,7 +57,26 @@ def _write_episode(tmp: Path) -> Path:
                 "end": 55.0,
                 "title": "Flow",
                 "steps": ["a", "b"],
-            }
+            },
+            {
+                "kind": "emphasis",
+                "start": 12.0,
+                "end": 13.2,
+                "text": "Studio API",
+            },
+            {
+                "kind": "chapter",
+                "start": 1.0,
+                "end": 4.0,
+                "kicker": "Chapter 01",
+                "text": "Hook",
+            },
+            {
+                "kind": "chip",
+                "start": 48.0,
+                "end": 50.0,
+                "text": "Odoo",
+            },
         ],
         "sfx": [],
     }
@@ -87,7 +106,9 @@ def test_forbidden_set_has_whoosh():
     assert "whoosh" in FORBIDDEN
 
 
-def test_suggest_couples_punch_screen_typing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_suggest_one_shots_no_typing_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     ep = _write_episode(tmp_path)
     monkeypatch.setenv("AGENTIC_EDITOR_HOME", str(Path(__file__).resolve().parents[1]))
     from agentic_editor import paths
@@ -98,11 +119,29 @@ def test_suggest_couples_punch_screen_typing(tmp_path: Path, monkeypatch: pytest
     kinds = {s["kind"] for s in suggestion["sfx"]}
     assert "shutter" in kinds
     assert "click" in kinds
-    assert "typing" in kinds
+    assert "typing" not in kinds
     assert suggestion["_meta"]["no_whoosh"] is True
+    assert suggestion["_meta"]["typing_enabled"] is False
+    assert suggestion["_meta"]["mg_enabled"] is True
     notes = " ".join(str(s.get("note")) for s in suggestion["sfx"])
     assert "punch" in notes or "cut_snap" in notes or "framing_snap" in notes
     assert "screen_enter" in notes or "deixis" in notes
+    assert "mg_diagram" in notes or "mg_chapter" in notes
+    assert "mg_emphasis" in notes or "mg_chip" in notes
+
+
+def test_suggest_mg_appear_mapping(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    ep = _write_episode(tmp_path)
+    monkeypatch.setenv("AGENTIC_EDITOR_HOME", str(Path(__file__).resolve().parents[1]))
+    from agentic_editor import paths
+
+    monkeypatch.setattr(paths, "framework_home", lambda: Path(__file__).resolve().parents[1])
+
+    suggestion = suggest_sfx(ep)
+    by_note = {str(s.get("note")): s for s in suggestion["sfx"]}
+    assert by_note.get("suggest:mg_chapter", {}).get("kind") == "shutter"
+    assert by_note.get("suggest:mg_diagram", {}).get("kind") == "shutter"
+    assert by_note.get("suggest:mg_emphasis", {}).get("kind") == "click"
 
 
 def test_remap_sfx_through_edl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -129,7 +168,7 @@ def test_remap_sfx_through_edl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "end": 70.0,
             "src": "typing-thock.mp3",
             "volume": 0.38,
-            "note": "suggest:screen_demo",
+            "note": "hand:typing",
         },
     ]
     edl = json.loads((ep / "edit" / "edl.json").read_text(encoding="utf-8"))

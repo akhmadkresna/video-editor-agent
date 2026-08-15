@@ -154,16 +154,25 @@ DEFAULT_SFX: dict[str, Any] = {
     "enabled": True,
     "no_whoosh": True,
     "pack": "styles/tutorial/sfx",
-    "volumes": {"typing": 0.38, "shutter": 0.42, "click": 0.36},
+    "volumes": {"typing": 0.38, "shutter": 0.38, "click": 0.32},
     "density": {
         "sec_per_sfx": 30,
         "min_gap_sec": 1.2,
         "shutter_click_min_gap_sec": 0.4,
         "typing_merge_gap_sec": 1.5,
     },
-    "typing": {"min_hold_sec": 4.0, "tile_sec": 1.2},
+    # Typing holds run the full screen demo — off by default; prefer one-shots.
+    "typing": {"enabled": False, "min_hold_sec": 4.0, "tile_sec": 1.2},
     "shutter": {"max_sec": 0.22},
-    "click": {"max_sec": 0.18},
+    "click": {"max_sec": 0.22},
+    # One-shot at MG appear (cover.overlays).
+    "mg": {
+        "enabled": True,
+        "chapter": "shutter",
+        "diagram": "shutter",
+        "emphasis": "click",
+        "chip": "click",
+    },
 }
 
 

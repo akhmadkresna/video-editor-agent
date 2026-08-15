@@ -7,7 +7,8 @@ type Props = {
 };
 
 /**
- * Additive modern-tech SFX under cam VO. Typing tiles; shutter/click are one-shots.
+ * Additive modern-tech SFX under cam VO. Shutter/click are one-shots.
+ * Typing tiles only when present (opt-in / hand-authored — off in default suggest).
  * No whoosh assets — pack is curated in styles/tutorial/sfx.
  */
 export const SfxLayer: React.FC<Props> = ({ sfx }) => {
@@ -44,15 +45,12 @@ export const SfxLayer: React.FC<Props> = ({ sfx }) => {
           return <React.Fragment key={item.id}>{tiles}</React.Fragment>;
         }
 
-        const oneShot = Math.min(
-          duration,
-          Math.max(1, Math.round((item.kind === "shutter" ? 0.22 : 0.18) * fps)),
-        );
+        // Play full remapped durationSec (do not hard-cap — onset may sit late in raw assets).
         return (
           <Sequence
             key={item.id}
             from={from}
-            durationInFrames={oneShot}
+            durationInFrames={duration}
             name={item.id}
             layout="none"
           >

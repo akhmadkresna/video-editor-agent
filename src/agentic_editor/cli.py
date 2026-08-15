@@ -790,7 +790,7 @@ def build_parser() -> argparse.ArgumentParser:
     ssug = sub.add_parser(
         "sfx-suggest",
         help=(
-            "Suggest modern-tech SFX (typing/shutter/click — no whoosh) "
+            "Suggest modern-tech SFX (shutter/click + MG appear; typing opt-in — no whoosh) "
             "from camera_play, punches, screen, and deixis"
         ),
     )

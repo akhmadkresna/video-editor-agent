@@ -33,6 +33,20 @@ TYPING_HINTS = (
     "yaml",
 )
 
+# Default MG → SFX kind (overridable via style sfx.mg).
+DEFAULT_MG_KINDS = {
+    "chapter": "shutter",
+    "diagram": "shutter",
+    "emphasis": "click",
+    "chip": "click",
+}
+MG_PRIORITY = {
+    "chapter": 4,
+    "diagram": 4,
+    "emphasis": 3,
+    "chip": 2,
+}
+
 
 def _load_pack_yaml(pack_dir: Path) -> dict[str, Any]:
     path = pack_dir / "pack.yaml"
@@ -138,10 +152,14 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
     min_gap = float(dens.get("min_gap_sec", 1.2))
     shutter_click_gap = float(dens.get("shutter_click_min_gap_sec", 0.4))
     typing_merge = float(dens.get("typing_merge_gap_sec", 1.5))
-    typing_min = float((sfx_cfg.get("typing") or {}).get("min_hold_sec", 4.0))
+    typing_cfg = sfx_cfg.get("typing") or {}
+    typing_enabled = bool(typing_cfg.get("enabled", False))
+    typing_min = float(typing_cfg.get("min_hold_sec", 4.0))
     shutter_max = float((sfx_cfg.get("shutter") or {}).get("max_sec", 0.22))
     click_max = float((sfx_cfg.get("click") or {}).get("max_sec", 0.18))
     vols = sfx_cfg.get("volumes") or {}
+    mg_cfg = sfx_cfg.get("mg") or {}
+    mg_enabled = bool(mg_cfg.get("enabled", True))
 
     edl_path = episode / "edit" / "edl.json"
     if not edl_path.is_file():
@@ -238,46 +256,76 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
         )
         click_i += 1
 
-    for s, e in screens:
-        for lo, hi in _clip_to_keep(s, e, keeps):
-            if hi - lo < typing_min:
+    if mg_enabled:
+        for ov in overlays:
+            if not isinstance(ov, dict):
                 continue
-            blob = _word_hay_at(words, lo, hi)
-            if not any(h in blob for h in TYPING_HINTS):
-                has_diagram = any(
-                    str(o.get("kind") or "").lower() == "diagram"
-                    and float(o.get("start", -1)) < hi
-                    and float(o.get("end", -1)) > lo
-                    for o in overlays
-                    if isinstance(o, dict)
-                )
-                if not has_diagram:
-                    continue
-            candidates.append(
-                {
-                    "kind": "typing",
-                    "start": lo,
-                    "end": hi,
-                    "note": "screen_demo",
-                    "priority": 1,
-                }
-            )
+            ov_kind = str(ov.get("kind") or "").lower().strip()
+            if ov_kind not in DEFAULT_MG_KINDS:
+                continue
+            sfx_kind = str(mg_cfg.get(ov_kind) or DEFAULT_MG_KINDS[ov_kind]).lower()
+            if sfx_kind not in ("shutter", "click"):
+                continue
+            try:
+                start = float(ov["start"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not _in_keep(start, keeps):
+                continue
+            dur = shutter_max if sfx_kind == "shutter" else click_max
+            entry: dict[str, Any] = {
+                "kind": sfx_kind,
+                "start": start,
+                "end": start + dur,
+                "note": f"mg_{ov_kind}",
+                "priority": int(MG_PRIORITY.get(ov_kind, 3)),
+            }
+            if sfx_kind == "click":
+                entry["bank"] = click_i
+                click_i += 1
+            candidates.append(entry)
 
-    typing = [c for c in candidates if c["kind"] == "typing"]
-    others = [c for c in candidates if c["kind"] != "typing"]
-    typing.sort(key=lambda c: float(c["start"]))
-    merged_typing: list[dict[str, Any]] = []
-    for c in typing:
-        if (
-            merged_typing
-            and float(c["start"]) <= float(merged_typing[-1]["end"]) + typing_merge
-        ):
-            merged_typing[-1]["end"] = max(
-                float(merged_typing[-1]["end"]), float(c["end"])
-            )
-        else:
-            merged_typing.append(dict(c))
-    candidates = others + merged_typing
+    if typing_enabled:
+        for s, e in screens:
+            for lo, hi in _clip_to_keep(s, e, keeps):
+                if hi - lo < typing_min:
+                    continue
+                blob = _word_hay_at(words, lo, hi)
+                if not any(h in blob for h in TYPING_HINTS):
+                    has_diagram = any(
+                        str(o.get("kind") or "").lower() == "diagram"
+                        and float(o.get("start", -1)) < hi
+                        and float(o.get("end", -1)) > lo
+                        for o in overlays
+                        if isinstance(o, dict)
+                    )
+                    if not has_diagram:
+                        continue
+                candidates.append(
+                    {
+                        "kind": "typing",
+                        "start": lo,
+                        "end": hi,
+                        "note": "screen_demo",
+                        "priority": 1,
+                    }
+                )
+
+        typing = [c for c in candidates if c["kind"] == "typing"]
+        others = [c for c in candidates if c["kind"] != "typing"]
+        typing.sort(key=lambda c: float(c["start"]))
+        merged_typing: list[dict[str, Any]] = []
+        for c in typing:
+            if (
+                merged_typing
+                and float(c["start"]) <= float(merged_typing[-1]["end"]) + typing_merge
+            ):
+                merged_typing[-1]["end"] = max(
+                    float(merged_typing[-1]["end"]), float(c["end"])
+                )
+            else:
+                merged_typing.append(dict(c))
+        candidates = others + merged_typing
 
     candidates.sort(key=lambda c: (-int(c.get("priority", 0)), float(c["start"])))
     accepted: list[dict[str, Any]] = []
@@ -335,6 +383,8 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
             "enabled": True,
             "style": style_name,
             "no_whoosh": True,
+            "typing_enabled": typing_enabled,
+            "mg_enabled": mg_enabled,
             "keep_sec": round(keep_dur, 2),
             "counts": {
                 "total": len(out_sfx),
