@@ -174,6 +174,16 @@ export const CoverSchema = z.object({
         text: z.string(),
         start: z.number(),
         end: z.number(),
+        style: z.enum(["plain", "karaoke"]).optional(),
+        words: z
+          .array(
+            z.object({
+              text: z.string(),
+              start: z.number(),
+              end: z.number(),
+            }),
+          )
+          .optional(),
       }),
     )
     .default([]),
@@ -194,7 +204,15 @@ export const TimelineClipSchema = z.object({
   sourceOut: z.number(),
   fromSec: z.number(),
   durationSec: z.number(),
-  layout: z.enum(["full", "float_centered", "pip_corner"]).default("full"),
+  layout: z
+    .enum([
+      "full",
+      "float_centered",
+      "pip_corner",
+      "stack_top",
+      "stack_bottom",
+    ])
+    .default("full"),
   framing: FramingSchema.default("medium"),
   scale: z.number().default(1),
   motion: FramingMotionSchema.default("snap"),
@@ -290,6 +308,25 @@ export const TimelineSchema = z.object({
     .object({
       screenExplainer: ScreenExplainerSchema.optional(),
       overlays: OverlayStyleSchema.optional(),
+      profile: z.enum(["tutorial", "evidence", "social"]).optional(),
+      captions: z
+        .object({
+          style: z.enum(["off", "plain", "karaoke"]).optional(),
+          accent: z.string().optional(),
+          safeBottomRatio: z.number().optional(),
+        })
+        .optional(),
+      cta: z
+        .object({
+          enabled: z.boolean().optional(),
+          text: z.string().optional(),
+          blink: z.boolean().optional(),
+          blinkPeriodSec: z.number().optional(),
+          anchor: z.enum(["top_center", "top_left"]).optional(),
+          topCqh: z.number().optional(),
+          sizeCqh: z.number().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });

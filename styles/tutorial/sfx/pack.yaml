@@ -9,17 +9,17 @@ typing:
   tile_sec: 1.2
   min_hold_sec: 4.0
 shutter:
-  # House: D:\YT\SFX\SFX new\camera_shutter.mp3 (onset-trimmed)
-  file: shutter.mp3
+  # Deterministic dry two-stage shutter one-shot, stored with this pack.
+  file: shutter.wav
   volume: 0.38
   max_sec: 0.22
 click:
-  # House: D:\YT\SFX\SFX new\soft_tick.mp3 (trimmed)
+  # Deterministic dry UI clicks, stored with this pack.
   files:
-    - click_01.mp3
-    - click_02.mp3
-    - click_03.mp3
-    - click_04.mp3
+    - click_01.wav
+    - click_02.wav
+    - click_03.wav
+    - click_04.wav
   volume: 0.32
   max_sec: 0.22
 mg:

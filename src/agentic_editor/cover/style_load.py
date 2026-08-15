@@ -186,6 +186,33 @@ def load_sfx(style_name: str = "tutorial") -> dict[str, Any]:
     return cfg
 
 
+DEFAULT_SOCIAL: dict[str, Any] = {
+    # Portrait crops a 16:9 full-cam clip to roughly a third of its width, which
+    # reads as an extreme zoom. Keep every beat on the screen + cam PIP stage.
+    "force_screen_with_cam": True,
+    # Always-on pointer back to the long-form upload.
+    "cta": {
+        "enabled": True,
+        "text": "Full video di YouTube",
+        "blink": True,
+        "blinkPeriodSec": 1.2,
+        "anchor": "band_top_center",
+        "bandTopCqh": 3.2,
+        "sizeCqh": 2.0,
+    },
+}
+
+
+def load_social(style_name: str = "social") -> dict[str, Any]:
+    """Return portrait profile knobs (stage forcing)."""
+    cfg = _deep_merge({}, DEFAULT_SOCIAL)
+    parsed = _load_style_yaml(style_name)
+    social = parsed.get("social")
+    if isinstance(social, dict):
+        cfg = _deep_merge(cfg, social)
+    return cfg
+
+
 def sfx_pack_dir(style_name: str = "tutorial") -> Path:
     """Absolute path to styles/<style>/sfx (or pack override)."""
     cfg = load_sfx(style_name)

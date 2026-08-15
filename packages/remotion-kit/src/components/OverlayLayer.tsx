@@ -72,6 +72,8 @@ const Chapter: React.FC<{
   const left = style.chapter?.leftCqw ?? 4.5;
   const top = style.chapter?.topCqh ?? 12;
   const maxW = style.chapter?.maxWidthCqw ?? 42;
+  const kickerSize = style.chapter?.kickerSizeCqh ?? 2.4;
+  const titleSize = style.chapter?.titleSizeCqh ?? 9;
   return (
   <div
     style={{
@@ -88,7 +90,7 @@ const Chapter: React.FC<{
         <div
           style={{
             fontFamily: UI,
-            fontSize: Math.round(h * 0.024),
+            fontSize: Math.round(h * (kickerSize / 100)),
             fontWeight: 600,
             letterSpacing: "0.14em",
             textTransform: "uppercase",
@@ -103,7 +105,7 @@ const Chapter: React.FC<{
         style={{
           fontFamily: DISPLAY,
           fontWeight: 800,
-          fontSize: Math.round(h * 0.09),
+          fontSize: Math.round(h * (titleSize / 100)),
           lineHeight: 0.98,
           letterSpacing: "-0.03em",
         }}
@@ -131,14 +133,16 @@ const Emphasis: React.FC<{
   const tail = parts.slice(-1)[0] || ov.text || "";
   const left = style.emphasis?.leftCqw ?? 4.5;
   const bottom = style.emphasis?.bottomCqh ?? 28;
+  const top = style.emphasis?.topCqh;
   const sizeCqh = style.emphasis?.sizeCqh ?? 16;
+  const maxW = style.emphasis?.maxWidthCqw ?? 55;
   return (
     <div
       style={{
         position: "absolute",
         left: `${left}%`,
-        bottom: `${bottom}%`,
-        maxWidth: "55%",
+        ...(top != null ? { top: `${top}%` } : { bottom: `${bottom}%` }),
+        maxWidth: `${maxW}%`,
         color: style.ink,
         textShadow: "0 8px 28px rgba(0,0,0,0.55)",
       }}
@@ -361,6 +365,7 @@ const Callout: React.FC<{
 }> = ({ ov, style, h }) => {
   const left = style.callout?.leftCqw ?? 4.5;
   const bottom = style.callout?.bottomCqh ?? 22;
+  const top = style.callout?.topCqh;
   const valueSize = style.callout?.valueSizeCqh ?? 14;
   const sourceSize = style.callout?.sourceSizeCqh ?? 2.8;
   const maxW = style.callout?.maxWidthCqw ?? 48;
@@ -371,7 +376,7 @@ const Callout: React.FC<{
       style={{
         position: "absolute",
         left: `${left}%`,
-        bottom: `${bottom}%`,
+        ...(top != null ? { top: `${top}%` } : { bottom: `${bottom}%` }),
         maxWidth: `${maxW}%`,
         color: style.ink,
         textShadow: "0 8px 28px rgba(0,0,0,0.55)",

@@ -7,7 +7,12 @@ export type FramingMotion =
   | "ease_out"
   | "drift";
 
-export type ClipLayout = "full" | "float_centered" | "pip_corner";
+export type ClipLayout =
+  | "full"
+  | "float_centered"
+  | "pip_corner"
+  | "stack_top"
+  | "stack_bottom";
 
 export type WindowCropNorm = {
   x: number;
@@ -45,6 +50,12 @@ export type Caption = {
   text: string;
   start: number;
   end: number;
+  style?: "plain" | "karaoke";
+  words?: Array<{
+    text: string;
+    start: number;
+    end: number;
+  }>;
 };
 
 export type OverlayKind =
@@ -103,14 +114,19 @@ export type ScreenExplainerStyle = {
     presentation?: string;
     widthRatio?: number;
     maxHeightRatio?: number;
+    /** Portrait only: fraction of frame height from top to the screen card. */
+    topRatio?: number;
     borderRadiusPx?: number;
     objectFit?: string;
   };
   pip?: {
     anchor?: string;
     widthRatio?: number;
+    /** Stacked portrait: fraction of frame height for the host half. */
+    heightRatio?: number;
     aspectRatio?: string;
     insetRightRatio?: number;
+    insetLeftRatio?: number;
     insetBottomRatio?: number;
     borderRadiusPx?: number;
     border?: string;
@@ -138,7 +154,10 @@ export type OverlayStyle = {
   emphasis?: {
     leftCqw?: number;
     bottomCqh?: number;
+    /** When set, pin to top (letterbox top bar) instead of bottom. */
+    topCqh?: number;
     sizeCqh?: number;
+    maxWidthCqw?: number;
     underline?: boolean;
   };
   diagram?: {
@@ -150,6 +169,8 @@ export type OverlayStyle = {
   callout?: {
     leftCqw?: number;
     bottomCqh?: number;
+    /** When set, pin to top (letterbox top bar) instead of bottom. */
+    topCqh?: number;
     valueSizeCqh?: number;
     sourceSizeCqh?: number;
     maxWidthCqw?: number;
@@ -185,6 +206,20 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
   chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4 },
 };
 
+/** Persistent call-to-action badge (social profile). */
+export type CtaBadgeStyle = {
+  enabled?: boolean;
+  text?: string;
+  blink?: boolean;
+  blinkPeriodSec?: number;
+  /** band_top_center = sit on the letterbox 16:9 stage (Option A). */
+  anchor?: "top_center" | "top_left" | "band_top_center";
+  topCqh?: number;
+  /** Inset from the top edge of the 16:9 band when anchor is band_top_center. */
+  bandTopCqh?: number;
+  sizeCqh?: number;
+};
+
 export type Timeline = {
   fps: number;
   width: number;
@@ -200,6 +235,13 @@ export type Timeline = {
   presentation?: {
     screenExplainer?: ScreenExplainerStyle;
     overlays?: OverlayStyle;
+    profile?: "tutorial" | "evidence" | "social";
+    captions?: {
+      style?: "off" | "plain" | "karaoke";
+      accent?: string;
+      safeBottomRatio?: number;
+    };
+    cta?: CtaBadgeStyle;
   };
 };
 

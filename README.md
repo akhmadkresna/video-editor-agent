@@ -77,6 +77,8 @@ Default ASR language is **Indonesian** (`asr.language: id`); override per episod
 | `ae mezzanine .` | Deliverable proxies → `edit/mezzanine/` (raw untouched) |
 | `ae compose . [--studio]` | Remotion preview / render |
 | `ae qa .` | Cut-boundary frames in `edit/verify/` |
+| `ae social . [--studio]` | Separate 1080×1920 karaoke cut from `edit/social/` |
+| `ae social . --qa` | Representative portrait frames in `edit/social/verify/` |
 | `ae promote-check .` | Show `edit/promotions.md` |
 
 ---

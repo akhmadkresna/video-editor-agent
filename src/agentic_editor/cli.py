@@ -23,26 +23,35 @@ from agentic_editor.compose import (
     run_studio,
 )
 from agentic_editor.compose.mezzanine import build_mezzanines
-from agentic_editor.cover import example_cover, write_timeline
-from agentic_editor.cover import build_timeline_from_edl_and_cover
-from agentic_editor.cover.suggest import suggest_cover, write_cover_suggest
+from agentic_editor.cover import (
+    build_timeline_from_edl_and_cover,
+    example_cover,
+    write_timeline,
+)
+from agentic_editor.cover.evidence_suggest import (
+    apply_evidence_events,
+    suggest_evidence_events,
+)
 from agentic_editor.cover.overlay_suggest import suggest_overlays, write_overlay_suggest
 from agentic_editor.cover.sfx_suggest import (
     merge_sfx_into_cover,
     suggest_sfx,
     write_sfx_suggest,
 )
-from agentic_editor.cover.evidence_suggest import (
-    apply_evidence_events,
-    suggest_evidence_events,
-)
-from agentic_editor.preprod import build_brief, gather_evidence, write_brief_bundle
 from agentic_editor.cover.style_load import load_overlays, load_screen_explainer
+from agentic_editor.cover.suggest import suggest_cover, write_cover_suggest
 from agentic_editor.editor.edl import example_edl, load_edl
 from agentic_editor.editor.qa import qa_episode_preview
 from agentic_editor.editor.render import render_edl
 from agentic_editor.paths import framework_home, resolve_episode
+from agentic_editor.preprod import build_brief, gather_evidence, write_brief_bundle
 from agentic_editor.project import load_project, resolve_source
+from agentic_editor.social import (
+    prepare_social,
+    qa_social,
+    render_social,
+    run_social_studio,
+)
 
 
 def cmd_doctor(_: argparse.Namespace) -> int:
@@ -631,6 +640,30 @@ def cmd_compose(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_social(args: argparse.Namespace) -> int:
+    """Prepare, preview, or render the confirmed 9:16 social cut."""
+    episode = resolve_episode(args.episode)
+    if args.qa:
+        verify = qa_social(episode)
+        print(f"Social QA frames ready: {verify}")
+        return 0
+    if args.studio:
+        run_social_studio(episode)
+        return 0
+    if args.prepare_only:
+        props = prepare_social(episode)
+        print(f"Social props ready: {props}")
+        return 0
+    out = render_social(
+        episode,
+        output=Path(args.output) if args.output else None,
+        nvenc=bool(args.nvenc),
+        gl=args.gl,
+    )
+    print(f"Wrote {out}")
+    return 0
+
+
 def cmd_draft(args: argparse.Namespace) -> int:
     """Prepare a first-N-seconds draft with quality gates; optionally render."""
     episode = resolve_episode(args.episode)
@@ -890,6 +923,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Chrome GL backend for faster frame render (Windows: try angle)",
     )
     com.set_defaults(func=cmd_compose)
+
+    social = sub.add_parser(
+        "social",
+        help="Prepare / preview / render edit/social as a 1080x1920 karaoke short",
+    )
+    social.add_argument("episode", nargs="?", default=".")
+    social.add_argument("--studio", action="store_true")
+    social.add_argument("--qa", action="store_true", help="Extract five representative QA frames")
+    social.add_argument("--prepare-only", action="store_true")
+    social.add_argument("-o", "--output")
+    social.add_argument("--nvenc", action="store_true")
+    social.add_argument(
+        "--gl",
+        choices=("angle", "egl", "swiftshader", "vulkan", "angle-egl"),
+        default=None,
+    )
+    social.set_defaults(func=cmd_social)
 
     dr = sub.add_parser(
         "draft",

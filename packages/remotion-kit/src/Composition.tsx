@@ -11,8 +11,10 @@ import { SourceClip } from "./components/SourceClip";
 import { CaptionLayer } from "./components/CaptionLayer";
 import { OverlayLayer } from "./components/OverlayLayer";
 import { SfxLayer } from "./components/SfxLayer";
+import { CtaBadge } from "./components/CtaBadge";
 import { MissingTimelineBanner } from "./components/MissingTimelineBanner";
 import { DEFAULT_OVERLAY_STYLE, DEFAULT_SCREEN_EXPLAINER, type TimelineProps } from "./types";
+import { isLetterboxPresentation } from "./letterbox";
 
 function looksLikeEmptyTimeline(timeline: TimelineProps["timeline"]): string | null {
   const clips = timeline?.clips || [];
@@ -37,6 +39,9 @@ function looksLikeEmptyTimeline(timeline: TimelineProps["timeline"]): string | n
 function canvasBackground(timeline: TimelineProps["timeline"]): string {
   const se =
     timeline.presentation?.screenExplainer || DEFAULT_SCREEN_EXPLAINER;
+  if (isLetterboxPresentation(se.screen?.presentation) || se.preset === "social_letterbox") {
+    return se.canvas?.background || "#000000";
+  }
   const bg = se.canvas?.background || DEFAULT_SCREEN_EXPLAINER.canvas!.background!;
   const deep =
     se.canvas?.backgroundDeep || DEFAULT_SCREEN_EXPLAINER.canvas!.backgroundDeep!;
@@ -156,10 +161,17 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
         );
       })}
 
-      <CaptionLayer captions={timeline.captions || []} />
+      <CaptionLayer
+        captions={timeline.captions || []}
+        presentation={timeline.presentation?.captions}
+      />
       <OverlayLayer
         overlays={timeline.overlays || []}
         styleTokens={timeline.presentation?.overlays || DEFAULT_OVERLAY_STYLE}
+      />
+      <CtaBadge
+        cta={timeline.presentation?.cta}
+        screenExplainer={screenExplainer}
       />
       <SfxLayer sfx={timeline.sfx || []} />
     </AbsoluteFill>

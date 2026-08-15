@@ -233,6 +233,13 @@ def build_timeline_from_edl_and_cover(
     float_presentation = str(
         (se.get("screen") or {}).get("presentation") or "float_centered"
     )
+    # Remotion clip.layout is a fixed enum; letterbox is a screen presentation mode
+    # carried on presentation.screenExplainer, not on each clip.
+    float_layout = (
+        "float_centered"
+        if float_presentation in ("letterbox_landscape", "letterbox")
+        else float_presentation
+    )
 
     from agentic_editor.cover.remap import build_timeline_overlays, build_timeline_sfx
     from agentic_editor.cover.suggest import load_cam_words
@@ -295,10 +302,10 @@ def build_timeline_from_edl_and_cover(
             if evidence_visual:
                 visual_src = str(part.get("src_key") or "cam")
                 ev_layout = str(part.get("layout") or "float")
-                layout = float_presentation if ev_layout == "float" else "full"
+                layout = float_layout if ev_layout == "float" else "full"
             elif screen_visual:
                 visual_src = "screen"
-                layout = float_presentation
+                layout = float_layout
             else:
                 visual_src = str(r["source"])
                 layout = "full"

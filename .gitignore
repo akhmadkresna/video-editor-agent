@@ -4,6 +4,7 @@ out/
 .turbo/
 *.mp4
 *.wav
+!styles/**/sfx/*.wav
 *.mov
 !templates/**/.gitkeep
 .DS_Store
@@ -28,4 +29,5 @@ models/*
 coverage/
 *.log
 .ae-cache/
+.artifacts/
 packages/remotion-kit/public/ae-media/

@@ -73,8 +73,29 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
       `#7dd3fc`, Rp title from public estimators (SocialCounts-high preferred), evidence
       screenshot background, export **1280×720**.
     Agents must not redesign per episode.
+13. **Portrait social cut:** never mutate the confirmed long-form EDL/cover.
+    After confirming the short strategy, write sibling `edit/social/edl.json` and
+    `edit/social/cover.json`. Use `ae social . --studio` or `ae social .` for a
+    separate 1080×1920 output with word-remapped karaoke captions. Run
+    `ae social . --qa` before handoff.
+    **Never full-cam in portrait:** cropping 16:9 to 9:16 keeps about a third of
+    the width, so the host reads as an extreme zoom. `ae social` forces
+    `screen_with_cam` on every keep (`styles/social/style.md`
+    `social.force_screen_with_cam`); do not hand-author full-cam social ranges.
+    Cam audio still comes from the PIP clip, and framing/punch events are inert
+    on the stage — leave `events: []` unless an episode has no screen source.
+    Top-anchored MG (chapter/chip/diagram) sits in the left band below the
+    screen; keep it clear of the right-side PIP. Click/shutter only; no whoosh.
 
 ## Process
+
+### TikTok / Reels / Shorts (`edit/social`)
+
+1. Pick one marketing promise and 1–2 proof moments from `takes_packed.md`.
+2. Propose the 30–60s radio-edit and **wait for confirmation**.
+3. Write word-snapped `edit/social/edl.json` + source-time `cover.json`.
+4. `ae social . --studio` for review, then `ae social .` to render.
+5. `ae social . --qa` and inspect opening, proof, karaoke, and CTA frames.
 
 ### Evidence series (`style: evidence`) — start here
 

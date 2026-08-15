@@ -16,6 +16,7 @@ import type {
   WindowCropNorm,
 } from "../types";
 import { DEFAULT_SCREEN_EXPLAINER } from "../types";
+import { isLetterboxPresentation, letterboxBand } from "../letterbox";
 
 type Props = {
   src: string;
@@ -194,27 +195,73 @@ export const SourceClip: React.FC<Props> = ({
   const se = screenExplainer || DEFAULT_SCREEN_EXPLAINER;
   const screenCfg = { ...DEFAULT_SCREEN_EXPLAINER.screen, ...se.screen };
   const pipCfg = { ...DEFAULT_SCREEN_EXPLAINER.pip, ...se.pip };
+  const portrait = height > width;
 
   if (layout === "pip_corner") {
-    const pipW = Math.round(width * (pipCfg.widthRatio ?? 0.18));
+    const letterbox = isLetterboxPresentation(screenCfg.presentation);
+    const band = letterbox
+      ? letterboxBand(width, height, screenCfg.widthRatio ?? 1)
+      : null;
+    const pipW = Math.round(
+      width * (pipCfg.widthRatio ?? (portrait ? (letterbox ? 0.22 : 0.36) : 0.18)),
+    );
     const pipH = Math.round(pipW * 1.25); // 4:5
-    const right = Math.round(width * (pipCfg.insetRightRatio ?? 0.035));
-    const bottom = Math.round(height * (pipCfg.insetBottomRatio ?? 0.045));
+    const anchor = (pipCfg.anchor || "stage_lower_right").toLowerCase();
+    const pinLeft = anchor.includes("left");
     const radius = pipCfg.borderRadiusPx ?? 14;
+
+    let left: number | undefined;
+    let right: number | undefined;
+    let bottom: number | undefined;
+    let top: number | undefined;
+
+    if (band && (anchor.includes("band") || letterbox)) {
+      // Option A: cam sits on the 16:9 stage, bottom-left of the landscape band.
+      const insetX = Math.round(
+        band.bandW * (pipCfg.insetLeftRatio ?? pipCfg.insetRightRatio ?? 0.02),
+      );
+      const insetY = Math.round(
+        band.bandH * (pipCfg.insetBottomRatio ?? 0.03),
+      );
+      left = pinLeft || !anchor.includes("right")
+        ? band.left + insetX
+        : undefined;
+      right = !pinLeft && anchor.includes("right")
+        ? width - (band.left + band.bandW) + insetX
+        : undefined;
+      if (left == null && right == null) {
+        left = band.left + insetX;
+      }
+      top = band.top + band.bandH - pipH - insetY;
+    } else {
+      bottom = Math.round(
+        height * (pipCfg.insetBottomRatio ?? (portrait ? 0.29 : 0.045)),
+      );
+      const sideInset = Math.round(
+        width *
+          (pinLeft
+            ? (pipCfg.insetLeftRatio ?? pipCfg.insetRightRatio ?? 0.04)
+            : (pipCfg.insetRightRatio ?? 0.035)),
+      );
+      if (pinLeft) left = sideInset;
+      else right = sideInset;
+    }
+
     return (
       <AbsoluteFill>
         <div
           style={{
             position: "absolute",
-            right,
-            bottom,
+            ...(left != null ? { left } : {}),
+            ...(right != null ? { right } : {}),
+            ...(top != null ? { top } : {}),
+            ...(bottom != null ? { bottom } : {}),
             width: pipW,
             height: pipH,
             borderRadius: radius,
             overflow: "hidden",
             boxShadow:
               "0 22px 44px rgba(18, 24, 32, 0.32), 0 6px 14px rgba(18, 24, 32, 0.18)",
-            // border: none (locked)
             background: "#0a0a0a",
           }}
         >
@@ -237,6 +284,38 @@ export const SourceClip: React.FC<Props> = ({
   }
 
   if (layout === "float_centered") {
+    const letterbox = isLetterboxPresentation(screenCfg.presentation);
+    if (letterbox) {
+      const band = letterboxBand(width, height, screenCfg.widthRatio ?? 1);
+      const radius = screenCfg.borderRadiusPx ?? 0;
+      const fit = (screenCfg.objectFit as string | undefined) ?? "cover";
+      return (
+        <AbsoluteFill style={{ background: "#000" }}>
+          <div
+            style={{
+              position: "absolute",
+              left: band.left,
+              top: band.top,
+              width: band.bandW,
+              height: band.bandH,
+              borderRadius: radius,
+              overflow: "hidden",
+              background: "#141414",
+            }}
+          >
+            <CroppedVideo
+              src={resolvedSrc}
+              startFrom={startFrom}
+              volume={vol}
+              liveScale={liveScale}
+              transformOrigin="center center"
+              windowCrop={windowCrop}
+              objectFit={fit}
+            />
+          </div>
+        </AbsoluteFill>
+      );
+    }
     const widthRatio = screenCfg.widthRatio ?? 0.78;
     const maxH = height * (screenCfg.maxHeightRatio ?? 0.82);
     const floatW = Math.round(width * widthRatio);
@@ -250,16 +329,17 @@ export const SourceClip: React.FC<Props> = ({
     }
     const radius = screenCfg.borderRadiusPx ?? 24;
     const fit = (screenCfg.objectFit as string | undefined) ?? "cover";
+    const topRatio = screenCfg.topRatio ?? 0.08;
     return (
       <AbsoluteFill>
         <div
           style={{
             position: "absolute",
             left: "50%",
-            top: "50%",
+            top: portrait ? `${Math.round(topRatio * 1000) / 10}%` : "50%",
             width: floatW,
             height: floatH,
-            transform: "translate(-50%, -50%)",
+            transform: portrait ? "translateX(-50%)" : "translate(-50%, -50%)",
             borderRadius: radius,
             overflow: "hidden",
             boxShadow:
