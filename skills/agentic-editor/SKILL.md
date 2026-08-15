@@ -64,6 +64,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 12. **Series YouTube thumbnails:**
     - `series: odoo-studio-agentic-ai` → `styles/series/odoo-studio-agentic-ai/thumbnail.md`
       (+ `refs/*-canonical.png`). Accent `#3dbff3`, export **1280×720**.
+      **Plate + draw (required):** never ask an image generator for the finished thumb —
+      it drifts on alignment and crops the head. Generate a **text-free plate** (host +
+      studio room behind him; darkened Odoo UI only on left/edges), then
+      `uv run python styles/series/odoo-studio-agentic-ai/build_thumbnail.py` (canonical
+      metrics + fonts in that folder). Top-crop plates to 16:9 (never centre-crop).
     - `series: ai-youtube-idr` → `styles/series/ai-youtube-idr/thumbnail.md`. Accent
       `#7dd3fc`, Rp title from public estimators (SocialCounts-high preferred), evidence
       screenshot background, export **1280×720**.

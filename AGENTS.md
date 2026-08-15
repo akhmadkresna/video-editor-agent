@@ -26,6 +26,10 @@ editing rules.
   kit resolve. Episodes are thin folders (`project.yaml` + `raw/` + `edit/`) that live
   *outside* this repo.
 
+### Git (this framework only)
+- Commit and push framework changes **directly on `main`**. Do not open a feature /
+  cursor branch or PR unless the user explicitly asks for a new branch.
+
 ### First-run network downloads (cached afterward)
 - `ae ingest` uses **faster-whisper**, which downloads model weights from HuggingFace on
   first use (cached in `~/.cache/huggingface`). For quick smoke tests set `asr.model: tiny`
