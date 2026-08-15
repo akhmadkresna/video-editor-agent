@@ -114,6 +114,13 @@ parts:
     payoff: "1 FREE APP"
     chips: [Sales, Cart, Stock]
     # bg: product kanban with "Tambah ke Keranjang" + Kasir menu (sales/cashier build)
+  4:
+    badge: "PART 4"
+    title: ["AI BUILDS", "ODOO BOOKS"]
+    payoff: "1 FREE APP"
+    chips: [Cash, "P&L", KPI]
+    # bg: Dashboard Toko Material — saldo kas / omzet / laba / piutang tiles
+  # Keep title line_b at 10 characters or fewer, or it runs into the host.
 ```
 
 ## Agent checklist (every new part)

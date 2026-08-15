@@ -129,6 +129,23 @@ def icon(draw, kind: str, x: int, y: int, s: int, col, wd: int = 3) -> None:
         for i in range(3):
             gy = y + 6 + i * 10
             draw.line([(x + 2, gy), (x + s - 2, gy)], fill=col, width=wd)
+    elif kind == "chart":
+        draw.line([(x + 2, y + 2), (x + 2, y + s - 3), (x + s - 1, y + s - 3)], fill=col, width=wd)
+        for i, bh in enumerate((10, 18, 26)):
+            bx = x + 9 + i * 8
+            draw.line([(bx, y + s - 5), (bx, y + s - 5 - bh)], fill=col, width=5)
+    elif kind == "receipt":
+        draw.rounded_rectangle(
+            [x + 4, y + 1, x + s - 4, y + s - 1], radius=3, outline=col, width=wd
+        )
+        for i in range(3):
+            gy = y + 9 + i * 7
+            draw.line([(x + 10, gy), (x + s - 10, gy)], fill=col, width=2)
+    elif kind == "pie":
+        draw.ellipse([x + 2, y + 2, x + s - 2, y + s - 2], outline=col, width=wd)
+        mid = s // 2
+        draw.line([(x + mid, y + mid), (x + mid, y + 2)], fill=col, width=wd)
+        draw.line([(x + mid, y + mid), (x + s - 2, y + mid)], fill=col, width=wd)
     else:
         draw.rounded_rectangle([x, y + 4, x + s, y + s - 4], radius=4, outline=col, width=wd)
 
@@ -245,7 +262,7 @@ def main() -> None:
         action="append",
         default=[],
         metavar="ICON=LABEL",
-        help="Repeat exactly 3 times. ICON: cart, basket, box, menu",
+        help="Repeat exactly 3 times. ICON: cart, basket, box, menu, chart, receipt, pie",
     )
     p.add_argument("--scrim", type=int, default=95, help="Left darkening strength (0-255)")
     args = p.parse_args()
