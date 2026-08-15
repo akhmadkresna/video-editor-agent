@@ -21,6 +21,61 @@ from agentic_editor.project import load_project, resolve_source
 _ABS_PATH = re.compile(r"^(?:/|[A-Za-z]:[\\/]|\\\\)")
 
 
+def probe_video_aspect(path: Path) -> float | None:
+    """Return width/height from ffprobe, or None if unavailable."""
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        line = (proc.stdout or "").strip().splitlines()[:1]
+        if not line:
+            return None
+        parts = line[0].split(",")
+        if len(parts) < 2:
+            return None
+        w, h = float(parts[0]), float(parts[1])
+        return w / h if w > 0 and h > 0 else None
+    except Exception:
+        return None
+
+
+def apply_screen_aspect(
+    screen_explainer: dict[str, Any],
+    screen_path: Path | str | None,
+    *,
+    verbose: bool = False,
+) -> dict[str, Any]:
+    """Stamp screen.mp4 AR onto explainer so the float card fits without distorting."""
+    if not screen_path:
+        return screen_explainer
+    path = Path(screen_path)
+    if not path.is_file():
+        return screen_explainer
+    ar = probe_video_aspect(path)
+    if not ar:
+        return screen_explainer
+    screen = dict(screen_explainer.get("screen") or {})
+    screen["aspectRatio"] = round(ar, 6)
+    out = {**screen_explainer, "screen": screen}
+    if verbose:
+        print(f"• screen card AR ← {path.name} ({ar:.5f})")
+    return out
+
+
 def remotion_kit_dir() -> Path:
     return framework_home() / "packages" / "remotion-kit"
 
@@ -215,6 +270,16 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
 
     style_name = str(cfg.get("style") or "tutorial")
     screen_explainer = load_screen_explainer(style_name)
+    ep_se = cfg.get("screen_explainer")
+    if isinstance(ep_se, dict):
+        from agentic_editor.cover.style_load import _deep_merge
+
+        screen_explainer = _deep_merge(screen_explainer, ep_se)
+    # Card AR from screen pixels (fit/center only — no distort).
+    screen_path = abs_sources.get("screen") or compose_sources.get("screen")
+    screen_explainer = apply_screen_aspect(
+        screen_explainer, screen_path, verbose=verbose
+    )
     overlays = load_overlays(style_name)
 
     timeline = build_timeline_from_edl_and_cover(

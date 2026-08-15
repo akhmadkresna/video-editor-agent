@@ -104,7 +104,12 @@ export type ScreenExplainerStyle = {
     widthRatio?: number;
     maxHeightRatio?: number;
     borderRadiusPx?: number;
+    /** width/height of screen.mp4 — card fits this AR (no distort). */
+    aspectRatio?: number;
     objectFit?: string;
+    crop?: {
+      mode?: "none" | "smart_window_detect";
+    };
   };
   pip?: {
     anchor?: string;
@@ -234,7 +239,8 @@ export const DEFAULT_SCREEN_EXPLAINER: ScreenExplainerStyle = {
     widthRatio: 0.78,
     maxHeightRatio: 0.82,
     borderRadiusPx: 24,
-    objectFit: "cover",
+    objectFit: "fill",
+    crop: { mode: "none" },
   },
   pip: {
     anchor: "stage_lower_right",

@@ -86,7 +86,7 @@ DEFAULT_SCREEN_EXPLAINER: dict[str, Any] = {
         "maxHeightRatio": 0.82,
         "borderRadiusPx": 24,
         "shadow": "soft_float",
-        "objectFit": "cover",
+        "objectFit": "fill",
         "crop": {
             "mode": "none",
         },
