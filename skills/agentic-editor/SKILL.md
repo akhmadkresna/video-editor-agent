@@ -235,6 +235,41 @@ Framing presets simulate a 2–3 camera setup from one cam. Propose a camera-pla
 
 **Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + soft round (`borderRadiusPx: 24`) + `crop.mode: none`. Host supplies clean full-frame screen; do not run smart window detect. Optional static `crop.inset` only for tiny capture-edge trash. PIP anchors to the **frame** lower-right.
 
+### Generated MG cutaways (`cover.cutaways[]`)
+
+A cutaway is a **generated scene that takes over the picture** for a few seconds
+while cam VO keeps playing (cam clips stay mounted underneath — never mute them).
+Not B-roll footage, not a text overlay.
+
+```json
+{
+  "cutaways": [
+    {
+      "scene": "ledger_flow",
+      "start": 406.4,
+      "end": 427.6,
+      "kicker": "Buku kas",
+      "title": "Tercatat otomatis",
+      "openingBalance": 1200000,
+      "feeds": [{ "label": "Penjualan", "amount": 4850000, "at": 412.94 }],
+      "cues": { "ledgerIn": 406.54, "balance": 416.52, "lock": 419.74,
+                "attempts": [422.34, 423.02], "stamp": 425.96 }
+    }
+  ]
+}
+```
+
+Rules:
+
+- Times are **cam source seconds** (like overlays); `ae cover` remaps to output
+  `fromSec` and converts every cue to a scene-local second.
+- Snap each cue to the word that earns it — a beat that fires off-word reads worse
+  than no scene at all.
+- Scenes are **framework components** (`packages/remotion-kit/src/components/cutaway/`).
+  Add a scene there + to `CutawaySceneSchema`; never fork a scene into `edit/`.
+- Preview cue timing without media: `CutawayLab` composition
+  (`npx remotion still src/index.ts CutawayLab out.png --frame=N`).
+
 ## Promote
 
 Append to `edit/promotions.md`, then patch framework packages and re-preview.

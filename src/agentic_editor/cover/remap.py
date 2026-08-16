@@ -109,6 +109,168 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
     return out
 
 
+CUTAWAY_SCENES = frozenset({"ledger_flow"})
+
+_CUTAWAY_CUE_KEYS = {
+    "ledgerIn": "ledgerInSec",
+    "inOut": "inOutSec",
+    "balance": "balanceSec",
+    "lock": "lockSec",
+    "stamp": "stampSec",
+}
+
+
+def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Generated MG cutaway scenes live on cover.cutaways[] (cam source time)."""
+    if not cover:
+        return []
+    out: list[dict[str, Any]] = []
+    for i, item in enumerate(cover.get("cutaways") or []):
+        if not isinstance(item, dict):
+            continue
+        scene = str(item.get("scene") or "").lower().strip()
+        if scene not in CUTAWAY_SCENES:
+            continue
+        try:
+            start = float(item["start"])
+            end = float(item["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end <= start:
+            continue
+        entry: dict[str, Any] = {
+            "id": str(item.get("id") or f"cut-{scene}-{i}"),
+            "scene": scene,
+            "start": start,
+            "end": end,
+            "source": str(item.get("source") or "cam"),
+        }
+        for key in (
+            "kicker",
+            "title",
+            "inLabel",
+            "outLabel",
+            "lockLabel",
+            "stampLabel",
+            "balanceLabel",
+            "note",
+        ):
+            val = str(item.get(key) or "").strip()
+            if val:
+                entry[key] = val
+        if item.get("openingBalance") is not None:
+            try:
+                entry["openingBalance"] = float(item["openingBalance"])
+            except (TypeError, ValueError):
+                pass
+        labels = item.get("attemptLabels")
+        if isinstance(labels, list):
+            entry["attemptLabels"] = [str(x) for x in labels if str(x).strip()]
+        feeds: list[dict[str, Any]] = []
+        for f in item.get("feeds") or []:
+            if not isinstance(f, dict):
+                continue
+            try:
+                feeds.append(
+                    {
+                        "label": str(f.get("label") or "").strip(),
+                        "amount": float(f["amount"]),
+                        "at": float(f["at"]),
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        if feeds:
+            entry["feeds"] = feeds
+        cues = item.get("cues")
+        if isinstance(cues, dict):
+            entry["cues"] = cues
+        out.append(entry)
+    return out
+
+
+def build_timeline_cutaways(
+    edl: dict[str, Any],
+    cover: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Remap cover.cutaways[] to output time; cues become scene-local seconds.
+
+    Scene beats are authored in cam source seconds (word-snapped, like
+    overlays) and converted to offsets from the scene start so a Remotion
+    scene never needs to know about the EDL.
+    """
+    timeline_dur = edl_keep_duration_sec(edl)
+    out: list[dict[str, Any]] = []
+    for cut in collect_cutaway_defs(cover):
+        source = str(cut.get("source") or "cam")
+        start = float(cut["start"])
+        slices = remap_source_window(edl, start, float(cut["end"]), source=source)
+        sl = _pick_best_slice(slices)
+        if sl is None:
+            continue
+        from_sec = float(sl["fromSec"])
+        dur = min(float(sl["durationSec"]), max(0.05, timeline_dur - from_sec))
+        entry: dict[str, Any] = {
+            "id": cut["id"],
+            "scene": cut["scene"],
+            "fromSec": round(from_sec, 3),
+            "durationSec": round(dur, 3),
+        }
+        for key in (
+            "kicker",
+            "title",
+            "inLabel",
+            "outLabel",
+            "lockLabel",
+            "stampLabel",
+            "balanceLabel",
+            "attemptLabels",
+            "openingBalance",
+            "note",
+        ):
+            if key in cut:
+                entry[key] = cut[key]
+        # Source-time cue → local second inside the scene.
+        def local(src_sec: float) -> float:
+            return round(max(0.0, min(dur, float(src_sec) - start)), 3)
+
+        feeds = []
+        for f in cut.get("feeds") or []:
+            feeds.append(
+                {
+                    "label": f["label"],
+                    "amount": f["amount"],
+                    "atSec": local(f["at"]),
+                }
+            )
+        if feeds:
+            entry["feeds"] = feeds
+        raw_cues = cut.get("cues") or {}
+        cues: dict[str, Any] = {}
+        for src_key, out_key in _CUTAWAY_CUE_KEYS.items():
+            if raw_cues.get(src_key) is None:
+                continue
+            try:
+                cues[out_key] = local(float(raw_cues[src_key]))
+            except (TypeError, ValueError):
+                continue
+        attempts = raw_cues.get("attempts")
+        if isinstance(attempts, list):
+            vals = []
+            for a in attempts:
+                try:
+                    vals.append(local(float(a)))
+                except (TypeError, ValueError):
+                    continue
+            if vals:
+                cues["attemptSec"] = vals
+        if cues:
+            entry["cues"] = cues
+        out.append(entry)
+    out.sort(key=lambda x: float(x["fromSec"]))
+    return out
+
+
 def _pick_best_slice(slices: list[dict[str, float]]) -> dict[str, float] | None:
     """One instance per overlay: longest preferred slice; sole short slice kept."""
     if not slices:

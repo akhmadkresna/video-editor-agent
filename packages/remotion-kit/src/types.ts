@@ -89,6 +89,46 @@ export type TimelineOverlay = {
   note?: string;
 };
 
+/** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
+export type CutawayScene = "ledger_flow";
+
+export type CutawayFeed = {
+  label: string;
+  /** Signed rupiah amount, e.g. 4850000 / -250000. */
+  amount: number;
+  /** Local second (relative to cutaway start) when this feed fires. */
+  atSec: number;
+};
+
+export type TimelineCutaway = {
+  id: string;
+  scene: CutawayScene;
+  fromSec: number;
+  durationSec: number;
+  kicker?: string;
+  title?: string;
+  /** Ledger opening balance in rupiah. */
+  openingBalance?: number;
+  feeds?: CutawayFeed[];
+  /** Local seconds for scene beats — word-snapped upstream. */
+  cues?: {
+    ledgerInSec?: number;
+    inOutSec?: number;
+    balanceSec?: number;
+    lockSec?: number;
+    /** Rejected edit/delete attempts. */
+    attemptSec?: number[];
+    stampSec?: number;
+  };
+  inLabel?: string;
+  outLabel?: string;
+  lockLabel?: string;
+  attemptLabels?: string[];
+  stampLabel?: string;
+  balanceLabel?: string;
+  note?: string;
+};
+
 /** Additive SFX under cam VO (output time after EDL remap). */
 export type TimelineSfx = {
   id: string;
@@ -236,6 +276,7 @@ export type Timeline = {
   effects: PunchEffect[];
   captions: Caption[];
   overlays?: TimelineOverlay[];
+  cutaways?: TimelineCutaway[];
   sfx?: TimelineSfx[];
   presentation?: {
     screenExplainer?: ScreenExplainerStyle;
@@ -265,6 +306,7 @@ export const emptyTimeline: Timeline = {
   effects: [],
   captions: [],
   overlays: [],
+  cutaways: [],
   sfx: [],
 };
 

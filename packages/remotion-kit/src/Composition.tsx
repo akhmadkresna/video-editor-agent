@@ -9,6 +9,7 @@ import {
 } from "remotion";
 import { SourceClip } from "./components/SourceClip";
 import { CaptionLayer } from "./components/CaptionLayer";
+import { CutawayLayer } from "./components/CutawayLayer";
 import { OverlayLayer } from "./components/OverlayLayer";
 import { SfxLayer } from "./components/SfxLayer";
 import { CtaBadge } from "./components/CtaBadge";
@@ -160,6 +161,8 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
           </Sequence>
         );
       })}
+
+      <CutawayLayer cutaways={timeline.cutaways} />
 
       <CaptionLayer
         captions={timeline.captions || []}

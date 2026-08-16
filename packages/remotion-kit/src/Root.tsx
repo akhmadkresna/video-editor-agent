@@ -1,6 +1,7 @@
 import React from "react";
 import { Composition, getInputProps } from "remotion";
 import { AgenticTimeline } from "./Composition";
+import { CutawayLab, LAB_CUTAWAY } from "./CutawayLab";
 import type { TimelineProps } from "./types";
 import { emptyTimeline } from "./types";
 
@@ -41,6 +42,15 @@ export const RemotionRoot: React.FC = () => {
             height: t.height || 1080,
           };
         }}
+      />
+      <Composition
+        id="CutawayLab"
+        component={CutawayLab}
+        durationInFrames={Math.round(LAB_CUTAWAY.durationSec * 30)}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ cutaway: LAB_CUTAWAY }}
       />
     </>
   );

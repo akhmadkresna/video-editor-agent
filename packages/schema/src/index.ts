@@ -130,6 +130,47 @@ export const CoverOverlaySchema = z.object({
   note: z.string().optional(),
 });
 
+/** Generated MG cutaway scenes (picture takeover under cam VO), source-time. */
+export const CutawaySceneSchema = z.enum(["ledger_flow"]);
+
+export const CutawayFeedSchema = z.object({
+  label: z.string(),
+  /** Signed rupiah amount. */
+  amount: z.number(),
+  /** Cam source second when this feed fires (word-snapped). */
+  at: z.number(),
+});
+
+export const CoverCutawaySchema = z.object({
+  id: z.string().optional(),
+  scene: CutawaySceneSchema,
+  start: z.number(),
+  end: z.number(),
+  source: z.string().default("cam"),
+  kicker: z.string().optional(),
+  title: z.string().optional(),
+  openingBalance: z.number().optional(),
+  feeds: z.array(CutawayFeedSchema).optional(),
+  /** Scene beats in cam source seconds. */
+  cues: z
+    .object({
+      ledgerIn: z.number().optional(),
+      inOut: z.number().optional(),
+      balance: z.number().optional(),
+      lock: z.number().optional(),
+      attempts: z.array(z.number()).optional(),
+      stamp: z.number().optional(),
+    })
+    .optional(),
+  inLabel: z.string().optional(),
+  outLabel: z.string().optional(),
+  lockLabel: z.string().optional(),
+  attemptLabels: z.array(z.string()).optional(),
+  stampLabel: z.string().optional(),
+  balanceLabel: z.string().optional(),
+  note: z.string().optional(),
+});
+
 /** Modern-tech SFX under cam VO — no whoosh. Source-time on cover. */
 export const SfxKindSchema = z.enum(["typing", "shutter", "click"]);
 
@@ -166,6 +207,8 @@ export const CoverSchema = z.object({
   events: z.array(CoverEventSchema).default([]),
   /** Sparse MG creatives in cam source time — confirm before write. */
   overlays: z.array(CoverOverlaySchema).default([]),
+  /** Generated MG cutaway scenes in cam source time — confirm before write. */
+  cutaways: z.array(CoverCutawaySchema).default([]),
   /** Additive SFX under cam VO (source-time). */
   sfx: z.array(CoverSfxSchema).default([]),
   captions: z
@@ -303,6 +346,45 @@ export const TimelineSchema = z.object({
     )
     .default([]),
   overlays: z.array(TimelineOverlaySchema).default([]),
+  cutaways: z
+    .array(
+      z.object({
+        id: z.string(),
+        scene: CutawaySceneSchema,
+        fromSec: z.number(),
+        durationSec: z.number(),
+        kicker: z.string().optional(),
+        title: z.string().optional(),
+        openingBalance: z.number().optional(),
+        feeds: z
+          .array(
+            z.object({
+              label: z.string(),
+              amount: z.number(),
+              atSec: z.number(),
+            }),
+          )
+          .optional(),
+        cues: z
+          .object({
+            ledgerInSec: z.number().optional(),
+            inOutSec: z.number().optional(),
+            balanceSec: z.number().optional(),
+            lockSec: z.number().optional(),
+            attemptSec: z.array(z.number()).optional(),
+            stampSec: z.number().optional(),
+          })
+          .optional(),
+        inLabel: z.string().optional(),
+        outLabel: z.string().optional(),
+        lockLabel: z.string().optional(),
+        attemptLabels: z.array(z.string()).optional(),
+        stampLabel: z.string().optional(),
+        balanceLabel: z.string().optional(),
+        note: z.string().optional(),
+      }),
+    )
+    .default([]),
   sfx: z.array(TimelineSfxSchema).default([]),
   presentation: z
     .object({

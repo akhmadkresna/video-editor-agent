@@ -241,7 +241,11 @@ def build_timeline_from_edl_and_cover(
         else float_presentation
     )
 
-    from agentic_editor.cover.remap import build_timeline_overlays, build_timeline_sfx
+    from agentic_editor.cover.remap import (
+        build_timeline_cutaways,
+        build_timeline_overlays,
+        build_timeline_sfx,
+    )
     from agentic_editor.cover.suggest import load_cam_words
     from agentic_editor.cover.style_load import load_sfx
 
@@ -256,6 +260,7 @@ def build_timeline_from_edl_and_cover(
     timeline_overlays = build_timeline_overlays(
         edl, cover, words=cam_words, dwell=dwell
     )
+    timeline_cutaways = build_timeline_cutaways(edl, cover)
     style_name = "tutorial"
     if episode is not None:
         try:
@@ -394,6 +399,7 @@ def build_timeline_from_edl_and_cover(
         "effects": effects,
         "captions": captions,
         "overlays": timeline_overlays,
+        "cutaways": timeline_cutaways,
         "sfx": timeline_sfx,
         "camera_play": {
             "snap_on_cuts": snap,
