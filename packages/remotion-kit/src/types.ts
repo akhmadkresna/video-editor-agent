@@ -92,6 +92,13 @@ export type TimelineOverlay = {
 /** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
 export type CutawayScene = "ledger_flow";
 
+/** Surface treatment for cutaway scenes. `glass` was the first pass. */
+export type CutawayLook =
+  | "glass"
+  | "flat_light"
+  | "flat_dark"
+  | "flat_editorial";
+
 export type CutawayFeed = {
   label: string;
   /** Signed rupiah amount, e.g. 4850000 / -250000. */
@@ -105,6 +112,7 @@ export type TimelineCutaway = {
   scene: CutawayScene;
   fromSec: number;
   durationSec: number;
+  look?: CutawayLook;
   kicker?: string;
   title?: string;
   /** Ledger opening balance in rupiah. */
