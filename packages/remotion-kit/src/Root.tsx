@@ -51,6 +51,15 @@ export const RemotionRoot: React.FC = () => {
         width={1920}
         height={1080}
         defaultProps={{ cutaway: LAB_CUTAWAY }}
+        calculateMetadata={async ({ props }) => {
+          const dur = props.cutaway?.durationSec ?? LAB_CUTAWAY.durationSec;
+          return {
+            durationInFrames: Math.max(1, Math.round(dur * 30)),
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          };
+        }}
       />
     </>
   );
