@@ -90,7 +90,57 @@ export type TimelineOverlay = {
 };
 
 /** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
-export type CutawayScene = "ledger_flow";
+/** @deprecated Prefer CutawayFamily; kept as Remotion component keys / aliases. */
+export type CutawayScene =
+  | "ledger_flow"
+  | "receipt_tape"
+  | "kinetic_figures"
+  | "blueprint_nodes"
+  | "evidence"
+  | "minimal";
+
+/**
+ * Motion family = visual language / layout engine.
+ * New VOs are data; a new family needs a new motion language.
+ */
+export type CutawayFamily =
+  | "document"
+  | "flow"
+  | "kinetic_type"
+  | "comparison"
+  | "sequence"
+  | "system_map"
+  | "evidence"
+  | "minimal";
+
+export type CutawayIntent =
+  | "explain"
+  | "compare"
+  | "accumulate"
+  | "transform"
+  | "sequence"
+  | "prove"
+  | "warn"
+  | "summarize";
+
+export type CutawayTone =
+  | "technical"
+  | "editorial"
+  | "tactile"
+  | "playful"
+  | "serious";
+
+export type CutawayBeatKind =
+  | "reveal"
+  | "connect"
+  | "update"
+  | "reject"
+  | "resolve"
+  | "open"
+  | "classify"
+  | "total"
+  | "lock"
+  | "stamp";
 
 /** Surface treatment for cutaway scenes. `glass` was the first pass. */
 export type CutawayLook =
@@ -99,26 +149,103 @@ export type CutawayLook =
   | "flat_dark"
   | "flat_editorial";
 
+/** Framework vector glyph set — drawn in code, tinted by the look. */
+export type CutawayGlyph =
+  | "cart"
+  | "bag"
+  | "receipt"
+  | "wallet"
+  | "chart"
+  | "lock";
+
+/** What sits behind the scene elements. */
+export type CutawayBackdrop = {
+  /** plate = opaque look background; cam_blur = blurred footage under it. */
+  kind: "plate" | "cam_blur" | "image";
+  /** Staged public path (ae-media/...) for image backdrops and mockups. */
+  src?: string;
+  blurPx?: number;
+  /** 0–1 wash over the backdrop so elements stay readable. */
+  dim?: number;
+  /** Overscan so blur edges never show. */
+  scale?: number;
+};
+
+/** Staged image asset (screen crop, logo, photo) used as visual proof. */
+export type CutawayAsset = {
+  src: string;
+  caption?: string;
+  /** How the asset participates in the scene. */
+  role?: "hero" | "proof" | "texture" | "annotation";
+  /** Episode-relative or absolute origin before staging. */
+  provenance?: string;
+};
+
 export type CutawayFeed = {
   label: string;
-  /** Signed rupiah amount, e.g. 4850000 / -250000. */
-  amount: number;
+  /** Signed amount (e.g. rupiah); optional for non-numeric entities. */
+  amount?: number;
   /** Local second (relative to cutaway start) when this feed fires. */
   atSec: number;
+  icon?: CutawayGlyph;
+  unit?: string;
+};
+
+/** Neutral entity in a VisualBrief (timeline-local after remap). */
+export type CutawayEntity = {
+  id?: string;
+  label: string;
+  value?: number;
+  unit?: string;
+  atSec: number;
+  icon?: CutawayGlyph;
+  asset?: CutawayAsset;
+};
+
+export type CutawayBeat = {
+  kind: CutawayBeatKind;
+  atSec: number;
+  label?: string;
+};
+
+export type CutawayCopy = {
+  kicker?: string;
+  title?: string;
+  totalLabel?: string;
+  lockLabel?: string;
+  stampLabel?: string;
+  attemptLabels?: string[];
+  inLabel?: string;
+  outLabel?: string;
 };
 
 export type TimelineCutaway = {
   id: string;
+  /** @deprecated Prefer family; still used as Remotion component key. */
   scene: CutawayScene;
+  /** Canonical motion family. */
+  family?: CutawayFamily;
+  intent?: CutawayIntent;
+  tone?: CutawayTone;
   fromSec: number;
   durationSec: number;
   look?: CutawayLook;
+  backdrop?: CutawayBackdrop;
+  /** Real screenshot/asset shown inside the scene as proof. */
+  proof?: CutawayAsset;
+  assets?: CutawayAsset[];
+  copy?: CutawayCopy;
+  /** @deprecated Prefer copy.kicker */
   kicker?: string;
+  /** @deprecated Prefer copy.title */
   title?: string;
-  /** Ledger opening balance in rupiah. */
+  /** Opening total when the story accumulates values. */
   openingBalance?: number;
+  /** @deprecated Prefer entities */
   feeds?: CutawayFeed[];
-  /** Local seconds for scene beats — word-snapped upstream. */
+  entities?: CutawayEntity[];
+  beats?: CutawayBeat[];
+  /** Local seconds for scene beats — word-snapped upstream. Legacy names. */
   cues?: {
     ledgerInSec?: number;
     inOutSec?: number;
@@ -127,6 +254,11 @@ export type TimelineCutaway = {
     /** Rejected edit/delete attempts. */
     attemptSec?: number[];
     stampSec?: number;
+    openSec?: number;
+    classifySec?: number;
+    totalSec?: number;
+    rejectSec?: number[];
+    resolveSec?: number;
   };
   inLabel?: string;
   outLabel?: string;

@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentic_editor.cover.remap import collect_overlay_defs
+from agentic_editor.cover.remap import collect_overlay_defs, collect_cutaway_defs
+from agentic_editor.cover.cutaway_families import (
+    resolve_family,
+    validate_brief_against_family,
+)
 
 
 # Tutorial look: close must read as a second camera, not a 2% nudge.
@@ -154,6 +158,97 @@ def audit_timeline_quality(
                 "full-cam clips never reach close scale — framing events may be "
                 "missing or camera_play scales too soft"
             )
+
+    # --- Cutaway production gates ---
+    cover_cutaways = list((cover or {}).get("cutaways") or [])
+    tl_cutaways = [
+        c for c in (timeline.get("cutaways") or []) if isinstance(c, dict)
+    ]
+    if cover_cutaways and not tl_cutaways:
+        errors.append(
+            f"cover.json has {len(cover_cutaways)} cutaway(s) but timeline.cutaways "
+            "is empty — remap failed or unknown family/scene"
+        )
+    elif cover_cutaways:
+        defs = collect_cutaway_defs(cover)
+        tl_ids = {str(c.get("id") or "") for c in tl_cutaways}
+        dropped = [d for d in defs if d["id"] not in tl_ids]
+        if dropped:
+            sample = ", ".join(d["id"] for d in dropped[:3])
+            errors.append(
+                f"{len(dropped)} cover cutaway(s) missing from timeline after remap "
+                f"(e.g. {sample})"
+            )
+
+    for c in tl_cutaways:
+        family = str(c.get("family") or resolve_family(c) or "")
+        feeds = c.get("feeds") or c.get("entities") or []
+        entity_count = len(feeds) if isinstance(feeds, list) else 0
+        has_values = False
+        if isinstance(feeds, list):
+            for f in feeds:
+                if not isinstance(f, dict):
+                    continue
+                if f.get("amount") is not None or f.get("value") is not None:
+                    try:
+                        if float(f.get("amount", f.get("value"))) != 0:
+                            has_values = True
+                            break
+                    except (TypeError, ValueError):
+                        pass
+        proof = c.get("proof") or {}
+        has_proof = bool(isinstance(proof, dict) and proof.get("src"))
+        title = str(
+            ((c.get("copy") or {}).get("title") if isinstance(c.get("copy"), dict) else None)
+            or c.get("title")
+            or ""
+        )
+        issues = validate_brief_against_family(
+            family or "minimal",
+            entity_count=entity_count,
+            has_values=has_values,
+            has_proof=has_proof,
+            copy_chars=len(title),
+            duration_sec=float(c.get("durationSec") or 0),
+            intent=str(c.get("intent") or "") or None,
+        )
+        hard = [
+            i
+            for i in issues
+            if "maxEntities" in i or "supportValues" in i or "supportProof" in i
+        ]
+        for i in hard:
+            warnings.append(f"cutaway {c.get('id')}: {i} — consider family=minimal")
+        # Beats / cues inside duration
+        dur = float(c.get("durationSec") or 0)
+        cues = c.get("cues") or {}
+        for key, val in cues.items():
+            if key.endswith("Sec") and not isinstance(val, list):
+                try:
+                    t = float(val)
+                except (TypeError, ValueError):
+                    continue
+                if t < 0 or (dur and t > dur + 0.05):
+                    warnings.append(
+                        f"cutaway {c.get('id')} cue {key}={t} outside duration {dur}"
+                    )
+        # Staged asset paths must be public-relative
+        for asset in [proof, *((c.get("assets") or []) if isinstance(c.get("assets"), list) else [])]:
+            if not isinstance(asset, dict):
+                continue
+            src = str(asset.get("src") or "")
+            if not src:
+                continue
+            if src.startswith("/") or (len(src) > 2 and src[1] == ":"):
+                errors.append(
+                    f"cutaway {c.get('id')} asset is absolute disk path "
+                    f"({src}) — stage via ae compose into ae-media/"
+                )
+            elif not src.startswith("ae-media/") and not src.startswith("http"):
+                warnings.append(
+                    f"cutaway {c.get('id')} asset src={src} is not ae-media/… "
+                    "(may fail in Studio)"
+                )
 
     return errors, warnings
 

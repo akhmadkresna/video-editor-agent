@@ -254,8 +254,21 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
     if cover_path.is_file():
         cover = json.loads(cover_path.read_text(encoding="utf-8"))
         from agentic_editor.cover.evidence import collect_evidence_sources_from_cover
+        from agentic_editor.cover.cutaway_assets import stage_cutaway_assets_for_remotion
 
         abs_sources.update(collect_evidence_sources_from_cover(episode, cover))
+        staged_cover = stage_cutaway_assets_for_remotion(
+            episode,
+            cover,
+            remotion_public=remotion_kit_dir() / "public",
+            verbose=verbose,
+        )
+        if staged_cover is not None:
+            cover = staged_cover
+            # Persist rewritten public-relative paths so Studio reloads stay valid.
+            cover_path.write_text(
+                json.dumps(cover, indent=2) + "\n", encoding="utf-8"
+            )
 
     # Prefer edit/mezzanine/* (deliverable size) over multi-GB raw masters.
     compose_sources = resolve_compose_sources(
@@ -324,6 +337,9 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
         raise RuntimeError(msg)
 
     from agentic_editor.compose.quality import audit_timeline_quality, format_audit
+    from agentic_editor.compose.cutaway_qa import write_cutaway_contact_plan
+
+    write_cutaway_contact_plan(episode, timeline)
 
     q_err, q_warn = audit_timeline_quality(timeline, cover=cover)
     if verbose and (q_err or q_warn):

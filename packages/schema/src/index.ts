@@ -131,45 +131,183 @@ export const CoverOverlaySchema = z.object({
 });
 
 /** Generated MG cutaway scenes (picture takeover under cam VO), source-time. */
-export const CutawaySceneSchema = z.enum(["ledger_flow"]);
+/** @deprecated Prefer CutawayFamilySchema; kept as Remotion component keys. */
+export const CutawaySceneSchema = z.enum([
+  "ledger_flow",
+  "receipt_tape",
+  "kinetic_figures",
+  "blueprint_nodes",
+  "evidence",
+  "minimal",
+]);
+
+export const CutawayFamilySchema = z.enum([
+  "document",
+  "flow",
+  "kinetic_type",
+  "comparison",
+  "sequence",
+  "system_map",
+  "evidence",
+  "minimal",
+]);
+
+export const CutawayIntentSchema = z.enum([
+  "explain",
+  "compare",
+  "accumulate",
+  "transform",
+  "sequence",
+  "prove",
+  "warn",
+  "summarize",
+]);
+
+export const CutawayToneSchema = z.enum([
+  "technical",
+  "editorial",
+  "tactile",
+  "playful",
+  "serious",
+]);
+
+export const CutawayBeatKindSchema = z.enum([
+  "reveal",
+  "connect",
+  "update",
+  "reject",
+  "resolve",
+  "open",
+  "classify",
+  "total",
+  "lock",
+  "stamp",
+]);
+
+export const CutawayLookSchema = z.enum([
+  "glass",
+  "flat_light",
+  "flat_dark",
+  "flat_editorial",
+]);
+
+/** House vector glyphs — drawn in the scene, no staging needed. */
+export const CutawayGlyphSchema = z.enum([
+  "cart",
+  "bag",
+  "receipt",
+  "wallet",
+  "chart",
+  "lock",
+]);
+
+export const CutawayBackdropSchema = z.object({
+  kind: z.enum(["plate", "cam_blur", "image"]),
+  /** Staged public path; required for kind "image". */
+  src: z.string().optional(),
+  blurPx: z.number().optional(),
+  /** 0–1 wash of the look colour over the footage. */
+  dim: z.number().optional(),
+  scale: z.number().optional(),
+});
+
+/** Image asset (screen crop, logo, photo) shown inside a scene. */
+export const CutawayAssetSchema = z.object({
+  src: z.string(),
+  caption: z.string().optional(),
+  role: z.enum(["hero", "proof", "texture", "annotation"]).optional(),
+  provenance: z.string().optional(),
+});
 
 export const CutawayFeedSchema = z.object({
   label: z.string(),
-  /** Signed rupiah amount. */
-  amount: z.number(),
+  /** Signed amount; optional for non-numeric entities. */
+  amount: z.number().optional(),
   /** Cam source second when this feed fires (word-snapped). */
   at: z.number(),
+  icon: CutawayGlyphSchema.optional(),
+  unit: z.string().optional(),
 });
 
-export const CoverCutawaySchema = z.object({
+export const CutawayEntitySchema = z.object({
   id: z.string().optional(),
-  scene: CutawaySceneSchema,
-  start: z.number(),
-  end: z.number(),
-  source: z.string().default("cam"),
+  label: z.string(),
+  value: z.number().optional(),
+  unit: z.string().optional(),
+  /** Cam source second. */
+  at: z.number(),
+  icon: CutawayGlyphSchema.optional(),
+  asset: CutawayAssetSchema.optional(),
+});
+
+export const CutawayBeatSchema = z.object({
+  kind: CutawayBeatKindSchema,
+  /** Cam source second. */
+  at: z.number(),
+  label: z.string().optional(),
+});
+
+export const CutawayCopySchema = z.object({
   kicker: z.string().optional(),
   title: z.string().optional(),
-  openingBalance: z.number().optional(),
-  feeds: z.array(CutawayFeedSchema).optional(),
-  /** Scene beats in cam source seconds. */
-  cues: z
-    .object({
-      ledgerIn: z.number().optional(),
-      inOut: z.number().optional(),
-      balance: z.number().optional(),
-      lock: z.number().optional(),
-      attempts: z.array(z.number()).optional(),
-      stamp: z.number().optional(),
-    })
-    .optional(),
+  totalLabel: z.string().optional(),
+  lockLabel: z.string().optional(),
+  stampLabel: z.string().optional(),
+  attemptLabels: z.array(z.string()).optional(),
   inLabel: z.string().optional(),
   outLabel: z.string().optional(),
-  lockLabel: z.string().optional(),
-  attemptLabels: z.array(z.string()).optional(),
-  stampLabel: z.string().optional(),
-  balanceLabel: z.string().optional(),
-  note: z.string().optional(),
 });
+
+export const CoverCutawaySchema = z
+  .object({
+    id: z.string().optional(),
+    /** Preferred: motion family. */
+    family: CutawayFamilySchema.optional(),
+    /** @deprecated Prefer family; still accepted as alias. */
+    scene: CutawaySceneSchema.optional(),
+    start: z.number(),
+    end: z.number(),
+    source: z.string().default("cam"),
+    intent: CutawayIntentSchema.optional(),
+    tone: CutawayToneSchema.optional(),
+    look: CutawayLookSchema.optional(),
+    backdrop: CutawayBackdropSchema.optional(),
+    proof: CutawayAssetSchema.optional(),
+    assets: z.array(CutawayAssetSchema).optional(),
+    copy: CutawayCopySchema.optional(),
+    kicker: z.string().optional(),
+    title: z.string().optional(),
+    openingBalance: z.number().optional(),
+    feeds: z.array(CutawayFeedSchema).optional(),
+    entities: z.array(CutawayEntitySchema).optional(),
+    beats: z.array(CutawayBeatSchema).optional(),
+    /** Scene beats in cam source seconds (legacy + generic keys). */
+    cues: z
+      .object({
+        ledgerIn: z.number().optional(),
+        inOut: z.number().optional(),
+        balance: z.number().optional(),
+        lock: z.number().optional(),
+        attempts: z.array(z.number()).optional(),
+        stamp: z.number().optional(),
+        open: z.number().optional(),
+        classify: z.number().optional(),
+        total: z.number().optional(),
+        reject: z.array(z.number()).optional(),
+        resolve: z.number().optional(),
+      })
+      .optional(),
+    inLabel: z.string().optional(),
+    outLabel: z.string().optional(),
+    lockLabel: z.string().optional(),
+    attemptLabels: z.array(z.string()).optional(),
+    stampLabel: z.string().optional(),
+    balanceLabel: z.string().optional(),
+    note: z.string().optional(),
+  })
+  .refine((v) => Boolean(v.family || v.scene), {
+    message: "cutaway requires family or scene",
+  });
 
 /** Modern-tech SFX under cam VO — no whoosh. Source-time on cover. */
 export const SfxKindSchema = z.enum(["typing", "shutter", "click"]);
@@ -351,8 +489,16 @@ export const TimelineSchema = z.object({
       z.object({
         id: z.string(),
         scene: CutawaySceneSchema,
+        family: CutawayFamilySchema.optional(),
+        intent: CutawayIntentSchema.optional(),
+        tone: CutawayToneSchema.optional(),
         fromSec: z.number(),
         durationSec: z.number(),
+        look: CutawayLookSchema.optional(),
+        backdrop: CutawayBackdropSchema.optional(),
+        proof: CutawayAssetSchema.optional(),
+        assets: z.array(CutawayAssetSchema).optional(),
+        copy: CutawayCopySchema.optional(),
         kicker: z.string().optional(),
         title: z.string().optional(),
         openingBalance: z.number().optional(),
@@ -360,8 +506,32 @@ export const TimelineSchema = z.object({
           .array(
             z.object({
               label: z.string(),
-              amount: z.number(),
+              amount: z.number().optional(),
               atSec: z.number(),
+              icon: CutawayGlyphSchema.optional(),
+              unit: z.string().optional(),
+            }),
+          )
+          .optional(),
+        entities: z
+          .array(
+            z.object({
+              id: z.string().optional(),
+              label: z.string(),
+              value: z.number().optional(),
+              unit: z.string().optional(),
+              atSec: z.number(),
+              icon: CutawayGlyphSchema.optional(),
+              asset: CutawayAssetSchema.optional(),
+            }),
+          )
+          .optional(),
+        beats: z
+          .array(
+            z.object({
+              kind: CutawayBeatKindSchema,
+              atSec: z.number(),
+              label: z.string().optional(),
             }),
           )
           .optional(),
@@ -373,6 +543,11 @@ export const TimelineSchema = z.object({
             lockSec: z.number().optional(),
             attemptSec: z.array(z.number()).optional(),
             stampSec: z.number().optional(),
+            openSec: z.number().optional(),
+            classifySec: z.number().optional(),
+            totalSec: z.number().optional(),
+            rejectSec: z.array(z.number()).optional(),
+            resolveSec: z.number().optional(),
           })
           .optional(),
         inLabel: z.string().optional(),

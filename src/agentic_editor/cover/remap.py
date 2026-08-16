@@ -109,14 +109,34 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
     return out
 
 
-CUTAWAY_SCENES = frozenset({"ledger_flow"})
+from agentic_editor.cover.cutaway_families import (
+    BEAT_ALIASES,
+    FAMILY_TO_SCENE,
+    resolve_family,
+)
 
+CUTAWAY_SCENES = frozenset(FAMILY_TO_SCENE.values()) | frozenset(
+    {
+        "ledger_flow",
+        "receipt_tape",
+        "kinetic_figures",
+        "blueprint_nodes",
+        "evidence",
+        "minimal",
+    }
+)
+
+# Legacy + generic source cue keys → timeline *Sec fields.
 _CUTAWAY_CUE_KEYS = {
     "ledgerIn": "ledgerInSec",
     "inOut": "inOutSec",
     "balance": "balanceSec",
     "lock": "lockSec",
     "stamp": "stampSec",
+    "open": "openSec",
+    "classify": "classifySec",
+    "total": "totalSec",
+    "resolve": "resolveSec",
 }
 
 
@@ -128,9 +148,14 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
     for i, item in enumerate(cover.get("cutaways") or []):
         if not isinstance(item, dict):
             continue
-        scene = str(item.get("scene") or "").lower().strip()
-        if scene not in CUTAWAY_SCENES:
+        family = resolve_family(item)
+        if not family:
             continue
+        scene = FAMILY_TO_SCENE.get(family, family)
+        # Prefer explicit legacy scene when provided and still known.
+        raw_scene = str(item.get("scene") or "").lower().strip()
+        if raw_scene in CUTAWAY_SCENES:
+            scene = raw_scene
         try:
             start = float(item["start"])
             end = float(item["end"])
@@ -139,13 +164,17 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         if end <= start:
             continue
         entry: dict[str, Any] = {
-            "id": str(item.get("id") or f"cut-{scene}-{i}"),
+            "id": str(item.get("id") or f"cut-{family}-{i}"),
+            "family": family,
             "scene": scene,
             "start": start,
             "end": end,
             "source": str(item.get("source") or "cam"),
         }
         for key in (
+            "look",
+            "intent",
+            "tone",
             "kicker",
             "title",
             "inLabel",
@@ -158,6 +187,48 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
             val = str(item.get(key) or "").strip()
             if val:
                 entry[key] = val
+        copy = item.get("copy")
+        if isinstance(copy, dict):
+            entry["copy"] = copy
+            for ck, flat in (
+                ("kicker", "kicker"),
+                ("title", "title"),
+                ("totalLabel", "balanceLabel"),
+                ("lockLabel", "lockLabel"),
+                ("stampLabel", "stampLabel"),
+                ("inLabel", "inLabel"),
+                ("outLabel", "outLabel"),
+            ):
+                if flat not in entry and copy.get(ck):
+                    entry[flat] = str(copy[ck]).strip()
+            labels = copy.get("attemptLabels")
+            if isinstance(labels, list) and "attemptLabels" not in entry:
+                entry["attemptLabels"] = [str(x) for x in labels if str(x).strip()]
+        backdrop = item.get("backdrop")
+        if isinstance(backdrop, dict) and backdrop.get("kind"):
+            entry["backdrop"] = backdrop
+        proof = item.get("proof")
+        if isinstance(proof, dict) and str(proof.get("src") or "").strip():
+            entry["proof"] = proof
+        assets = item.get("assets")
+        if isinstance(assets, list):
+            cleaned = [
+                a
+                for a in assets
+                if isinstance(a, dict) and str(a.get("src") or "").strip()
+            ]
+            if cleaned:
+                entry["assets"] = cleaned
+                if "proof" not in entry:
+                    proof_like = next(
+                        (
+                            a
+                            for a in cleaned
+                            if str(a.get("role") or "") in ("proof", "hero", "")
+                        ),
+                        cleaned[0],
+                    )
+                    entry["proof"] = proof_like
         if item.get("openingBalance") is not None:
             try:
                 entry["openingBalance"] = float(item["openingBalance"])
@@ -166,22 +237,108 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         labels = item.get("attemptLabels")
         if isinstance(labels, list):
             entry["attemptLabels"] = [str(x) for x in labels if str(x).strip()]
+
+        # entities (preferred) or feeds (legacy)
+        entities: list[dict[str, Any]] = []
+        for e in item.get("entities") or []:
+            if not isinstance(e, dict):
+                continue
+            try:
+                ent = {
+                    "label": str(e.get("label") or "").strip(),
+                    "at": float(e["at"]),
+                }
+            except (KeyError, TypeError, ValueError):
+                continue
+            if e.get("value") is not None:
+                try:
+                    ent["value"] = float(e["value"])
+                except (TypeError, ValueError):
+                    pass
+            elif e.get("amount") is not None:
+                try:
+                    ent["value"] = float(e["amount"])
+                except (TypeError, ValueError):
+                    pass
+            for opt in ("id", "unit", "icon"):
+                if e.get(opt):
+                    ent[opt] = e[opt]
+            if isinstance(e.get("asset"), dict) and e["asset"].get("src"):
+                ent["asset"] = e["asset"]
+            entities.append(ent)
         feeds: list[dict[str, Any]] = []
         for f in item.get("feeds") or []:
             if not isinstance(f, dict):
                 continue
             try:
-                feeds.append(
-                    {
-                        "label": str(f.get("label") or "").strip(),
-                        "amount": float(f["amount"]),
-                        "at": float(f["at"]),
-                    }
-                )
+                feed = {
+                    "label": str(f.get("label") or "").strip(),
+                    "at": float(f["at"]),
+                }
             except (KeyError, TypeError, ValueError):
                 continue
+            if f.get("amount") is not None:
+                try:
+                    feed["amount"] = float(f["amount"])
+                except (TypeError, ValueError):
+                    pass
+            icon = str(f.get("icon") or "").strip()
+            if icon:
+                feed["icon"] = icon
+            if f.get("unit"):
+                feed["unit"] = str(f["unit"])
+            feeds.append(feed)
+            if not entities:
+                ent = {
+                    "label": feed["label"],
+                    "at": feed["at"],
+                }
+                if "amount" in feed:
+                    ent["value"] = feed["amount"]
+                if icon:
+                    ent["icon"] = icon
+                entities.append(ent)
         if feeds:
             entry["feeds"] = feeds
+        if entities:
+            entry["entities"] = entities
+            if "feeds" not in entry:
+                entry["feeds"] = [
+                    {
+                        "label": e["label"],
+                        "at": e["at"],
+                        **({"amount": e["value"]} if "value" in e else {}),
+                        **({"icon": e["icon"]} if e.get("icon") else {}),
+                    }
+                    for e in entities
+                ]
+
+        beats = item.get("beats")
+        if isinstance(beats, list):
+            cleaned_beats = []
+            for b in beats:
+                if not isinstance(b, dict):
+                    continue
+                kind = str(b.get("kind") or "").strip()
+                if not kind:
+                    continue
+                try:
+                    cleaned_beats.append(
+                        {
+                            "kind": kind,
+                            "at": float(b["at"]),
+                            **(
+                                {"label": str(b["label"]).strip()}
+                                if b.get("label")
+                                else {}
+                            ),
+                        }
+                    )
+                except (KeyError, TypeError, ValueError):
+                    continue
+            if cleaned_beats:
+                entry["beats"] = cleaned_beats
+
         cues = item.get("cues")
         if isinstance(cues, dict):
             entry["cues"] = cues
@@ -213,10 +370,18 @@ def build_timeline_cutaways(
         entry: dict[str, Any] = {
             "id": cut["id"],
             "scene": cut["scene"],
+            "family": cut["family"],
             "fromSec": round(from_sec, 3),
             "durationSec": round(dur, 3),
         }
         for key in (
+            "look",
+            "intent",
+            "tone",
+            "backdrop",
+            "proof",
+            "assets",
+            "copy",
             "kicker",
             "title",
             "inLabel",
@@ -230,21 +395,58 @@ def build_timeline_cutaways(
         ):
             if key in cut:
                 entry[key] = cut[key]
-        # Source-time cue → local second inside the scene.
+
         def local(src_sec: float) -> float:
             return round(max(0.0, min(dur, float(src_sec) - start)), 3)
 
         feeds = []
         for f in cut.get("feeds") or []:
-            feeds.append(
-                {
-                    "label": f["label"],
-                    "amount": f["amount"],
-                    "atSec": local(f["at"]),
-                }
-            )
+            feed: dict[str, Any] = {
+                "label": f["label"],
+                "atSec": local(f["at"]),
+            }
+            if "amount" in f:
+                feed["amount"] = f["amount"]
+            if f.get("icon"):
+                feed["icon"] = f["icon"]
+            if f.get("unit"):
+                feed["unit"] = f["unit"]
+            feeds.append(feed)
         if feeds:
             entry["feeds"] = feeds
+
+        entities = []
+        for e in cut.get("entities") or []:
+            ent: dict[str, Any] = {
+                "label": e["label"],
+                "atSec": local(e["at"]),
+            }
+            if e.get("id"):
+                ent["id"] = e["id"]
+            if "value" in e:
+                ent["value"] = e["value"]
+            if e.get("unit"):
+                ent["unit"] = e["unit"]
+            if e.get("icon"):
+                ent["icon"] = e["icon"]
+            if e.get("asset"):
+                ent["asset"] = e["asset"]
+            entities.append(ent)
+        if entities:
+            entry["entities"] = entities
+
+        beats_out = []
+        for b in cut.get("beats") or []:
+            beats_out.append(
+                {
+                    "kind": b["kind"],
+                    "atSec": local(b["at"]),
+                    **({"label": b["label"]} if b.get("label") else {}),
+                }
+            )
+        if beats_out:
+            entry["beats"] = beats_out
+
         raw_cues = cut.get("cues") or {}
         cues: dict[str, Any] = {}
         for src_key, out_key in _CUTAWAY_CUE_KEYS.items():
@@ -254,16 +456,61 @@ def build_timeline_cutaways(
                 cues[out_key] = local(float(raw_cues[src_key]))
             except (TypeError, ValueError):
                 continue
-        attempts = raw_cues.get("attempts")
-        if isinstance(attempts, list):
+        # Also mirror generic → legacy for existing Remotion skins.
+        for gen, legacy in (
+            ("openSec", "ledgerInSec"),
+            ("classifySec", "inOutSec"),
+            ("totalSec", "balanceSec"),
+            ("resolveSec", "stampSec"),
+        ):
+            if gen in cues and legacy not in cues:
+                cues[legacy] = cues[gen]
+            if legacy in cues and gen not in cues:
+                cues[gen] = cues[legacy]
+        for list_key, out_key in (
+            ("attempts", "attemptSec"),
+            ("reject", "rejectSec"),
+        ):
+            raw_list = raw_cues.get(list_key)
+            if not isinstance(raw_list, list):
+                continue
             vals = []
-            for a in attempts:
+            for a in raw_list:
                 try:
                     vals.append(local(float(a)))
                 except (TypeError, ValueError):
                     continue
             if vals:
-                cues["attemptSec"] = vals
+                cues[out_key] = vals
+        if "rejectSec" in cues and "attemptSec" not in cues:
+            cues["attemptSec"] = cues["rejectSec"]
+        if "attemptSec" in cues and "rejectSec" not in cues:
+            cues["rejectSec"] = cues["attemptSec"]
+
+        # Derive cues from beats[] when cues omitted.
+        if beats_out and not cues:
+            for b in beats_out:
+                kind = str(b["kind"])
+                out_key = BEAT_ALIASES.get(kind)
+                if not out_key:
+                    if kind in ("reveal", "open"):
+                        out_key = "ledgerInSec"
+                    elif kind == "resolve":
+                        out_key = "stampSec"
+                    else:
+                        continue
+                if out_key.endswith("Sec") and out_key != "attemptSec":
+                    cues.setdefault(out_key, b["atSec"])
+                elif out_key == "attemptSec":
+                    cues.setdefault("attemptSec", []).append(b["atSec"])
+            for gen, legacy in (
+                ("openSec", "ledgerInSec"),
+                ("classifySec", "inOutSec"),
+                ("totalSec", "balanceSec"),
+            ):
+                if legacy in cues and gen not in cues:
+                    cues[gen] = cues[legacy]
+
         if cues:
             entry["cues"] = cues
         out.append(entry)

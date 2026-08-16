@@ -4,27 +4,39 @@ import { CutawaySceneView } from "./components/CutawayLayer";
 import type { TimelineCutaway } from "./types";
 
 /**
- * Scene lab: preview one MG cutaway without staging media, so cue timing can be
- * checked frame by frame before it goes into an episode cover.
- *
- * Cues below are Part 4 cam word times minus the 406.40s scene start:
- * "buku kas" 406.54 · "masuk/keluar" 410.52 · "penjualan" 412.94 ·
- * "pembelian" 414.10 · "operasional" 415.14 · "saldo berjalan" 416.52 ·
- * "immutable ledger" 419.74 · "diedit" 422.34 · "dibusyap" 423.02 ·
- * "tervalidasi" 425.96
+ * Part 4 buku-kas fixture — episode data, not framework defaults.
+ * Cues are cam word times minus the 406.40s scene start.
  */
 export const LAB_CUTAWAY: TimelineCutaway = {
-  id: "lab-ledger-flow",
-  scene: "ledger_flow",
+  id: "lab-document-ledger",
+  scene: "receipt_tape",
+  family: "document",
+  intent: "prove",
+  tone: "tactile",
   fromSec: 0,
   durationSec: 21.2,
   kicker: "Buku kas",
   title: "Tercatat otomatis",
   openingBalance: 1200000,
+  copy: {
+    kicker: "Buku kas",
+    title: "Tercatat otomatis",
+    totalLabel: "Saldo berjalan",
+    lockLabel: "Tidak bisa diedit",
+    stampLabel: "TERVALIDASI",
+    attemptLabels: ["Edit", "Hapus"],
+    inLabel: "Masuk",
+    outLabel: "Keluar",
+  },
   feeds: [
-    { label: "Penjualan", amount: 4850000, atSec: 6.54 },
-    { label: "Pembelian", amount: -2300000, atSec: 7.7 },
-    { label: "Biaya operasional", amount: -250000, atSec: 8.74 },
+    { label: "Penjualan", amount: 4850000, atSec: 6.54, icon: "cart" },
+    { label: "Pembelian", amount: -2300000, atSec: 7.7, icon: "bag" },
+    {
+      label: "Biaya operasional",
+      amount: -250000,
+      atSec: 8.74,
+      icon: "receipt",
+    },
   ],
   cues: {
     ledgerInSec: 0.14,
@@ -40,6 +52,20 @@ export const LAB_CUTAWAY: TimelineCutaway = {
   attemptLabels: ["Edit", "Hapus"],
   stampLabel: "TERVALIDASI",
   balanceLabel: "Saldo berjalan",
+};
+
+/** Minimal-family smoke fixture for CutawayLab matrix. */
+export const LAB_MINIMAL: TimelineCutaway = {
+  id: "lab-minimal",
+  scene: "minimal",
+  family: "minimal",
+  intent: "summarize",
+  fromSec: 0,
+  durationSec: 6,
+  copy: { kicker: "Claim", title: "One strong idea" },
+  kicker: "Claim",
+  title: "One strong idea",
+  cues: { openSec: 0.1, ledgerInSec: 0.1 },
 };
 
 export const CutawayLab: React.FC<{ cutaway: TimelineCutaway }> = ({

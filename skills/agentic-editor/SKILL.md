@@ -241,34 +241,53 @@ A cutaway is a **generated scene that takes over the picture** for a few seconds
 while cam VO keeps playing (cam clips stay mounted underneath — never mute them).
 Not B-roll footage, not a text overlay.
 
+**New VO = new VisualBrief data. New family only = new motion language.**
+
 ```json
 {
   "cutaways": [
     {
-      "scene": "ledger_flow",
+      "family": "document",
+      "intent": "prove",
       "start": 406.4,
       "end": 427.6,
-      "kicker": "Buku kas",
-      "title": "Tercatat otomatis",
-      "openingBalance": 1200000,
-      "feeds": [{ "label": "Penjualan", "amount": 4850000, "at": 412.94 }],
-      "cues": { "ledgerIn": 406.54, "balance": 416.52, "lock": 419.74,
-                "attempts": [422.34, 423.02], "stamp": 425.96 }
+      "copy": { "kicker": "Buku kas", "title": "Tercatat otomatis",
+                "lockLabel": "Tidak bisa diedit", "stampLabel": "TERVALIDASI" },
+      "entities": [{ "label": "Penjualan", "value": 4850000, "at": 412.94, "icon": "cart" }],
+      "cues": { "open": 406.54, "total": 416.52, "lock": 419.74,
+                "reject": [422.34, 423.02], "stamp": 425.96 },
+      "backdrop": { "kind": "cam_blur", "blurPx": 34, "dim": 0.65 },
+      "proof": { "src": "edit/cutaway_assets/form.png", "role": "proof" }
     }
   ]
 }
 ```
 
+Families (engines): `document` · `flow` · `kinetic_type` · `comparison` ·
+`sequence` · `system_map` · `evidence` · `minimal` (safe fallback).
+
+Legacy `scene` aliases still work: `receipt_tape`→document, `ledger_flow`→flow,
+`kinetic_figures`→kinetic_type, `blueprint_nodes`→system_map.
+
+Pipeline:
+
+1. After cover (and preferably overlays): `ae cutaway-suggest .`
+2. Review `edit/cutaways.suggest.json` with the user — allow `none` / drop weak ideas
+3. Confirm → `ae cutaway-suggest . --apply`
+4. `ae compose .` stages cutaway stills into `public/ae-media/cutaways/`,
+   remaps cues, writes `edit/cutaway_contact_plan.json` (opening/dense/payoff frames),
+   and quality-gates family capability + absolute asset paths
+
 Rules:
 
-- Times are **cam source seconds** (like overlays); `ae cover` remaps to output
-  `fromSec` and converts every cue to a scene-local second.
-- Snap each cue to the word that earns it — a beat that fires off-word reads worse
-  than no scene at all.
-- Scenes are **framework components** (`packages/remotion-kit/src/components/cutaway/`).
-  Add a scene there + to `CutawaySceneSchema`; never fork a scene into `edit/`.
-- Preview cue timing without media: `CutawayLab` composition
-  (`npx remotion still src/index.ts CutawayLab out.png --frame=N`).
+- Times are **cam source seconds**; remap converts cues/entities to scene-local seconds.
+- Snap every beat to the word that earns it.
+- Prefer `family` + `copy` + `entities` + generic cues (`open`/`total`/`lock`/`reject`/`stamp`).
+- Do **not** add a React component per VO topic. Add a family only for a new motion language.
+- Preview: `CutawayLab` (`npx remotion still src/index.ts CutawayLab out.png --frame=N`).
+- Image assets: episode paths under `edit/cutaway_assets/` (or absolute) are staged by
+  `ae compose` to `ae-media/cutaways/…`. Glyphs stay code-drawn (`icon`).
+- No useful asset is fine — families must read without one; use `minimal` when unsure.
 
 ## Promote
 

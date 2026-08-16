@@ -1,12 +1,84 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Img,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { CutawayFeed, CutawayLook, TimelineCutaway } from "../../types";
+import type {
+  CutawayFeed,
+  CutawayGlyph,
+  CutawayLook,
+  TimelineCutaway,
+} from "../../types";
+
+/** Public-relative asset paths go through staticFile; URLs pass straight. */
+function assetSrc(src: string): string {
+  if (/^(https?:|data:|blob:)/.test(src)) return src;
+  return staticFile(src);
+}
+
+/**
+ * House glyph set: stroked vectors drawn in code so they inherit the look's
+ * accent and never need staging. Raster/vector files go through `proof`.
+ */
+const GLYPHS: Record<CutawayGlyph, React.ReactNode> = {
+  cart: (
+    <>
+      <path d="M2 4h3l2.6 10.4A2 2 0 0 0 9.5 16h8.2a2 2 0 0 0 2-1.6L21.5 7H6" />
+      <circle cx="10" cy="20" r="1.6" />
+      <circle cx="18" cy="20" r="1.6" />
+    </>
+  ),
+  bag: (
+    <>
+      <path d="M6 8h12l-1.2 12H7.2L6 8z" />
+      <path d="M9.2 8V6a2.8 2.8 0 0 1 5.6 0v2" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z" />
+      <path d="M9.5 8h5M9.5 12h5" />
+    </>
+  ),
+  wallet: (
+    <>
+      <path d="M3 7h15a3 3 0 0 1 3 3v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+      <path d="M3 7l12-3.2V7" />
+      <circle cx="17" cy="13" r="1.5" />
+    </>
+  ),
+  chart: <path d="M4 20V11M10 20V4M16 20v-6.5M2 20h20" />,
+  lock: (
+    <>
+      <path d="M6 11h12v9H6z" />
+      <path d="M9 11V8a3 3 0 0 1 6 0v3" />
+    </>
+  ),
+};
+
+const Glyph: React.FC<{ name: CutawayGlyph; size: number; color: string }> = ({
+  name,
+  size,
+  color,
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {GLYPHS[name]}
+  </svg>
+);
 
 const DISPLAY = 'Syne, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 const UI = '"Instrument Sans", "Segoe UI", system-ui, sans-serif';
@@ -18,6 +90,8 @@ const REJECT = "#e11d48";
 
 type Look = {
   background: string;
+  /** Flat colour used to wash blurred footage so elements stay readable. */
+  plate: string;
   /** Breathing grid — off for flat treatments. */
   grid: boolean;
   ink: string;
@@ -45,6 +119,7 @@ const LOOKS: Record<CutawayLook, Look> = {
   glass: {
     background:
       "radial-gradient(ellipse 80% 70% at 42% 40%, #16273a 0%, #0d1a26 62%, #08111a 100%)",
+    plate: "#0b1723",
     grid: true,
     ink: "#ffffff",
     dim: "rgba(255,255,255,0.55)",
@@ -64,6 +139,7 @@ const LOOKS: Record<CutawayLook, Look> = {
   },
   flat_light: {
     background: "#d9e2ec",
+    plate: "#d9e2ec",
     grid: false,
     ink: "#0c1c2a",
     dim: "rgba(12,28,42,0.55)",
@@ -83,6 +159,7 @@ const LOOKS: Record<CutawayLook, Look> = {
   },
   flat_dark: {
     background: "#0e1b26",
+    plate: "#0e1b26",
     grid: false,
     ink: "#ffffff",
     dim: "rgba(255,255,255,0.55)",
@@ -102,6 +179,7 @@ const LOOKS: Record<CutawayLook, Look> = {
   },
   flat_editorial: {
     background: "#e8eef4",
+    plate: "#e8eef4",
     grid: false,
     ink: "#0b1a27",
     dim: "rgba(11,26,39,0.5)",
@@ -147,12 +225,15 @@ function groupDigits(n: number): string {
 }
 
 const rupiah = (n: number) => `Rp ${groupDigits(n)}`;
-const signed = (n: number) => `${n < 0 ? "−" : "+"} Rp ${groupDigits(n)}`;
+const signed = (n: number | undefined) => {
+  const v = n ?? 0;
+  return `${v < 0 ? "−" : "+"} Rp ${groupDigits(v)}`;
+};
 
 const DEFAULT_FEEDS: CutawayFeed[] = [
-  { label: "Penjualan", amount: 4850000, atSec: 6.5 },
-  { label: "Pembelian", amount: -2300000, atSec: 7.7 },
-  { label: "Biaya operasional", amount: -250000, atSec: 8.7 },
+  { label: "Penjualan", amount: 4850000, atSec: 6.5, icon: "cart" },
+  { label: "Pembelian", amount: -2300000, atSec: 7.7, icon: "bag" },
+  { label: "Biaya operasional", amount: -250000, atSec: 8.7, icon: "receipt" },
 ];
 
 /**
@@ -194,8 +275,8 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
   const rowGap = 92;
 
   const chipX = width * 0.06;
-  const chipW = width * 0.2;
-  const chipH = 108;
+  const chipW = width * 0.235;
+  const chipH = 120;
   const chipTop = height * 0.305;
   const chipGap = 152;
 
@@ -207,7 +288,7 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
   feeds.forEach((f) => {
     if (t >= arrivalOf(f)) {
       prevTotal = targetTotal;
-      targetTotal = targetTotal + f.amount;
+      targetTotal = targetTotal + (f.amount ?? 0);
       lastArrival = arrivalOf(f);
     }
   });
@@ -231,10 +312,49 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
   const cardScale = interpolate(sp(ledgerIn), [0, 1], [0.94, 1]);
   const cardOpacity = interpolate(sp(ledgerIn), [0, 1], [0, 1]);
 
+  const backdrop = cutaway.backdrop;
+  const footage = backdrop && backdrop.kind !== "plate";
+  const blurPx = backdrop?.blurPx ?? 34;
+  const dim = backdrop?.dim ?? 0.55;
+
+  // Proof asset docks under the source column; the stamp lands on top of it.
+  const proof = cutaway.proof;
+  const proofW = Math.round(chipW);
+  const proofY = chipTop + (feeds.length - 1) * chipGap + chipH + 22;
+  const proofPop = proof ? sp(arrivalOf(feeds[feeds.length - 1]) + 0.2, 14, 150) : 0;
+
   return (
     <AbsoluteFill
-      style={{ background: look.background, overflow: "hidden" }}
+      style={{
+        background: footage ? "transparent" : look.background,
+        overflow: "hidden",
+      }}
     >
+      {footage ? (
+        <AbsoluteFill>
+          {backdrop?.src ? (
+            <Img
+              src={assetSrc(backdrop.src)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                filter: `blur(${blurPx}px) saturate(0.85)`,
+                transform: `scale(${backdrop.scale ?? 1.14})`,
+              }}
+            />
+          ) : (
+            <AbsoluteFill
+              style={{
+                backdropFilter: `blur(${blurPx}px) saturate(0.85)`,
+                WebkitBackdropFilter: `blur(${blurPx}px) saturate(0.85)`,
+              }}
+            />
+          )}
+          <AbsoluteFill style={{ background: look.plate, opacity: dim }} />
+        </AbsoluteFill>
+      ) : null}
+
       {look.grid ? (
         <AbsoluteFill
           style={{
@@ -386,36 +506,63 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
               borderRadius: look.radius === 0 ? 0 : 16,
               borderBottom: look.chrome ? "none" : `1px solid ${look.divider}`,
               borderLeft: `${look.chrome ? 8 : 10}px solid ${
-                f.amount < 0 ? look.divider : look.fill
+                (f.amount ?? 0) < 0 ? look.divider : look.fill
               }`,
               background: look.chrome ? look.card : "transparent",
               padding: "18px 24px",
               boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
               opacity: interpolate(s, [0, 1], [0, consumed ? 0.62 : 1]),
               transform: `translateX(${interpolate(s, [0, 1], [-40, 0])}px)`,
             }}
           >
-            <div
-              style={{
-                fontFamily: UI,
-                fontSize: Math.round(height * 0.022),
-                color: look.dim,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {f.label}
-            </div>
-            <div
-              style={{
-                fontFamily: DISPLAY,
-                fontWeight: 800,
-                fontSize: Math.round(height * 0.036),
-                color: f.amount < 0 ? look.minus : look.plus,
-                marginTop: 6,
-              }}
-            >
-              {signed(f.amount)}
+            {f.icon ? (
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  flex: "0 0 auto",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: look.radius === 0 ? 0 : 12,
+                  background: look.chrome ? look.row : "transparent",
+                  border: look.chrome ? "none" : `2px solid ${look.divider}`,
+                }}
+              >
+                <Glyph
+                  name={f.icon}
+                  size={30}
+                  color={(f.amount ?? 0) < 0 ? look.minus : look.wire}
+                />
+              </div>
+            ) : null}
+            <div>
+              <div
+                style={{
+                  fontFamily: UI,
+                  fontSize: Math.round(height * 0.022),
+                  color: look.dim,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {f.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: DISPLAY,
+                  fontWeight: 800,
+                  fontSize: Math.round(height * 0.034),
+                  color: (f.amount ?? 0) < 0 ? look.minus : look.plus,
+                  marginTop: 6,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {signed(f.amount)}
+              </div>
             </div>
           </div>
         );
@@ -486,7 +633,7 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
                 borderRadius: look.radius === 0 ? 0 : 10,
                 background: look.row,
                 borderLeft: look.chrome
-                  ? `6px solid ${f.amount < 0 ? look.divider : look.fill}`
+                  ? `6px solid ${(f.amount ?? 0) < 0 ? look.divider : look.fill}`
                   : "none",
                 borderBottom: look.chrome ? "none" : `1px solid ${look.divider}`,
                 opacity: s,
@@ -503,12 +650,18 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
                   gap: 14,
                 }}
               >
-                {look.chrome ? null : (
+                {f.icon ? (
+                  <Glyph
+                    name={f.icon}
+                    size={26}
+                    color={(f.amount ?? 0) < 0 ? look.dim : look.wire}
+                  />
+                ) : look.chrome ? null : (
                   <span
                     style={{
                       width: 14,
                       height: 14,
-                      background: f.amount < 0 ? look.divider : look.fill,
+                      background: (f.amount ?? 0) < 0 ? look.divider : look.fill,
                       display: "inline-block",
                     }}
                   />
@@ -520,7 +673,7 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
                   fontFamily: DISPLAY,
                   fontWeight: 800,
                   fontSize: Math.round(height * 0.028),
-                  color: f.amount < 0 ? look.minus : look.plus,
+                  color: (f.amount ?? 0) < 0 ? look.minus : look.plus,
                 }}
               >
                 {signed(f.amount)}
@@ -591,6 +744,7 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
               transform: `scale(${interpolate(lockPop, [0, 1], [1.6, 1])}) rotate(${interpolate(lockPop, [0, 1], [-12, 0])}deg)`,
             }}
           >
+            <Glyph name="lock" size={26} color={look.onFill} />
             <span
               style={{
                 fontFamily: UI,
@@ -606,6 +760,52 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
           </div>
         ) : null}
       </div>
+
+      {/* Proof asset: a real screen crop pinned as the document behind the row */}
+      {proof && proofPop > 0 ? (
+        <div
+          style={{
+            position: "absolute",
+            left: chipX,
+            top: proofY,
+            width: proofW,
+            padding: look.chrome ? 12 : 0,
+            boxSizing: "border-box",
+            background: look.chrome ? look.card : "transparent",
+            borderRadius: look.radius === 0 ? 0 : 14,
+            boxShadow: look.cardShadow,
+            border: look.chrome ? "none" : `2px solid ${look.divider}`,
+            opacity: proofPop,
+            transform: `translateY(${interpolate(proofPop, [0, 1], [30, 0])}px) rotate(${interpolate(proofPop, [0, 1], [-4, -1.5])}deg)`,
+          }}
+        >
+          <Img
+            src={assetSrc(proof.src)}
+            style={{
+              display: "block",
+              width: "100%",
+              height: Math.round(proofW * 0.44),
+              objectFit: "cover",
+              objectPosition: "50% 30%",
+              borderRadius: look.radius === 0 ? 0 : 8,
+            }}
+          />
+          {proof.caption ? (
+            <div
+              style={{
+                fontFamily: UI,
+                fontSize: Math.round(height * 0.019),
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: look.dim,
+                padding: look.chrome ? "10px 4px 2px" : "10px 12px 12px",
+              }}
+            >
+              {proof.caption}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Rejected edit attempts bounce off the locked ledger */}
       {attempts.map((a, i) => {
@@ -648,8 +848,9 @@ export const LedgerFlow: React.FC<{ cutaway: TimelineCutaway }> = ({
         <div
           style={{
             position: "absolute",
-            left: chipX,
-            bottom: height * 0.12,
+            left: proof ? chipX + proofW * 0.34 : chipX,
+            top: proof ? proofY + 96 : undefined,
+            bottom: proof ? undefined : height * 0.12,
             padding: "18px 34px",
             border: `4px solid ${look.chrome ? look.wire : look.ink}`,
             background: look.chrome ? "transparent" : look.fill,
