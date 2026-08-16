@@ -167,7 +167,7 @@ screen_explainer:
     maxHeightRatio: 0.82
     borderRadiusPx: 24          # soft round
     shadow: soft_float
-    objectFit: cover            # clean full-frame screen footage
+    objectFit: fill             # card sized to screen.mp4 AR — no distort/crop
     crop:
       mode: none               # no smart_window_detect — supply clean screen raw
   pip:
@@ -197,9 +197,10 @@ Agents must load these defaults when `project.yaml` has `style: tutorial` (frame
 | Screen + PIP stage | Cool-mist canvas `#d9e2ec` + cozy float (soft round, no smart crop) |
 
 Run `ae cover-suggest .` after the EDL is confirmed when a `screen` source exists.
-Supply **clean** screen footage (already cropped / no desktop chrome). Float uses
-`crop.mode: none` + soft `borderRadiusPx` — do not hardcode per-episode crop %.
-Do not fork overlay colors/fonts per episode — promote changes into this style pack.
+Supply **clean** full-frame screen footage. Float card uses **screen.mp4 aspect
+ratio**, soft `borderRadiusPx`, and centers inside the cozy max box — scale to
+fit, never distort or smart-crop. Do not fork overlay colors/fonts per episode —
+promote changes into this style pack.
 
 **Draft review:** use `ae draft . --seconds 120 --render` (fromSec-safe slice + quality gates).
 Do **not** hand-trim `remotion-props.json` by `start`/`end` — overlays use `fromSec`/`durationSec`

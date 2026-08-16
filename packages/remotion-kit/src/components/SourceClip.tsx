@@ -316,19 +316,26 @@ export const SourceClip: React.FC<Props> = ({
         </AbsoluteFill>
       );
     }
+    // Soft-round card only: size from screen aspect (no crop / no distort).
+    // Fit inside cozy max box; center on cool-mist canvas.
     const widthRatio = screenCfg.widthRatio ?? 0.78;
+    const maxW = width * widthRatio;
     const maxH = height * (screenCfg.maxHeightRatio ?? 0.82);
-    const floatW = Math.round(width * widthRatio);
-    const cropAr =
+    const ar =
       windowCrop && windowCrop.w > 0 && windowCrop.h > 0
         ? windowCrop.w / windowCrop.h
-        : 16 / 9;
-    let floatH = Math.round(floatW / cropAr);
+        : typeof screenCfg.aspectRatio === "number" && screenCfg.aspectRatio > 0
+          ? screenCfg.aspectRatio
+          : 16 / 9;
+    let floatW = maxW;
+    let floatH = floatW / ar;
     if (floatH > maxH) {
-      floatH = Math.round(maxH);
+      floatH = maxH;
+      floatW = floatH * ar;
     }
+    floatW = Math.round(floatW);
+    floatH = Math.round(floatH);
     const radius = screenCfg.borderRadiusPx ?? 24;
-    const fit = (screenCfg.objectFit as string | undefined) ?? "cover";
     const topRatio = screenCfg.topRatio ?? 0.08;
     return (
       <AbsoluteFill>
@@ -344,7 +351,7 @@ export const SourceClip: React.FC<Props> = ({
             overflow: "hidden",
             boxShadow:
               "0 36px 70px rgba(28, 36, 48, 0.22), 0 12px 28px rgba(28, 36, 48, 0.14)",
-            background: "#141414",
+            background: "transparent",
           }}
         >
           <CroppedVideo
@@ -352,9 +359,9 @@ export const SourceClip: React.FC<Props> = ({
             startFrom={startFrom}
             volume={vol}
             liveScale={liveScale}
-            transformOrigin="center top"
+            transformOrigin="center center"
             windowCrop={windowCrop}
-            objectFit={fit}
+            objectFit="fill"
           />
         </div>
       </AbsoluteFill>

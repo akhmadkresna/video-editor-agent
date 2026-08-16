@@ -208,13 +208,22 @@ def cmd_cover(args: argparse.Namespace) -> int:
     edl["sources"] = sources
     cover = json.loads(cover_path.read_text(encoding="utf-8"))
     style_name = str(cfg.get("style") or "tutorial")
+    from agentic_editor.compose import apply_screen_aspect
+
+    se = load_screen_explainer(style_name)
+    ep_se = cfg.get("screen_explainer")
+    if isinstance(ep_se, dict):
+        from agentic_editor.cover.style_load import _deep_merge
+
+        se = _deep_merge(se, ep_se)
+    se = apply_screen_aspect(se, sources.get("screen"), verbose=True)
     timeline = build_timeline_from_edl_and_cover(
         edl,
         cover,
         fps=int(cfg.get("fps", 30)),
         width=int(cfg.get("width", 1920)),
         height=int(cfg.get("height", 1080)),
-        screen_explainer=load_screen_explainer(style_name),
+        screen_explainer=se,
         overlays=load_overlays(style_name),
         episode=episode,
     )

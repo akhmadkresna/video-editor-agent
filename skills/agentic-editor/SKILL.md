@@ -222,7 +222,7 @@ Safe zones stay `left_third` + `faceClear`. Suggest also scales density with kee
 | Mode | Visual | Audio |
 |------|--------|-------|
 | Full me (default) | Cam + `camera_play` framing | Cam |
-| `screen_with_cam` | Cool-mist canvas + cozy floated screen (smart window crop) + cam PIP at stage lower-right | Cam only |
+| `screen_with_cam` | Cool-mist canvas + cozy floated screen (soft round, full frame) + cam PIP at stage lower-right | Cam only |
 
 **Formula** (also implemented by `ae cover-suggest`):
 
@@ -233,9 +233,7 @@ Safe zones stay `left_third` + `faceClear`. Suggest also scales density with kee
 
 Framing presets simulate a 2–3 camera setup from one cam. Propose a camera-play plan from the transcript before writing `cover.json`. On screen ranges, skip framing zooms.
 
-**Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + `smart_window_detect`. Do not hardcode crop % per episode — `ae compose` attaches `windowCrop` from pixel detection. PIP anchors to the **frame** lower-right.
-
-**Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + `smart_window_detect`. Do not hardcode crop % per episode — `ae compose` attaches `windowCrop` from pixel detection. PIP anchors to the **frame** lower-right.
+**Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + soft round (`borderRadiusPx: 24`) + `crop.mode: none`. Host supplies clean full-frame screen; do not run smart window detect. Optional static `crop.inset` only for tiny capture-edge trash. PIP anchors to the **frame** lower-right.
 
 ## Promote
 
