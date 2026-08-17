@@ -239,11 +239,22 @@ def _extract_wav(source: Path, dest: Path, sample_rate: int) -> None:
 
 def _pad_copy(src: Path, dest: Path, whole_dur: float, sample_rate: int) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_name(dest.name + ".partial")
-    cmd = ["ffmpeg", "-y", "-i", str(src), "-c:a", "pcm_s16le", "-ar", str(int(sample_rate))]
+    tmp = dest.with_name(f"{dest.stem}.partial{dest.suffix}")
+    if tmp.exists():
+        tmp.unlink()
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-c:a",
+        "pcm_s16le",
+        "-ar",
+        str(int(sample_rate)),
+    ]
     if whole_dur > 0:
         cmd.extend(["-af", f"apad=whole_dur={whole_dur:.6f}", "-t", f"{whole_dur:.6f}"])
-    cmd.append(str(tmp))
+    cmd.extend(["-f", "wav", str(tmp)])
     _run(cmd, what="pad enhanced wav to source duration")
     tmp.replace(dest)
 

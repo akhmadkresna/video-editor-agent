@@ -126,6 +126,13 @@ def test_cached_binary_path_is_under_models():
     assert DF_VERSION in path.parts
 
 
+def test_pad_temp_uses_wav_extension():
+    dest = Path("edit/audio/cam.voice.wav")
+    tmp = dest.with_name(f"{dest.stem}.partial{dest.suffix}")
+    assert tmp.name == "cam.voice.partial.wav"
+    assert tmp.suffix == ".wav"
+
+
 def test_extract_segment_maps_voice_wav(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
