@@ -91,17 +91,105 @@ def test_entities_become_feeds_and_local_beats():
     assert [e["label"] for e in cut["entities"]] == ["In", "Out"]
     assert [round(f["atSec"], 1) for f in cut["feeds"]] == [4.0, 6.0]
     assert abs(cut["cues"]["balanceSec"] - 10.0) < 0.01
+    # Last beat at +10s; window is 14s — trim the still tail.
+    assert cut["durationSec"] < 12.5
+
+
+def test_cutaway_trims_idle_after_last_feed():
+    cover = {
+        "cutaways": [
+            {
+                "family": "evidence",
+                "start": 100.0,
+                "end": 120.0,
+                "entities": [
+                    {"label": "Listrik", "at": 103.0},
+                    {"label": "Gaji", "at": 105.5},
+                ],
+                "cues": {"open": 100.2, "stamp": 119.8},
+            }
+        ]
+    }
+    cut = build_timeline_cutaways(_edl(), cover)[0]
+    # Stamp was 14s after last tile — pull it in and drop the still hold.
+    assert cut["durationSec"] < 9.0
+    assert cut["cues"]["stampSec"] < 8.0
 
 
 def test_validate_brief_against_family():
-    issues = validate_brief_against_family(
+    # One engine: values and proof are allowed on every family id.
+    ok = validate_brief_against_family(
         "minimal",
-        entity_count=5,
+        entity_count=3,
         has_values=True,
         has_proof=True,
     )
-    assert any("maxEntities" in i for i in issues)
-    assert any("supportValues" in i for i in issues)
+    assert not any("supportValues" in i or "supportProof" in i for i in ok)
+    too_many = validate_brief_against_family("document", entity_count=12)
+    assert any("maxEntities" in i for i in too_many)
+
+
+def test_remap_injects_press_and_cam_blur_defaults():
+    cover = {
+        "cutaways": [
+            {
+                "family": "document",
+                "start": 106.0,
+                "end": 120.0,
+                "title": "Tape",
+            }
+        ]
+    }
+    defs = collect_cutaway_defs(cover)
+    assert defs[0]["style"] == "press"
+    assert defs[0]["backdrop"] == {
+        "kind": "cam_blur",
+        "blurPx": 34,
+        "dim": 0.22,
+    }
+    cuts = build_timeline_cutaways(_edl(), cover)
+    assert cuts[0]["style"] == "press"
+    assert cuts[0]["backdrop"]["dim"] == 0.22
+
+
+def test_remap_keeps_explicit_backdrop_dim():
+    cover = {
+        "cutaways": [
+            {
+                "family": "flow",
+                "start": 106.0,
+                "end": 112.0,
+                "style": "night",
+                "backdrop": {"kind": "cam_blur", "blurPx": 20, "dim": 0.5},
+            }
+        ]
+    }
+    defs = collect_cutaway_defs(cover)
+    assert defs[0]["style"] == "night"
+    assert defs[0]["backdrop"]["dim"] == 0.5
+    assert defs[0]["backdrop"]["blurPx"] == 20
+
+
+def test_remap_passes_entity_focus():
+    cover = {
+        "cutaways": [
+            {
+                "family": "evidence",
+                "start": 106.0,
+                "end": 114.0,
+                "entities": [
+                    {
+                        "label": "Row",
+                        "at": 108.0,
+                        "focus": {"x": 0.4, "y": 0.55, "zoom": 2.1},
+                    }
+                ],
+            }
+        ]
+    }
+    cut = build_timeline_cutaways(_edl(), cover)[0]
+    assert cut["entities"][0]["focus"]["x"] == 0.4
+    assert cut["feeds"][0]["focus"]["y"] == 0.55
 
 
 def test_suggest_cutaways_on_temp_episode(tmp_path: Path):
@@ -139,6 +227,9 @@ def test_suggest_cutaways_on_temp_episode(tmp_path: Path):
     assert out.is_file()
     cover = merge_cutaways_into_cover({"cutaways": []}, suggestion["cutaways"])
     assert all(str(c.get("note") or "").startswith("suggest:") for c in cover["cutaways"])
+    for c in suggestion["cutaways"]:
+        assert c.get("style") == "press"
+        assert c.get("backdrop", {}).get("dim") == 0.22
 
 
 def test_stage_cutaway_assets(tmp_path: Path):

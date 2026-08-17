@@ -52,6 +52,18 @@ export function amt(n: number | undefined): number {
   return n ?? 0;
 }
 
+/**
+ * True when the brief actually carries numbers. Non-numeric stories (access
+ * maps, step parades) must not render a currency total.
+ */
+export function hasNumericValues(
+  feeds: CutawayFeed[],
+  opening = 0,
+): boolean {
+  if (opening) return true;
+  return feeds.some((f) => (f.amount ?? 0) !== 0);
+}
+
 export type Pt = { x: number; y: number };
 
 /** Cubic bezier point — a travelling token rides the curve the path draws. */
@@ -103,6 +115,8 @@ export function resolveFeeds(cutaway: TimelineCutaway): CutawayFeed[] {
       atSec: e.atSec,
       icon: e.icon,
       unit: e.unit,
+      state: e.state,
+      focus: e.focus ?? e.asset?.focus,
     }));
   }
   return [];
@@ -123,7 +137,7 @@ export function sceneBeats(cutaway: TimelineCutaway) {
   const balanceSec =
     cues.totalSec ?? cues.balanceSec ?? beatAt(cutaway, "total", "update") ?? 10.1;
   const lockSec = cues.lockSec ?? beatAt(cutaway, "lock");
-  const stampSec =
+  const stampRaw =
     cues.resolveSec ?? cues.stampSec ?? beatAt(cutaway, "stamp", "resolve");
   const attemptSec =
     cues.rejectSec?.length
@@ -131,6 +145,18 @@ export function sceneBeats(cutaway: TimelineCutaway) {
       : cues.attemptSec?.length
         ? cues.attemptSec
         : beatsOf(cutaway, "reject");
+  const lastAction = Math.max(
+    openSec,
+    ...feeds.map((f) => f.atSec),
+    ...(lockSec != null ? [lockSec] : []),
+    ...attemptSec,
+    ...(cues.totalSec != null ? [cues.totalSec] : []),
+    ...(cues.balanceSec != null ? [cues.balanceSec] : []),
+  );
+  const stampSec =
+    stampRaw != null && stampRaw - lastAction > 3.5
+      ? lastAction + 0.85
+      : stampRaw;
 
   return {
     feeds,
@@ -143,6 +169,8 @@ export function sceneBeats(cutaway: TimelineCutaway) {
     opening: cutaway.openingBalance ?? 0,
     kicker: copy.kicker ?? cutaway.kicker ?? "",
     title: copy.title ?? cutaway.title ?? "",
+    openingLabel: copy.openingLabel ?? "",
+    footerLabel: copy.footerLabel ?? "",
     balanceLabel: copy.totalLabel ?? cutaway.balanceLabel ?? "",
     lockLabel: copy.lockLabel ?? cutaway.lockLabel ?? "",
     stampLabel: copy.stampLabel ?? cutaway.stampLabel ?? "",
@@ -166,6 +194,73 @@ function beatsOf(cutaway: TimelineCutaway, kind: string): number[] {
   return (cutaway.beats || [])
     .filter((b) => b.kind === kind)
     .map((b) => b.atSec);
+}
+
+export const CUTAWAY_FADE_FRAMES = 10;
+const MOTION_SETTLE_SEC = 0.5;
+const HOLD_AFTER_LAST_SEC = 0.45;
+const MAX_IDLE_TO_RESOLVE_SEC = 3.5;
+const RESOLVE_AFTER_ACTION_SEC = 0.85;
+const MIN_PLAY_SEC = 2.4;
+
+const RESOLVE_CUE = new Set(["stampSec", "resolveSec"]);
+const ACTION_CUE = new Set([
+  "openSec",
+  "ledgerInSec",
+  "classifySec",
+  "inOutSec",
+  "totalSec",
+  "balanceSec",
+  "lockSec",
+  "rejectSec",
+  "attemptSec",
+]);
+
+function cueSeconds(value: unknown): number[] {
+  if (Array.isArray(value)) return value.flatMap(cueSeconds);
+  if (typeof value === "number" && Number.isFinite(value)) return [value];
+  return [];
+}
+
+/** Last feed/lock/reject, and a stamp only if it is not parked at window end. */
+export function lastCutawayMotionSec(cutaway: TimelineCutaway): number {
+  const action: number[] = [];
+  const resolve: number[] = [];
+  for (const row of [...(cutaway.feeds || []), ...(cutaway.entities || [])]) {
+    if (typeof row.atSec === "number") action.push(row.atSec);
+  }
+  for (const beat of cutaway.beats || []) {
+    if (beat.kind === "stamp" || beat.kind === "resolve") resolve.push(beat.atSec);
+    else action.push(beat.atSec);
+  }
+  const cues = cutaway.cues || {};
+  for (const [key, val] of Object.entries(cues)) {
+    const secs = cueSeconds(val);
+    if (RESOLVE_CUE.has(key)) resolve.push(...secs);
+    else if (ACTION_CUE.has(key)) action.push(...secs);
+  }
+  const lastAction = action.length ? Math.max(...action) : 0;
+  const lastResolve = resolve.length ? Math.max(...resolve) : undefined;
+  if (
+    lastResolve != null &&
+    lastResolve - lastAction > MAX_IDLE_TO_RESOLVE_SEC
+  ) {
+    return lastAction + RESOLVE_AFTER_ACTION_SEC;
+  }
+  return Math.max(lastAction, lastResolve ?? 0);
+}
+
+/** Sequence length: last motion + settle + short hold + dissolve, capped by authored window. */
+export function cutawaySequenceDurationSec(
+  cutaway: TimelineCutaway,
+  fps: number,
+): number {
+  const fade = CUTAWAY_FADE_FRAMES / fps;
+  const play = Math.max(
+    lastCutawayMotionSec(cutaway) + MOTION_SETTLE_SEC + HOLD_AFTER_LAST_SEC + fade,
+    MIN_PLAY_SEC,
+  );
+  return Math.max(fade + 0.05, Math.min(cutaway.durationSec, play));
 }
 
 /** Cue spring: 0 before the cue second, settles at 1 just after. */
@@ -240,6 +335,87 @@ export const Backdrop: React.FC<{
     </AbsoluteFill>
   );
 };
+
+/**
+ * Material primitives. Families read as physical objects — paper, print, ink —
+ * instead of UI panels, so these carry grain, edge wear and tape rather than
+ * borders and rounded cards.
+ */
+
+/** Film grain / paper tooth over everything below it. */
+export const Grain: React.FC<{
+  opacity?: number;
+  frequency?: number;
+  blend?: React.CSSProperties["mixBlendMode"];
+}> = ({ opacity = 0.16, frequency = 0.85, blend = "overlay" }) => {
+  const id = `grain-${String(frequency).replace(".", "")}`;
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity,
+        mixBlendMode: blend,
+        pointerEvents: "none",
+      }}
+    >
+      <filter id={id}>
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency={frequency}
+          numOctaves={3}
+          stitchTiles="stitch"
+        />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+      <rect width="100%" height="100%" filter={`url(#${id})`} />
+    </svg>
+  );
+};
+
+/** Lens/press vignette so the frame has a centre of gravity. */
+export const Vignette: React.FC<{ strength?: number }> = ({
+  strength = 0.55,
+}) => (
+  <AbsoluteFill
+    style={{
+      background: `radial-gradient(120% 90% at 50% 42%, transparent 38%, rgba(0,0,0,${strength}) 100%)`,
+      pointerEvents: "none",
+    }}
+  />
+);
+
+/** Torn strip of masking tape holding a print down. */
+export const Tape: React.FC<{
+  width: number;
+  height?: number;
+  rotate?: number;
+  style?: React.CSSProperties;
+}> = ({ width, height = 34, rotate = -6, style }) => (
+  <div
+    style={{
+      position: "absolute",
+      width,
+      height,
+      transform: `rotate(${rotate}deg)`,
+      background:
+        "linear-gradient(180deg, rgba(238,230,205,0.62), rgba(216,204,172,0.5))",
+      boxShadow: "0 6px 14px rgba(0,0,0,0.28)",
+      ...style,
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        backgroundImage:
+          "repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 3px, transparent 3px 9px)",
+      }}
+    />
+  </div>
+);
 
 /**
  * House glyph set: stroked vectors drawn in code so they inherit the scene

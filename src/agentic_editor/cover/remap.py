@@ -112,7 +112,9 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
 from agentic_editor.cover.cutaway_families import (
     BEAT_ALIASES,
     FAMILY_TO_SCENE,
+    apply_cutaway_defaults,
     resolve_family,
+    tighten_cutaway_motion,
 )
 
 CUTAWAY_SCENES = frozenset(FAMILY_TO_SCENE.values()) | frozenset(
@@ -172,6 +174,7 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
             "source": str(item.get("source") or "cam"),
         }
         for key in (
+            "style",
             "look",
             "intent",
             "tone",
@@ -198,6 +201,8 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
                 ("stampLabel", "stampLabel"),
                 ("inLabel", "inLabel"),
                 ("outLabel", "outLabel"),
+                ("openingLabel", "openingLabel"),
+                ("footerLabel", "footerLabel"),
             ):
                 if flat not in entry and copy.get(ck):
                     entry[flat] = str(copy[ck]).strip()
@@ -260,9 +265,11 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
                     ent["value"] = float(e["amount"])
                 except (TypeError, ValueError):
                     pass
-            for opt in ("id", "unit", "icon"):
+            for opt in ("id", "unit", "icon", "state"):
                 if e.get(opt):
                     ent[opt] = e[opt]
+            if isinstance(e.get("focus"), dict):
+                ent["focus"] = e["focus"]
             if isinstance(e.get("asset"), dict) and e["asset"].get("src"):
                 ent["asset"] = e["asset"]
             entities.append(ent)
@@ -287,6 +294,10 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
                 feed["icon"] = icon
             if f.get("unit"):
                 feed["unit"] = str(f["unit"])
+            if f.get("state"):
+                feed["state"] = str(f["state"])
+            if isinstance(f.get("focus"), dict):
+                feed["focus"] = f["focus"]
             feeds.append(feed)
             if not entities:
                 ent = {
@@ -297,6 +308,10 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
                     ent["value"] = feed["amount"]
                 if icon:
                     ent["icon"] = icon
+                if feed.get("state"):
+                    ent["state"] = feed["state"]
+                if feed.get("focus"):
+                    ent["focus"] = feed["focus"]
                 entities.append(ent)
         if feeds:
             entry["feeds"] = feeds
@@ -309,6 +324,9 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
                         "at": e["at"],
                         **({"amount": e["value"]} if "value" in e else {}),
                         **({"icon": e["icon"]} if e.get("icon") else {}),
+                        **({"unit": e["unit"]} if e.get("unit") else {}),
+                        **({"state": e["state"]} if e.get("state") else {}),
+                        **({"focus": e["focus"]} if e.get("focus") else {}),
                     }
                     for e in entities
                 ]
@@ -342,6 +360,7 @@ def collect_cutaway_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         cues = item.get("cues")
         if isinstance(cues, dict):
             entry["cues"] = cues
+        apply_cutaway_defaults(entry)
         out.append(entry)
     return out
 
@@ -375,6 +394,7 @@ def build_timeline_cutaways(
             "durationSec": round(dur, 3),
         }
         for key in (
+            "style",
             "look",
             "intent",
             "tone",
@@ -391,6 +411,8 @@ def build_timeline_cutaways(
             "balanceLabel",
             "attemptLabels",
             "openingBalance",
+            "openingLabel",
+            "footerLabel",
             "note",
         ):
             if key in cut:
@@ -411,6 +433,10 @@ def build_timeline_cutaways(
                 feed["icon"] = f["icon"]
             if f.get("unit"):
                 feed["unit"] = f["unit"]
+            if f.get("state"):
+                feed["state"] = f["state"]
+            if f.get("focus"):
+                feed["focus"] = f["focus"]
             feeds.append(feed)
         if feeds:
             entry["feeds"] = feeds
@@ -429,6 +455,10 @@ def build_timeline_cutaways(
                 ent["unit"] = e["unit"]
             if e.get("icon"):
                 ent["icon"] = e["icon"]
+            if e.get("state"):
+                ent["state"] = e["state"]
+            if e.get("focus"):
+                ent["focus"] = e["focus"]
             if e.get("asset"):
                 ent["asset"] = e["asset"]
             entities.append(ent)
@@ -513,6 +543,7 @@ def build_timeline_cutaways(
 
         if cues:
             entry["cues"] = cues
+        tighten_cutaway_motion(entry)
         out.append(entry)
     out.sort(key=lambda x: float(x["fromSec"]))
     return out

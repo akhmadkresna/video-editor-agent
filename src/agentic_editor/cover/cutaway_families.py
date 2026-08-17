@@ -1,14 +1,24 @@
-"""Cutaway motion families — visual engines, not VO topics.
+"""Cutaway family ids — labels for Sequence names / QA, not renderers.
 
-New VOs become data (VisualBrief). A new family is only justified when a
-genuinely new motion language is needed.
+Every brief renders through one Remotion engine (`InterfaceStage`). Board
+layout is inferred from the data (catalog / ledger / access / shot). Family
+ids stay so suggest can rotate names and contact sheets can group shots.
+
+New VOs become VisualBrief data. Do not add a React component per topic.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-# Canonical family ids (Remotion registry + suggest + quality gates).
+DEFAULT_CUTAWAY_STYLE = "press"
+DEFAULT_CUTAWAY_BACKDROP: dict[str, Any] = {
+    "kind": "cam_blur",
+    "blurPx": 34,
+    "dim": 0.22,
+}
+
+# Canonical family ids (timeline naming + suggest rotation + quality gates).
 CUTAWAY_FAMILIES = frozenset(
     {
         "document",
@@ -51,80 +61,26 @@ FAMILY_TO_SCENE: dict[str, str] = {
     "minimal": "minimal",
 }
 
+# One engine: every family id shares the same capability envelope.
+ENGINE_CAPABILITIES: dict[str, Any] = {
+    "supportsValues": True,
+    "supportsProof": True,
+    "maxEntities": 8,
+    "preferredIntents": [
+        "explain",
+        "compare",
+        "accumulate",
+        "transform",
+        "sequence",
+        "prove",
+        "warn",
+        "summarize",
+    ],
+    "minDurationSec": 3.0,
+    "maxCopyChars": 72,
+}
 FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
-    "document": {
-        "supportsValues": True,
-        "supportsProof": True,
-        "maxEntities": 6,
-        "preferredIntents": ["prove", "accumulate", "warn", "summarize"],
-        "minDurationSec": 8.0,
-        "maxCopyChars": 48,
-    },
-    "flow": {
-        "supportsValues": True,
-        "supportsProof": True,
-        "maxEntities": 5,
-        "preferredIntents": ["transform", "explain", "accumulate", "sequence"],
-        "minDurationSec": 8.0,
-        "maxCopyChars": 42,
-    },
-    "kinetic_type": {
-        "supportsValues": True,
-        "supportsProof": True,
-        "maxEntities": 4,
-        "preferredIntents": ["summarize", "compare", "explain", "warn"],
-        "minDurationSec": 5.0,
-        "maxCopyChars": 36,
-    },
-    "comparison": {
-        "supportsValues": True,
-        "supportsProof": False,
-        "maxEntities": 4,
-        "preferredIntents": ["compare"],
-        "minDurationSec": 6.0,
-        "maxCopyChars": 40,
-    },
-    "sequence": {
-        "supportsValues": False,
-        "supportsProof": False,
-        "maxEntities": 6,
-        "preferredIntents": ["sequence", "explain"],
-        "minDurationSec": 7.0,
-        "maxCopyChars": 40,
-    },
-    "system_map": {
-        "supportsValues": True,
-        "supportsProof": True,
-        "maxEntities": 6,
-        "preferredIntents": ["explain", "transform", "sequence"],
-        "minDurationSec": 8.0,
-        "maxCopyChars": 42,
-    },
-    "evidence": {
-        "supportsValues": False,
-        "supportsProof": True,
-        "maxEntities": 3,
-        "preferredIntents": ["prove", "explain"],
-        "minDurationSec": 4.0,
-        "maxCopyChars": 48,
-    },
-    "minimal": {
-        "supportsValues": False,
-        "supportsProof": False,
-        "maxEntities": 2,
-        "preferredIntents": [
-            "explain",
-            "compare",
-            "accumulate",
-            "transform",
-            "sequence",
-            "prove",
-            "warn",
-            "summarize",
-        ],
-        "minDurationSec": 3.0,
-        "maxCopyChars": 56,
-    },
+    fam: dict(ENGINE_CAPABILITIES) for fam in CUTAWAY_FAMILIES
 }
 
 # Generic beat names ↔ legacy cue keys (cover source time → timeline *Sec).
@@ -151,6 +107,138 @@ LEGACY_CUE_TO_BEAT: dict[str, str] = {
     "stamp": "stamp",
     "attempts": "reject",
 }
+
+# Picture takeover ends after the last real beat — not the VO window.
+# Matches CutawayLayer dissolve (10 frames @ 30fps) + InterfaceStage hitMotion.
+CUTAWAY_FADE_SEC = 10 / 30
+CUTAWAY_MOTION_SETTLE_SEC = 0.5
+CUTAWAY_HOLD_AFTER_LAST_SEC = 0.45
+CUTAWAY_MAX_IDLE_TO_RESOLVE_SEC = 3.5
+CUTAWAY_RESOLVE_AFTER_ACTION_SEC = 0.85
+CUTAWAY_MIN_PLAY_SEC = 2.4
+
+_RESOLVE_CUE_KEYS = frozenset(
+    {"stamp", "stampSec", "resolve", "resolveSec"}
+)
+_ACTION_CUE_KEYS = frozenset(
+    {
+        "open",
+        "openSec",
+        "ledgerIn",
+        "ledgerInSec",
+        "classify",
+        "classifySec",
+        "inOut",
+        "inOutSec",
+        "total",
+        "totalSec",
+        "balance",
+        "balanceSec",
+        "lock",
+        "lockSec",
+        "reject",
+        "rejectSec",
+        "attempts",
+        "attemptSec",
+    }
+)
+
+
+def _collect_seconds(value: Any) -> list[float]:
+    if isinstance(value, list):
+        out: list[float] = []
+        for item in value:
+            out.extend(_collect_seconds(item))
+        return out
+    try:
+        return [float(value)]
+    except (TypeError, ValueError):
+        return []
+
+
+def cutaway_action_times(cut: dict[str, Any]) -> tuple[list[float], list[float]]:
+    """Return (action seconds, resolve/stamp seconds) in the cut's time base."""
+    action: list[float] = []
+    resolve: list[float] = []
+    for row in list(cut.get("feeds") or []) + list(cut.get("entities") or []):
+        if not isinstance(row, dict):
+            continue
+        action.extend(_collect_seconds(row.get("atSec", row.get("at"))))
+    for beat in cut.get("beats") or []:
+        if not isinstance(beat, dict):
+            continue
+        kind = str(beat.get("kind") or "")
+        secs = _collect_seconds(beat.get("atSec", beat.get("at")))
+        if kind in ("stamp", "resolve"):
+            resolve.extend(secs)
+        else:
+            action.extend(secs)
+    cues = cut.get("cues") or {}
+    if isinstance(cues, dict):
+        for key, val in cues.items():
+            secs = _collect_seconds(val)
+            if key in _RESOLVE_CUE_KEYS:
+                resolve.extend(secs)
+            elif key in _ACTION_CUE_KEYS:
+                action.extend(secs)
+    return action, resolve
+
+
+def tighten_cutaway_motion(cut: dict[str, Any]) -> dict[str, Any]:
+    """Trim picture takeover to last motion; pull a parked end-stamp forward.
+
+    cover.start/end (or timeline fromSec/durationSec) is the *allowed* window.
+    After the last feed/lock/reject, do not hold a still graphic until VO ends.
+    """
+    duration = float(cut.get("durationSec") or 0.0)
+    if duration <= 0 and "start" in cut and "end" in cut:
+        duration = float(cut["end"]) - float(cut["start"])
+    action, resolve = cutaway_action_times(cut)
+    last_action = max(action) if action else 0.0
+    last_resolve = max(resolve) if resolve else None
+    used_resolve = last_resolve
+    if last_resolve is not None and last_resolve - last_action > CUTAWAY_MAX_IDLE_TO_RESOLVE_SEC:
+        used_resolve = round(last_action + CUTAWAY_RESOLVE_AFTER_ACTION_SEC, 3)
+        cues = dict(cut.get("cues") or {})
+        for key in ("stampSec", "resolveSec", "stamp", "resolve"):
+            if key in cues and not isinstance(cues.get(key), list):
+                cues[key] = used_resolve
+        cut["cues"] = cues
+    last_motion = last_action
+    if used_resolve is not None:
+        last_motion = max(last_motion, used_resolve)
+    play = max(
+        last_motion
+        + CUTAWAY_MOTION_SETTLE_SEC
+        + CUTAWAY_HOLD_AFTER_LAST_SEC
+        + CUTAWAY_FADE_SEC,
+        CUTAWAY_MIN_PLAY_SEC,
+    )
+    if duration > 0:
+        play = min(duration, play)
+        cut["durationSec"] = round(play, 3)
+        if "start" in cut and "end" in cut:
+            cut["end"] = round(float(cut["start"]) + play, 3)
+    return cut
+
+
+def apply_cutaway_defaults(entry: dict[str, Any]) -> dict[str, Any]:
+    """Fill production defaults: press ink + live cam blur through the field."""
+    if not str(entry.get("style") or "").strip() and not str(
+        entry.get("look") or ""
+    ).strip():
+        entry["style"] = DEFAULT_CUTAWAY_STYLE
+    bd = entry.get("backdrop")
+    if not isinstance(bd, dict) or not bd.get("kind"):
+        entry["backdrop"] = dict(DEFAULT_CUTAWAY_BACKDROP)
+        return entry
+    patched = dict(bd)
+    if patched.get("kind") == "cam_blur" and patched.get("blurPx") is None:
+        patched["blurPx"] = DEFAULT_CUTAWAY_BACKDROP["blurPx"]
+    if patched.get("dim") is None:
+        patched["dim"] = DEFAULT_CUTAWAY_BACKDROP["dim"]
+    entry["backdrop"] = patched
+    return entry
 
 
 def resolve_family(item: dict[str, Any]) -> str | None:

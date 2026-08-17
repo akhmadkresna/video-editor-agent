@@ -100,8 +100,8 @@ export type CutawayScene =
   | "minimal";
 
 /**
- * Motion family = visual language / layout engine.
- * New VOs are data; a new family needs a new motion language.
+ * Family id = Sequence / QA label. Every brief renders through InterfaceStage;
+ * board layout is inferred from the data (catalog / ledger / access / shot).
  */
 export type CutawayFamily =
   | "document"
@@ -142,7 +142,19 @@ export type CutawayBeatKind =
   | "lock"
   | "stamp";
 
-/** Surface treatment for cutaway scenes. `glass` was the first pass. */
+/**
+ * Print recipe shared by every family: stock, inks, type and mark language.
+ * See `components/cutaway/style.ts` for the tokens behind each name.
+ */
+export type CutawayStyleName =
+  | "press"
+  | "thermal"
+  | "darkroom"
+  | "cyanotype"
+  | "night"
+  | "daylight";
+
+/** @deprecated Superseded by `style`; kept so older covers still render. */
 export type CutawayLook =
   | "glass"
   | "flat_light"
@@ -179,7 +191,12 @@ export type CutawayAsset = {
   role?: "hero" | "proof" | "texture" | "annotation";
   /** Episode-relative or absolute origin before staging. */
   provenance?: string;
+  /** Detail worth magnifying: 0–1 fractions of the image plus a zoom factor. */
+  focus?: { x: number; y: number; zoom?: number };
 };
+
+/** Verdict polarity for non-numeric stories (access, checks, pass/fail). */
+export type CutawayState = "allow" | "deny" | "neutral";
 
 export type CutawayFeed = {
   label: string;
@@ -189,6 +206,9 @@ export type CutawayFeed = {
   atSec: number;
   icon?: CutawayGlyph;
   unit?: string;
+  state?: CutawayState;
+  /** Hotspot on the UI stage (0–1). Camera punches here when this entity lands. */
+  focus?: { x: number; y: number; zoom?: number };
 };
 
 /** Neutral entity in a VisualBrief (timeline-local after remap). */
@@ -200,6 +220,9 @@ export type CutawayEntity = {
   atSec: number;
   icon?: CutawayGlyph;
   asset?: CutawayAsset;
+  state?: CutawayState;
+  /** Hotspot on the UI stage (0–1). Camera punches here when this entity lands. */
+  focus?: { x: number; y: number; zoom?: number };
 };
 
 export type CutawayBeat = {
@@ -211,7 +234,10 @@ export type CutawayBeat = {
 export type CutawayCopy = {
   kicker?: string;
   title?: string;
+  openingLabel?: string;
   totalLabel?: string;
+  /** Small print under the document (journal no., source system). */
+  footerLabel?: string;
   lockLabel?: string;
   stampLabel?: string;
   attemptLabels?: string[];
@@ -229,6 +255,9 @@ export type TimelineCutaway = {
   tone?: CutawayTone;
   fromSec: number;
   durationSec: number;
+  /** Print recipe; overrides the tone/family default. */
+  style?: CutawayStyleName;
+  /** @deprecated Prefer style. */
   look?: CutawayLook;
   backdrop?: CutawayBackdrop;
   /** Real screenshot/asset shown inside the scene as proof. */

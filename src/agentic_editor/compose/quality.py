@@ -14,6 +14,7 @@ from typing import Any
 
 from agentic_editor.cover.remap import collect_overlay_defs, collect_cutaway_defs
 from agentic_editor.cover.cutaway_families import (
+    cutaway_action_times,
     resolve_family,
     validate_brief_against_family,
 )
@@ -181,6 +182,16 @@ def audit_timeline_quality(
             )
 
     for c in tl_cutaways:
+        action, resolve = cutaway_action_times(c)
+        last_action = max(action) if action else 0.0
+        last_resolve = max(resolve) if resolve else 0.0
+        last_motion = max(last_action, last_resolve)
+        dur = float(c.get("durationSec") or 0)
+        if dur and last_motion and dur > last_motion + 2.2:
+            warnings.append(
+                f"cutaway {c.get('id')} holds {dur - last_motion:.1f}s after last "
+                "motion — takeover should end after the last beat"
+            )
         family = str(c.get("family") or resolve_family(c) or "")
         feeds = c.get("feeds") or c.get("entities") or []
         entity_count = len(feeds) if isinstance(feeds, list) else 0
@@ -218,7 +229,7 @@ def audit_timeline_quality(
             if "maxEntities" in i or "supportValues" in i or "supportProof" in i
         ]
         for i in hard:
-            warnings.append(f"cutaway {c.get('id')}: {i} — consider family=minimal")
+            warnings.append(f"cutaway {c.get('id')}: {i} — trim entities or copy")
         # Beats / cues inside duration
         dur = float(c.get("durationSec") or 0)
         cues = c.get("cues") or {}

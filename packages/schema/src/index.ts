@@ -131,7 +131,7 @@ export const CoverOverlaySchema = z.object({
 });
 
 /** Generated MG cutaway scenes (picture takeover under cam VO), source-time. */
-/** @deprecated Prefer CutawayFamilySchema; kept as Remotion component keys. */
+/** @deprecated Prefer CutawayFamilySchema; kept as authoring aliases. */
 export const CutawaySceneSchema = z.enum([
   "ledger_flow",
   "receipt_tape",
@@ -184,6 +184,17 @@ export const CutawayBeatKindSchema = z.enum([
   "stamp",
 ]);
 
+/** Print recipe shared by every family (stock, inks, type, mark language). */
+export const CutawayStyleSchema = z.enum([
+  "press",
+  "thermal",
+  "darkroom",
+  "cyanotype",
+  "night",
+  "daylight",
+]);
+
+/** @deprecated Superseded by CutawayStyleSchema. */
 export const CutawayLookSchema = z.enum([
   "glass",
   "flat_light",
@@ -217,7 +228,18 @@ export const CutawayAssetSchema = z.object({
   caption: z.string().optional(),
   role: z.enum(["hero", "proof", "texture", "annotation"]).optional(),
   provenance: z.string().optional(),
+  /** Detail worth magnifying: 0–1 fractions of the image plus a zoom factor. */
+  focus: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+      zoom: z.number().optional(),
+    })
+    .optional(),
 });
+
+/** Verdict polarity for non-numeric stories (access, checks, pass/fail). */
+export const CutawayStateSchema = z.enum(["allow", "deny", "neutral"]);
 
 export const CutawayFeedSchema = z.object({
   label: z.string(),
@@ -227,6 +249,7 @@ export const CutawayFeedSchema = z.object({
   at: z.number(),
   icon: CutawayGlyphSchema.optional(),
   unit: z.string().optional(),
+  state: CutawayStateSchema.optional(),
 });
 
 export const CutawayEntitySchema = z.object({
@@ -238,6 +261,7 @@ export const CutawayEntitySchema = z.object({
   at: z.number(),
   icon: CutawayGlyphSchema.optional(),
   asset: CutawayAssetSchema.optional(),
+  state: CutawayStateSchema.optional(),
 });
 
 export const CutawayBeatSchema = z.object({
@@ -250,7 +274,9 @@ export const CutawayBeatSchema = z.object({
 export const CutawayCopySchema = z.object({
   kicker: z.string().optional(),
   title: z.string().optional(),
+  openingLabel: z.string().optional(),
   totalLabel: z.string().optional(),
+  footerLabel: z.string().optional(),
   lockLabel: z.string().optional(),
   stampLabel: z.string().optional(),
   attemptLabels: z.array(z.string()).optional(),
@@ -270,6 +296,7 @@ export const CoverCutawaySchema = z
     source: z.string().default("cam"),
     intent: CutawayIntentSchema.optional(),
     tone: CutawayToneSchema.optional(),
+    style: CutawayStyleSchema.optional(),
     look: CutawayLookSchema.optional(),
     backdrop: CutawayBackdropSchema.optional(),
     proof: CutawayAssetSchema.optional(),
@@ -494,6 +521,7 @@ export const TimelineSchema = z.object({
         tone: CutawayToneSchema.optional(),
         fromSec: z.number(),
         durationSec: z.number(),
+        style: CutawayStyleSchema.optional(),
         look: CutawayLookSchema.optional(),
         backdrop: CutawayBackdropSchema.optional(),
         proof: CutawayAssetSchema.optional(),
@@ -510,6 +538,7 @@ export const TimelineSchema = z.object({
               atSec: z.number(),
               icon: CutawayGlyphSchema.optional(),
               unit: z.string().optional(),
+              state: CutawayStateSchema.optional(),
             }),
           )
           .optional(),
@@ -523,6 +552,7 @@ export const TimelineSchema = z.object({
               atSec: z.number(),
               icon: CutawayGlyphSchema.optional(),
               asset: CutawayAssetSchema.optional(),
+              state: CutawayStateSchema.optional(),
             }),
           )
           .optional(),

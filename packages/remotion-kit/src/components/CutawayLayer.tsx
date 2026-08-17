@@ -7,15 +7,12 @@ import {
   useVideoConfig,
 } from "remotion";
 import type { CutawayFamily, TimelineCutaway } from "../types";
-import { BlueprintNodes } from "./cutaway/BlueprintNodes";
-import { EvidenceCutaway } from "./cutaway/Evidence";
-import { KineticFigures } from "./cutaway/KineticFigures";
-import { LedgerFlow } from "./cutaway/LedgerFlow";
-import { MinimalCutaway } from "./cutaway/Minimal";
-import { ReceiptTape } from "./cutaway/ReceiptTape";
-import { resolveFamily } from "./cutaway/shared";
-
-const FADE_FRAMES = 10;
+import { InterfaceStage } from "./cutaway/InterfaceStage";
+import {
+  CUTAWAY_FADE_FRAMES,
+  cutawaySequenceDurationSec,
+  resolveFamily,
+} from "./cutaway/shared";
 
 /** Dissolve on/off so the takeover never hard-flashes against cam. */
 const Dissolve: React.FC<{
@@ -24,13 +21,13 @@ const Dissolve: React.FC<{
 }> = ({ durationInFrames, children }) => {
   const frame = useCurrentFrame();
   const opacity = Math.min(
-    interpolate(frame, [0, FADE_FRAMES], [0, 1], {
+    interpolate(frame, [0, CUTAWAY_FADE_FRAMES], [0, 1], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     }),
     interpolate(
       frame,
-      [durationInFrames - FADE_FRAMES, durationInFrames],
+      [durationInFrames - CUTAWAY_FADE_FRAMES, durationInFrames],
       [1, 0],
       { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
     ),
@@ -41,27 +38,23 @@ const Dissolve: React.FC<{
 type FamilyView = React.FC<{ cutaway: TimelineCutaway }>;
 
 /**
- * Family registry: visual engines, not VO topics.
- * comparison → kinetic_type engine; sequence → flow engine until dedicated skins land.
+ * One engine for every brief. Family ids stay on the timeline for naming and
+ * QA; layout is inferred from the data (catalog / ledger / access / shot).
  */
 export const CUTAWAY_FAMILY_REGISTRY: Record<CutawayFamily, FamilyView> = {
-  document: ReceiptTape,
-  flow: LedgerFlow,
-  kinetic_type: KineticFigures,
-  comparison: KineticFigures,
-  sequence: LedgerFlow,
-  system_map: BlueprintNodes,
-  evidence: EvidenceCutaway,
-  minimal: MinimalCutaway,
+  document: InterfaceStage,
+  flow: InterfaceStage,
+  kinetic_type: InterfaceStage,
+  comparison: InterfaceStage,
+  sequence: InterfaceStage,
+  system_map: InterfaceStage,
+  evidence: InterfaceStage,
+  minimal: InterfaceStage,
 };
 
 export const CutawaySceneView: React.FC<{ cutaway: TimelineCutaway }> = ({
   cutaway,
-}) => {
-  const family = resolveFamily(cutaway);
-  const View = CUTAWAY_FAMILY_REGISTRY[family] ?? MinimalCutaway;
-  return <View cutaway={cutaway} />;
-};
+}) => <InterfaceStage cutaway={cutaway} />;
 
 /**
  * MG cutaways cover the picture for their window. Cam clips stay mounted
@@ -76,7 +69,10 @@ export const CutawayLayer: React.FC<{ cutaways?: TimelineCutaway[] }> = ({
     <>
       {cutaways.map((c) => {
         const from = Math.round(c.fromSec * fps);
-        const duration = Math.max(1, Math.round(c.durationSec * fps));
+        const duration = Math.max(
+          1,
+          Math.round(cutawaySequenceDurationSec(c, fps) * fps),
+        );
         const family = resolveFamily(c);
         return (
           <Sequence
