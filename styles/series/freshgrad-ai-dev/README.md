@@ -117,18 +117,32 @@ Spine per part (do not reorder back to pedagogy-only):
 Do **not** open on “kampus primitive / 90 hari roadmap / kuliah percuma”.
 Do **not** dunk on lecturers. Replace `[NAMA]` only when the host supplies it.
 
-## Production (from naskah §4)
+## Production
 
-1. No music / “halo semuanya” in the first 40s. Hook = angka or “siapa di
-   sini yang…”.
-2. Disclaimer in the first ~90s. Engagement bait in minute one.
-3. Announce chapters on cam (“Oke, langsung masuk ke chapter pertama”).
-4. One sticky closing analogy per video (the screenshot line).
-5. Locked sign-off: **“Pelan-pelan aja, yang penting jalan terus.”** then
-   “Saya [NAMA], sampai jumpa di video berikutnya.”
-6. No negative named campuses, lecturers, or clients.
-7. Swap placeholder anecdotes (e.g. N+1 query) for the host’s real stories
-   before the take that ships.
+**Picture lock:** essay talking-head. Keep `style: tutorial` (Bold +
+`#7dd3fc`, camera_play, no karaoke). Do not switch the series to
+`style: evidence` — that pack is for estimator screenshots.
+
+- Full cam on Parts 1–2. No screen demo. No `cover.cutaways[]`.
+- Signature MG: `callout` (number + source on screen). Overlay-suggest
+  will not emit callouts — author them from `edit/evidence.md`.
+- Chapters + diagrams for lists. Emphasis only on thesis lines.
+- Quotes from EN/ID creators = **kartu kutipan** (`chapter` kicker =
+  channel name). Default no third-party video clips (Content ID).
+- Optional later: 8–12s `evidence_with_cam` of *real* BPS / Stanford /
+  LPEM page screenshots. Never AI dashboards.
+- Thumb accent `#facc15` is YouTube-only. In-video MG stays cool mist.
+- Sparser than Odoo demos: after overlay-suggest, delete most lexicon
+  gap-fill. Audio from cam; shutter/click only; no hook music.
+
+Episode runbook: `edit/production.md`. Number provenance:
+`edit/evidence.md`.
+
+Naskah craft (from §4): no “halo semuanya” in the first 40s; disclaimer
+in ~90s; engagement bait in minute one; announce chapters; one sticky
+closing analogy; sign-off **“Pelan-pelan aja, yang penting jalan terus.”**
+No negative named campuses, lecturers, or clients. Swap placeholder
+anecdotes (e.g. N+1 query) for the host’s real stories.
 
 ## Hard rules for agents
 
