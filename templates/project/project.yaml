@@ -11,3 +11,5 @@ fps: 30
 aspect: "16:9"
 width: 1920
 height: 1080
+# voice_enhance:
+#   enabled: false   # opt out of DeepFilterNet cam VO (default on)

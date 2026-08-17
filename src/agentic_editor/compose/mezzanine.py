@@ -106,6 +106,7 @@ def encode_mezzanine(
     fps: int,
     crf: int = DEFAULT_CRF,
     preset: str = DEFAULT_PRESET,
+    audio_src: Path | None = None,
 ) -> Path:
     """Re-encode ``src`` to project frame size/fps at high quality (does not touch raw)."""
     if not src.is_file():
@@ -130,30 +131,48 @@ def encode_mezzanine(
         "-y",
         "-i",
         str(src),
-        "-vf",
-        vf,
-        "-r",
-        str(fps),
-        "-c:v",
-        "libx264",
-        "-preset",
-        preset,
-        "-crf",
-        str(crf),
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-ar",
-        "48000",
-        "-movflags",
-        "+faststart",
-        "-f",
-        "mp4",
-        str(tmp),
     ]
+    if audio_src is not None:
+        cmd.extend(["-i", str(audio_src), "-map", "0:v:0", "-map", "1:a:0"])
+    cmd.extend(
+        [
+            "-vf",
+            vf,
+            "-r",
+            str(fps),
+            "-c:v",
+            "libx264",
+            "-preset",
+            preset,
+            "-crf",
+            str(crf),
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+        ]
+    )
+    if audio_src is not None:
+        dur = 0.0
+        try:
+            dur = float(probe_video(src).get("duration") or 0)
+        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError, TypeError):
+            dur = 0.0
+        if dur > 0:
+            cmd.extend(["-af", f"apad=whole_dur={dur:.6f}", "-t", f"{dur:.6f}"])
+    cmd.extend(
+        [
+            "-movflags",
+            "+faststart",
+            "-f",
+            "mp4",
+            str(tmp),
+        ]
+    )
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     tmp.replace(dest)
     return dest
@@ -169,15 +188,24 @@ def build_mezzanines(
     crf: int = DEFAULT_CRF,
     force: bool = False,
     verbose: bool = True,
+    audio_overrides: dict[str, Path] | None = None,
 ) -> dict[str, Path]:
     """Write ``edit/mezzanine/<name>.mp4`` for each source; skip up-to-date unless force."""
     out: dict[str, Path] = {}
     for name, src in sources.items():
         dest = mezzanine_path(episode, name)
+        audio_src = None
+        if audio_overrides:
+            cand = audio_overrides.get(name)
+            if cand is not None and cand.is_file():
+                audio_src = cand
+        newest_input = src.stat().st_mtime
+        if audio_src is not None:
+            newest_input = max(newest_input, audio_src.stat().st_mtime)
         if (
             not force
             and dest.is_file()
-            and dest.stat().st_mtime >= src.stat().st_mtime
+            and dest.stat().st_mtime >= newest_input
             and dest.stat().st_size > 0
         ):
             if verbose:
@@ -185,12 +213,19 @@ def build_mezzanines(
             out[name] = dest
             continue
         if verbose:
+            extra = f" + {audio_src.name}" if audio_src is not None else ""
             print(
-                f"• mezzanine {name}: {src.name} → "
+                f"• mezzanine {name}: {src.name}{extra} → "
                 f"{width}x{height}@{fps} CRF{crf} → {dest.relative_to(episode)}"
             )
         encode_mezzanine(
-            src, dest, width=width, height=height, fps=fps, crf=crf
+            src,
+            dest,
+            width=width,
+            height=height,
+            fps=fps,
+            crf=crf,
+            audio_src=audio_src,
         )
         if verbose:
             print(f"  wrote {dest.stat().st_size} bytes")
@@ -220,6 +255,12 @@ def resolve_compose_sources(
                     f"• compose source {name}: mezzanine "
                     f"({mezz.stat().st_size} bytes) — raw untouched"
                 )
+                voice = episode / "edit" / "audio" / f"{name}.voice.wav"
+                if voice.is_file() and mezz.stat().st_mtime < voice.stat().st_mtime:
+                    print(
+                        f"! {name} mezzanine is older than {voice.name} — "
+                        "run: ae mezzanine ."
+                    )
             continue
         resolved[name] = str(raw.resolve())
         if not raw.is_file():

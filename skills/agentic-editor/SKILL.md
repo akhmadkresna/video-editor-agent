@@ -37,6 +37,9 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
    Never start `remotion studio` bare — that shows a black empty timeline. Absolute `/Users/...`
    media paths will not load in the browser.
 9. **Audio always from cam.** Screen is visual-only (muted). Prefer `screen_with_cam` for UI demos.
+    Cam VO is DeepFilterNet-enhanced by default (`voice_enhance`, atten-lim 12 dB, delay compensated).
+    Cache: `edit/audio/cam.voice.wav`. Raw is never rewritten. Opt out: `voice_enhance.enabled: false`.
+    Do **not** substitute ffmpeg denoise / gate / `dialoguenhance` chains.
     SFX (typing / shutter / click) is additive under cam VO via `cover.sfx[]` — modern tech only,
     **no whoosh**. Run `ae sfx-suggest .` after cover; confirm then `--apply`.
 10. **Locked look (`style: tutorial`):** house default for Odoo/tech screen demos.
@@ -129,7 +132,7 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 2. **Converse** — describe material; ask shaped questions
 3. **Propose** radio-edit strategy (4–8 sentences) → **wait for confirm**
 4. **Write** `edit/edl.json` (`sources` + `ranges[]` with `source`/`start`/`end`)
-5. **Cut** — `ae cut .` → `edit/preview.mp4`
+5. **Cut** — `ae cut .` → `edit/preview.mp4` (enhances cam VO first)
 6. **Cover** (if `sources.screen` exists):
    - Run `ae cover-suggest .` → review `edit/cover.suggest.json`
    - Propose full-cam vs `screen_with_cam` ranges (formula below) → **wait for confirm**

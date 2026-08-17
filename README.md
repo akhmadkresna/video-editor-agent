@@ -72,9 +72,10 @@ Default ASR language is **Indonesian** (`asr.language: id`); override per episod
 | `ae doctor` | Check deps + chosen ASR backend |
 | `ae new <path>` | Scaffold episode |
 | `ae ingest .` | Probe + ASR + `takes_packed.md` |
-| `ae cut .` | EDL → `edit/preview.mp4` |
+| `ae cut .` | EDL → `edit/preview.mp4` (enhances cam VO first) |
 | `ae cover .` | EDL + cover → `timeline.json` |
-| `ae mezzanine .` | Deliverable proxies → `edit/mezzanine/` (raw untouched) |
+| `ae voice .` | DeepFilterNet cam VO → `edit/audio/cam.voice.wav` (raw untouched) |
+| `ae mezzanine .` | Deliverable proxies → `edit/mezzanine/` (muxes enhanced cam audio) |
 | `ae compose . [--studio]` | Remotion preview / render |
 | `ae qa .` | Cut-boundary frames in `edit/verify/` |
 | `ae social . [--studio]` | Separate 1080×1920 karaoke cut from `edit/social/` |
@@ -107,3 +108,4 @@ models/                # ggml *.bin (gitignored — download locally)
 5. All outputs in `edit/`. Raw footage is read-only (compose **copies** into public — never hardlinks).
 6. Promote reusable changes into this repo, not episode copies.
 7. Heavy raw (e.g. 1440p60 multi‑GB): `ae mezzanine .` before compose — CRF16 deliverable proxies, no quality loss for YouTube 1080p.
+8. Cam VO is DeepFilterNet-enhanced by default (`-D -a 12`). Cache `edit/audio/cam.voice.wav`. Opt out: `voice_enhance.enabled: false` in `project.yaml`. Do not use ffmpeg denoise/gate chains.

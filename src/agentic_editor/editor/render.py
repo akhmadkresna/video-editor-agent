@@ -46,6 +46,7 @@ def extract_segment(
     *,
     preview: bool = False,
     fps: int = 30,
+    audio_src: Path | None = None,
 ) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     portrait = is_portrait(source)
@@ -57,7 +58,13 @@ def extract_segment(
         preset, crf = "fast", "20"
 
     fade_out_start = max(0.0, duration - 0.03)
-    af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
+    af_parts: list[str] = []
+    if audio_src is not None:
+        # DF output can be a few tens of ms short; pad then fade.
+        af_parts.append("apad")
+    af_parts.append("afade=t=in:st=0:d=0.03")
+    af_parts.append(f"afade=t=out:st={fade_out_start:.3f}:d=0.03")
+    af = ",".join(af_parts)
 
     cmd = [
         "ffmpeg",
@@ -66,32 +73,51 @@ def extract_segment(
         f"{seg_start:.3f}",
         "-i",
         str(source),
-        "-t",
-        f"{duration:.3f}",
-        "-vf",
-        scale,
-        "-af",
-        af,
-        "-c:v",
-        "libx264",
-        "-preset",
-        preset,
-        "-crf",
-        crf,
-        "-pix_fmt",
-        "yuv420p",
-        "-r",
-        str(fps),
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-ar",
-        "48000",
-        "-movflags",
-        "+faststart",
-        str(out_path),
     ]
+    if audio_src is not None:
+        cmd.extend(
+            [
+                "-ss",
+                f"{seg_start:.3f}",
+                "-i",
+                str(audio_src),
+            ]
+        )
+    cmd.extend(
+        [
+            "-t",
+            f"{duration:.3f}",
+        ]
+    )
+    if audio_src is not None:
+        cmd.extend(["-map", "0:v:0", "-map", "1:a:0"])
+    cmd.extend(
+        [
+            "-vf",
+            scale,
+            "-af",
+            af,
+            "-c:v",
+            "libx264",
+            "-preset",
+            preset,
+            "-crf",
+            crf,
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            str(fps),
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+            "-movflags",
+            "+faststart",
+            str(out_path),
+        ]
+    )
     _run_ffmpeg(cmd)
 
 
@@ -136,6 +162,7 @@ def render_edl(
     preview: bool = True,
     fps: int = 30,
     verbose: bool = True,
+    audio_overrides: dict[str, Path] | None = None,
 ) -> Path:
     edl = load_edl(edl_path)
     ranges = edl["ranges"]
@@ -146,6 +173,12 @@ def render_edl(
     seg_paths: list[Path] = []
     if verbose:
         print(f"extracting {len(ranges)} segment(s) → {clips_dir.name}/")
+        if audio_overrides:
+            used = ", ".join(
+                f"{n}={p.name}" for n, p in audio_overrides.items() if p.is_file()
+            )
+            if used:
+                print(f"enhanced audio: {used}")
     for i, r in enumerate(ranges):
         src_name = r["source"]
         src_path = resolve_path(sources[src_name], edit_dir)
@@ -154,10 +187,21 @@ def render_edl(
         duration = end - start
         out_seg = clips_dir / f"seg_{i:02d}_{src_name}.mp4"
         note = r.get("note") or r.get("beat") or ""
+        audio_src = None
+        if audio_overrides:
+            cand = audio_overrides.get(src_name)
+            if cand is not None and cand.is_file():
+                audio_src = cand
         if verbose:
             print(f"  [{i:02d}] {src_name} {start:.2f}-{end:.2f} ({duration:.2f}s) {note}")
         extract_segment(
-            src_path, start, duration, out_seg, preview=preview, fps=fps
+            src_path,
+            start,
+            duration,
+            out_seg,
+            preview=preview,
+            fps=fps,
+            audio_src=audio_src,
         )
         seg_paths.append(out_seg)
 

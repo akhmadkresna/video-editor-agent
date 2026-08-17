@@ -1,7 +1,9 @@
 from agentic_editor.cover.style_load import (
     DEFAULT_OVERLAYS,
+    DEFAULT_VOICE_ENHANCE,
     load_overlays,
     load_screen_explainer,
+    load_voice_enhance,
 )
 
 
@@ -25,3 +27,12 @@ def test_screen_explainer_cool_mist_canvas():
     se = load_screen_explainer("tutorial")
     assert se["canvas"]["background"] == "#d9e2ec"
     assert se["preset"] == "cozy"
+
+
+def test_voice_enhance_locked_deepfilternet():
+    ve = load_voice_enhance("tutorial")
+    assert ve["enabled"] is True
+    assert ve["backend"] == "deepfilternet"
+    assert ve["atten_lim_db"] == 12
+    assert ve["compensate_delay"] is True
+    assert DEFAULT_VOICE_ENHANCE["sources"] == ["cam"]

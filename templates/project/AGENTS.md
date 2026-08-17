@@ -15,8 +15,10 @@ This folder is the **episode**. The framework lives in `$AGENTIC_EDITOR_HOME`.
 ```bash
 ae doctor
 ae ingest .
-ae cut .          # needs edit/edl.json
+ae cut .          # needs edit/edl.json; enhances cam VO
+ae voice .        # optional standalone DeepFilterNet pass
 ae cover .        # needs edit/cover.json (cam/screen/punch_in)
+ae mezzanine .    # 1080p30 proxies + enhanced cam audio
 ae compose . --studio
 ae qa .
 ```

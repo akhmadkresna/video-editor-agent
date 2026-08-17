@@ -1,4 +1,4 @@
-"""ae CLI — doctor, new, ingest, brief, evidence-gather, edl-suggest, cut, cover, cover-suggest, overlay-suggest, cutaway-suggest, sfx-suggest, evidence-suggest, mezzanine, draft, compose, qa, promote-check."""
+"""ae CLI — doctor, new, ingest, brief, evidence-gather, edl-suggest, cut, cover, cover-suggest, overlay-suggest, cutaway-suggest, sfx-suggest, evidence-suggest, voice, mezzanine, draft, compose, qa, promote-check."""
 
 from __future__ import annotations
 
@@ -15,6 +15,11 @@ from agentic_editor.asr.backends import (
     whisper_cpp_binary,
 )
 from agentic_editor.asr.ingest import ingest_episode
+from agentic_editor.audio.voice import (
+    DF_VERSION,
+    ensure_episode_voice,
+    find_deep_filter_binary,
+)
 from agentic_editor.compose import (
     prepare_compose,
     prepare_draft,
@@ -78,6 +83,11 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     fw = faster_whisper_available()
     print(f"faster-whisper:  {'OK' if fw else 'MISSING (uv sync)'}")
 
+    df = find_deep_filter_binary()
+    print(
+        f"deep-filter:     {'OK  ' + str(df) if df else 'MISSING (ae voice / ae cut downloads v' + DF_VERSION + ')'}"
+    )
+
     models = home / "models"
     if models.is_dir():
         bins = list(models.glob("ggml-*.bin"))
@@ -94,6 +104,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print("  Always:  ae compose <episode> --studio   # copy→public/ae-media + passes --props")
     print("  Draft:   ae draft <episode> --seconds 120 --render  # fromSec-safe + quality gates")
     print("  Heavy raw: ae mezzanine <episode>        # 1080p30 CRF16 → edit/mezzanine (raw safe)")
+    print("  Voice:     ae cut / ae mezzanine         # DeepFilterNet cam VO (opt out: voice_enhance.enabled: false)")
     print("  Never:   pnpm remotion studio   # alone → empty ~3s black timeline")
     print("  Never:   hand-trim remotion-props by start/end  # drops overlays (use ae draft)")
     print("  Media must be public-relative (ae-media/cam.mov), never /Users/... absolute paths")
@@ -148,6 +159,7 @@ fps: 30
 aspect: "16:9"
 width: 1920
 height: 1080
+# voice_enhance.enabled: false  # opt out of DeepFilterNet cam VO
 """,
             encoding="utf-8",
         )
@@ -174,12 +186,14 @@ def cmd_cut(args: argparse.Namespace) -> int:
         edl_path.write_text(json.dumps(example, indent=2) + "\n", encoding="utf-8")
         print("Update edit/edl.json with real keep ranges, then re-run ae cut")
         return 1
+    audio_overrides = ensure_episode_voice(episode, cfg, verbose=not args.quiet)
     out = render_edl(
         edl_path,
         edit,
         preview=not args.final,
         fps=int(cfg.get("fps", 30)),
         verbose=not args.quiet,
+        audio_overrides=audio_overrides or None,
     )
     print(f"Wrote {out}")
     return 0
@@ -630,6 +644,7 @@ def cmd_mezzanine(args: argparse.Namespace) -> int:
     if missing:
         print(f"Missing source file(s): {', '.join(missing)}", file=sys.stderr)
         return 1
+    audio_overrides = ensure_episode_voice(episode, cfg, verbose=not args.quiet)
     built = build_mezzanines(
         episode,
         sources,
@@ -639,9 +654,25 @@ def cmd_mezzanine(args: argparse.Namespace) -> int:
         crf=int(args.crf),
         force=bool(args.force),
         verbose=not args.quiet,
+        audio_overrides=audio_overrides or None,
     )
     print(f"Mezzanines ready: {', '.join(f'{n}→{p}' for n, p in built.items())}")
     print("Next: ae compose . --studio   # stages mezzanines, not multi-GB raw")
+    return 0
+
+
+def cmd_voice(args: argparse.Namespace) -> int:
+    """Enhance cam VO with DeepFilterNet → edit/audio/cam.voice.wav (raw untouched)."""
+    episode = resolve_episode(args.episode)
+    cfg = load_project(episode)
+    out = ensure_episode_voice(
+        episode, cfg, force=bool(args.force), verbose=not args.quiet
+    )
+    if not out:
+        print("Voice enhance disabled or no cam source")
+        return 0
+    for name, path in out.items():
+        print(f"Wrote {name} → {path}")
     return 0
 
 
@@ -925,6 +956,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Re-capture even if still files already exist",
     )
     eg.set_defaults(func=cmd_evidence_gather)
+
+    voice = sub.add_parser(
+        "voice",
+        help="Enhance cam VO with DeepFilterNet → edit/audio/cam.voice.wav (raw untouched)",
+    )
+    voice.add_argument("episode", nargs="?", default=".")
+    voice.add_argument("--force", action="store_true", help="Rebuild even if cache is fresh")
+    voice.add_argument("--quiet", action="store_true")
+    voice.set_defaults(func=cmd_voice)
 
     mez = sub.add_parser(
         "mezzanine",

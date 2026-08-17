@@ -213,6 +213,35 @@ def load_social(style_name: str = "social") -> dict[str, Any]:
     return cfg
 
 
+# Locked cam-VO treatment: DeepFilterNet 3 CLI, 12 dB atten-lim, delay compensated.
+# Opt out per episode with project.yaml voice_enhance.enabled: false.
+DEFAULT_VOICE_ENHANCE: dict[str, Any] = {
+    "enabled": True,
+    "backend": "deepfilternet",
+    "atten_lim_db": 12,
+    "compensate_delay": True,
+    "sample_rate": 48000,
+    "sources": ["cam"],
+}
+
+
+def load_voice_enhance(
+    style_name: str = "tutorial",
+    project: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return cam voice-enhance knobs (DEFAULT ← style yaml ← project.yaml)."""
+    cfg = _deep_merge({}, DEFAULT_VOICE_ENHANCE)
+    parsed = _load_style_yaml(style_name)
+    ve = parsed.get("voice_enhance")
+    if isinstance(ve, dict):
+        cfg = _deep_merge(cfg, ve)
+    if project:
+        ep = project.get("voice_enhance")
+        if isinstance(ep, dict):
+            cfg = _deep_merge(cfg, ep)
+    return cfg
+
+
 def sfx_pack_dir(style_name: str = "tutorial") -> Path:
     """Absolute path to styles/<style>/sfx (or pack override)."""
     cfg = load_sfx(style_name)

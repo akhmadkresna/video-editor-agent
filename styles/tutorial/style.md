@@ -7,6 +7,15 @@ Defaults for tech talking-head + screen recordings.
 ```yaml
 captions:
   style: off                   # no full/karaoke dialogue captions — use overlays.emphasis
+# Cam VO: DeepFilterNet 3 official CLI (v0.5.6). Raw stays read-only.
+# Cache: edit/audio/cam.voice.wav. Opt out per episode: voice_enhance.enabled: false
+voice_enhance:
+  enabled: true
+  backend: deepfilternet
+  atten_lim_db: 12
+  compensate_delay: true
+  sample_rate: 48000
+  sources: [cam]
 # Locked A-roll overlay presentation (Remotion). Bold + cool mist accent.
 overlays:
   preset: bold_mist
