@@ -1,8 +1,13 @@
-# Series: Freshgrad Software Dev — Era AI
+# Series: Kampus, AI, dan Masa Depan Anak IT
 
-Talking-head series for Indonesian CS / Informatika students. House video
-grammar stays `style: tutorial`. This folder is the **thumbnail + series
-bible lock** only.
+Talking-head series for Indonesian CS / Informatika / SI students and
+fresh graduates. House video grammar stays `style: tutorial`. This folder
+is the **thumbnail + series bible lock** only.
+
+Canonical naskah (Versi 3) lives in the episode:
+`edit/naskah-seri-5-video.md`. Agents must treat that file as the spine —
+do not revert to the old pedagogy map (cara latihan / intent dulu /
+pelatih / lengkapi semester).
 
 | File | Role |
 |------|------|
@@ -19,59 +24,118 @@ Agents must not redesign the thumbnail. A-roll MG stays Bold + `#7dd3fc`.
 
 ## Positioning
 
-- **Audience:** mahasiswa Informatika / CS / SI, plus freshgrad yang bingung
-  cara latihan coding sekarang.
-- **Promise:** kekhawatiran yang masuk akal — tool berubah lebih cepat daripada
-  silabus — plus cara latihan yang bisa dipakai *di samping* kuliah, tanpa
-  nyalahin dosen atau bolos kelas.
-- **Voice (locked):** humble, khawatir, solutif. “Kita”, bukan “kampus kalian
-  ketinggalan”. Akui silabus butuh waktu (akreditasi). Hormati dosen. Jangan
-  roast, jangan kata *primitive* / *joki* / *hijack* / *otak kosong*. Ganti
-  dengan: gap, shortcut, lengkapi, pemahaman belum nempel.
-- **Length:** 7–10 menit. Screen demo boleh di Part 2 (spec) dan Part 3
-  (prompt analogi vs minta kode jadi).
-- **Language:** Indonesia. Istilah Inggris (spec, review, agent) boleh tetap.
+- **Audience:** mahasiswa IT / Informatika / SI semester 3–8, plus fresh
+  graduate.
+- **Promise:** jawab keresahan soal kuliah vs industri vs AI **tanpa jualan
+  takut** dan tanpa “kuliah percuma”. Kampus bikin sanggup; siap itu kerja
+  di samping kuliah.
+- **Persona:** senior engineer 10+ tahun. Humble, tidak menghakimi.
+- **Voice (locked):** **saya / kalian** + sapaan **Teman-teman** (3–5× per
+  video, jangan lebih). Bahasa lisan (`gak`, `banget`, `ngerjain`), bukan
+  skripsi. Akui “saya juga sempat mikir gitu” / “saya juga pakai AI”.
+  Hormati dosen: gap = siklus kurikulum vs industri, bukan males.
+  Jangan roast, jangan kata *primitive* / *joki* / *hijack* / *otak kosong*
+  / *kuliah percuma*.
+- **Length:** **15–20 menit** (WPU niche is 18–24 min). Old 7–10 min target
+  is wrong.
+- **Language:** Indonesia. English that is natural on camera stays English
+  (job market, deploy, review, refactor, portfolio, red flag).
 
 ## Research lock
 
-Copy **angles**, not wording. Views as of 2026-08-17.
+Copy **angles / hook shape**, not wording. Do not paste source YouTube
+transcripts into the teleprompter.
 
-| # | Source | Views | Angle |
-|---|--------|------:|-------|
-| 1 | [TEDx — Raymond Fu, Learning SE During the Era of AI](https://www.youtube.com/watch?v=w4rG5GY9IlA) | 839k | Education is not “code faster”; orchestrator, foundations, architect, AI as teammate |
-| 2 | [Tina Huang — How To Learn To Code In 2026](https://www.youtube.com/watch?v=oshQg1uSRvg) | 883k | Vibe vs agentic; analogy-first; gate before unleashing agents |
-| 3 | [Google I/O — Build core skills to thrive as an AI-era developer](https://www.youtube.com/watch?v=q_Jq4IgYImk) | 77k | Shift left on intent; spec as deliverable; *delegate tasks, not judgment* |
-| 4 | [WPU — Kenapa SEKARANG waktu terbaik belajar coding](https://www.youtube.com/watch?v=oR6Pkw87JvI) | 87k | Computational thinking *before* programming; T-shape; three tiers |
-| 5 | [Sajjaad — Become a Software Engineer in 2026 blueprint](https://www.youtube.com/watch?v=avdDEZCcluo) | 586k | Practical “if I started now” |
+**Hook pattern (ID high-view):** angka mengejutkan → akui keresahan →
+balik arah / jawaban **bersyarat**. Judul = pertanyaan + bantahan halus.
+Sudut **kuliah/jurusan** outperforms “coding only”.
 
-Papers / policy (cite on camera, don’t invent numbers):
+ID references that changed the plan (views as of 2026-08):
 
-- Bastani et al., PNAS 2025: GPT-4 unconstrained +48% practice, **−17%** on
-  unaided exam; hint-only tutor mitigates the harm.
-- NUS–Google white paper 2026: CS pedagogy was built on *code scarcity*;
-  generating the assignment can skip the thinking the course needed.
-- Northeastern Khoury: **crutch → coach → colleague**.
-- Gupta (2026): review / spec / security deserve more airtime than they get.
-- ID: Menaker skill-mismatch (~900k unemployed grads cited 2026); ITB mixed
-  exam rules vs “AI wajib” — policy and day-to-day practice can differ.
+| Source | Views | Angle we copy |
+|--------|------:|---------------|
+| WPU — Kenapa SEKARANG waktu terbaik belajar coding | 87k | Angka → akui “ngapain belajar” → balik arah |
+| WPU — Roadmap Developer 2026 | 182k | Keresahan bersama → “saya juga sempat mikir” → jawaban bersyarat |
+| VoidFnc — Junior programmer bakal punah | 23k | Tuduhan halus → langsung dimaafkan → baru peringatan |
+| Dea Afrizal — Belajar coding di saat AI | 117k | Engagement bait di menit pertama + “saya juga pakai” |
 
-## Episode map (pedagogy, not career-tips order)
+EN clips are **optional evidence**, not the spine. Default on-camera treatment
+is an **MG quote card** (channel + short paraphrase + source on screen).
+Do **not** author picture-takeover `cover.cutaways[]` on `style: tutorial`.
+If the host later wants a 5–15s muted third-party clip, that is a confirmed
+exception (fair use / Content ID risk; commentary on top; never replace cam
+audio). Map:
 
-| Part | Working title | Beat |
-|------|---------------|------|
-| 1 | Cara kita latihan coding perlu disesuaikan | Concern + gap, humble |
-| 2 | Intent dulu, sintaks menyusul | New sequence + a small drill |
-| 3 | AI sebagai pelatih, bukan pengganti latihan | How to use it while learning |
-| 4 | Skill yang jarang sempat dilatih di kelas | Read, review, tests, security |
-| 5 | Lengkapi semester ini — kuliah tetap | This-term add-on, not a revolt |
+| Part | Optional EN evidence |
+|------|----------------------|
+| 1 | Fireship ~3:20–3:46 (nobody knows the future) |
+| 2 | Fireship code-as-tool + Sajjaad *context engineering* |
+| 3 | PrimeTime / Matt Garman AWS + Sajjaad PHK-narrative open |
+| 4 | Tina Huang security blind spot (~5:20–5:50) |
+| 5 | Tina Huang vibe vs agentic (~1:20–1:50) |
 
-Do **not** open on “AI gak gantiin junior / 90 hari roadmap / kampus
-primitive”. Do **not** dunk on lecturers.
+**Numbers — verify on primary sources before air, show source on screen:**
+
+- BPS Aug 2025: youth (15–24) unemployment **16.9%**
+- 22–25 in AI-exposed jobs: employment **−3.8%/yr** (circulating 2026 study)
+- **75%** firms: fresh grads strong on theory, weak on tools / industry std
+- Junior hiring drop circulating up to **−73%** (do not treat as gospel)
+- LPEM UI: informatika **mismatch** (specialist demand vs generalist campus)
+- Digital sector Indonesia ~**35% YoY**
+- WPU on-cam: **245k** IT layoffs, **>30%** attributed to AI
+
+Until verified, say “angka yang beredar / yang disebut di video X / BPS
+bilang…” — do not invent precision.
+
+## Episode map (Versi 3)
+
+| Part | Title | Thumb | Dur |
+|------|-------|-------|-----|
+| 1 | Kuliah IT 4 Tahun, Masih Cukup Gak Sih di 2026? | MASIH CUKUP? | 15–18 |
+| 2 | Kalau Ngoding Sekarang Gampang, Kita Dibayar Buat Apa? | DIBAYAR BUAT APA? | 15–18 |
+| 3 | Kenapa Lowongan Junior Makin Sedikit? (Ini Datanya) | JUNIOR -73% | 15–18 |
+| 4 | 5 Hal yang Paling Dicari HRD & Tech Lead, Tapi Gak Diajarin di Kampus | 5 HAL INI | 18–20 |
+| 5 | Kalau Saya Balik Jadi Mahasiswa IT di 2026, Ini yang Saya Lakuin | ROADMAP 2026 | 18–20 |
+
+Spine per part (do not reorder back to pedagogy-only):
+
+1. Hook 245k / BPS → bukan “kuliah percuma” → gap kurikulum vs industri
+   (bukan dosen males) → 3 hal kampus yang diremehin → 4 hal kampus
+   struktural gak bisa kasih → **cukup buat sanggup, gak cukup buat siap**
+   → tiket stadion + latihan “kalau dipakai 1000 orang, mana yang jebol”.
+2. ChatGPT-first dimaafkan → nilai pindah (kalkulator / kamera) → 4 tempat
+   (tahu apa yang dibangun, nilai jawaban AI, tanggung jawab, sistem
+   berantakan / context engineering) → tebak dulu 60 detik.
+3. “Bukan karena kalian jelek” + data → jalur masuk nyempit → Garman talent
+   pipeline → pintu dipindah (spesialis, domain, bukti, non-tech).
+4. Njelasin, baca kode orang, standar industri (+ security blind spot),
+   nanya sebelum ngerjain, paham uang.
+5. Bukan resep; 3 prinsip; th 1–2 fondasi + AI **tutor bukan tukang**;
+   th 3 sumbu teknis+domain + 5 user; th 4 magang = senior yang review;
+   4 kesalahan pribadi; pohon + “saya juga masih belajar”.
+
+Do **not** open on “kampus primitive / 90 hari roadmap / kuliah percuma”.
+Do **not** dunk on lecturers. Replace `[NAMA]` only when the host supplies it.
+
+## Production (from naskah §4)
+
+1. No music / “halo semuanya” in the first 40s. Hook = angka or “siapa di
+   sini yang…”.
+2. Disclaimer in the first ~90s. Engagement bait in minute one.
+3. Announce chapters on cam (“Oke, langsung masuk ke chapter pertama”).
+4. One sticky closing analogy per video (the screenshot line).
+5. Locked sign-off: **“Pelan-pelan aja, yang penting jalan terus.”** then
+   “Saya [NAMA], sampai jumpa di video berikutnya.”
+6. No negative named campuses, lecturers, or clients.
+7. Swap placeholder anecdotes (e.g. N+1 query) for the host’s real stories
+   before the take that ships.
 
 ## Hard rules for agents
 
 1. Confirm radio-edit before `edit/edl.json`.
-2. No pasted YouTube transcripts. Attribute Bastani / Google I/O if you quote
-   a number or slogan.
+2. No pasted YouTube transcripts. Attribute BPS / LPEM / WPU if you quote
+   a number.
 3. Tutorial overlays only. Audio from cam.
-4. Keep the humble voice in teleprompter, titles, thumbs, and YouTube copy.
+4. Keep the humble **saya/kalian** voice in teleprompter, titles, thumbs,
+   and YouTube copy.
+5. Prefer MG quote cards over third-party video clips.
