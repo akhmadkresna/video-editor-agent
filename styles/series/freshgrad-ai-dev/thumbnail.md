@@ -69,29 +69,29 @@ forbidden:
 parts:
   1:
     badge: "PART 1"
-    title: ["AI GAK GANTI", "JUNIOR?"]
-    payoff: "YANG MATI: TUKANG KETIK"
-    chips: ["FRESHGRAD", "DATA 2026", "HUMAN IN LOOP"]
+    title: ["KAMPUS MASIH", "PRIMITIVE"]
+    payoff: "CARA BELAJAR CODING HARUS GANTI"
+    chips: ["SINTAKS ≠ PRODUK", "JOKI", "LARANG AI"]
   2:
     badge: "PART 2"
-    title: ["JUNIOR JADI", "MANDOR AI"]
-    payoff: "BUKAN CRUD MONKEY"
-    chips: ["AGENT", "REVIEW", "SPEC"]
+    title: ["INTENT DULU", "KODE KEMUDIAN"]
+    payoff: "SPEC = TUGAS SEBENARNYA"
+    chips: ["SHIFT LEFT", "AADP", "DELEGATE TASKS"]
   3:
     badge: "PART 3"
-    title: ["BELAJAR CODING", "SEKARANG"]
-    payoff: "PASAR SUSAH = WAKTU LATIH"
-    chips: ["T-SHAPE", "JUDGMENT", "WHY NOW"]
+    title: ["JOKI", "ATAU MENTOR"]
+    payoff: "CRUTCH → COACH → COLLEAGUE"
+    chips: ["HINT BUKAN JAWAB", "+48% / −17%", "ANALOGI"]
   4:
     badge: "PART 4"
-    title: ["ROADMAP", "90 HARI"]
-    payoff: "FUNDAMENTAL DULU, BARU AGENT"
-    chips: ["PYTHON/JS", "GIT", "TEST"]
+    title: ["YANG KAMPUS", "SKIP"]
+    payoff: "BACA · REVIEW · SECURITY"
+    chips: ["READ > WRITE", "TES", "SISTEM"]
   5:
     badge: "PART 5"
-    title: ["PORTOFOLIO", "LOLOS"]
-    payoff: "BUKAN TO-DO LIST"
-    chips: ["USER NYATA", "BUILD IN PUBLIC", "AI DI DALAM"]
+    title: ["HIJACK", "SEMESTER INI"]
+    payoff: "KULIAH TETAP, METODE GANTI"
+    chips: ["LOG PROSES", "USER NYATA", "JANGAN TUNGGU"]
 ```
 
 **Plate + draw:** never ask an image generator for the finished thumb. Generate a

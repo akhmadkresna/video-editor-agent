@@ -1,14 +1,12 @@
 # Series: Freshgrad Software Dev — Era AI
 
-Talking-head career series for Indonesian CS / IT fresh graduates who are scared
-AI will eat the junior job. House video grammar stays `style: tutorial`. This
-folder is the **thumbnail + series bible lock** only.
+Talking-head series for Indonesian CS / Informatika students. House video
+grammar stays `style: tutorial`. This folder is the **thumbnail + series
+bible lock** only.
 
 | File | Role |
 |------|------|
 | `thumbnail.md` | Hard rules + YAML recipe (layout, colors, copy stack, export 1280×720) |
-
-Episodes set in `project.yaml`:
 
 ```yaml
 style: tutorial
@@ -17,53 +15,64 @@ asr:
   language: id
 ```
 
-Agents must not redesign the thumbnail. Do not invent episode-local colors or
-fonts for A-roll MG — keep Bold + accent `#7dd3fc` from `styles/tutorial`.
+Agents must not redesign the thumbnail. A-roll MG stays Bold + `#7dd3fc`.
 
 ## Positioning
 
-- **Audience:** mahasiswa tingkat akhir, freshgrad, junior 0–2 tahun, Indonesia.
-- **Promise:** AI tidak menghapus software engineer. Yang mati adalah junior yang
-  cuma ngetik sintaks. Series ini nunjukin cara jadi engineer yang *ngarahin*
-  AI, bukan yang *digantiin* AI.
-- **Voice:** lurus, ngobrol, tanpa doom. Hook pakai angka yang bikin cemas, lalu
-  putar ke aksi konkret. Satu metafora per episode, diulang 2–3 kali.
-- **Length:** 7–10 menit A-roll. Boleh screen demo pendek di ep 2 dan 4.
-- **Language:** Indonesia. Istilah Inggris (agent, review, spec, Git) boleh
-  tetap Inggris.
+- **Audience:** mahasiswa Informatika / CS / SI yang masih kuliah, plus
+  freshgrad yang merasa “kampus nggak nyiapin”.
+- **Promise:** masalahnya bukan “harus belajar AI tools”. Masalahnya **cara
+  kampus ngajar programming masih primitive** — sintaks sebagai produk,
+  tugas = file yang compile, AI dilarang *atau* dipakai jadi joki. Series
+  ini ganti *metode belajar*, bukan nambah tips karir.
+- **Voice:** lurus ke mahasiswa, bukan roast dosen. Kampus lambat karena
+  akreditasi; kamu yang harus hijack metodenya semester ini.
+- **Length:** 7–10 menit. Screen demo boleh di Part 2 (spec di editor) dan
+  Part 3 (prompt analogi vs “tulisin kodenya”).
+- **Language:** Indonesia. Istilah Inggris (spec, review, crutch, agent)
+  boleh tetap.
 
-## Research lock (do not swap the five sources)
+## Research lock
 
-Ideas and *structure* come from these five videos (views as of 2026-08-17).
-Narration in `edit/scripts/` is **original** — copy the angle, not the wording.
+Copy **angles**, not wording. Views as of 2026-08-17.
 
-| # | Source | Views | Angle we steal |
-|---|--------|------:|----------------|
-| 1 | [Sajjaad Khader — AI Replacing Developers Has Officially Failed](https://www.youtube.com/watch?v=v3tLa5nHz-M) | 480k | Myth-bust: headline AI ≠ layoff; human-in-the-loop; context > vibe |
-| 2 | [The PrimeTime — "AI Can't Replace Juniors" AWS CEO](https://www.youtube.com/watch?v=fP5URbP30j0) | 546k | AWS CEO quote; talent pipeline; juniors explore, AI only follows spec |
-| 3 | [Fireship — What will AI Programming look like in 5 Years?](https://www.youtube.com/watch?v=eaedq1Jl2fc) | 591k | Fast hook + prediction + punchline: code is a means, judgment stays |
-| 4 | [Tina Huang — How To Learn To Code In 2026](https://www.youtube.com/watch?v=oshQg1uSRvg) | 883k | Vibe vs agentic; fundamentals then agents; learn *with* AI, not *by* AI |
-| 5 | [WPU / Sandhika — Kenapa SEKARANG Waktu Terbaik Belajar Coding](https://www.youtube.com/watch?v=oR6Pkw87JvI) | 87k | Contrarian “why now”; T-shaped; three-tier readiness; real portfolio |
+| # | Source | Views | Angle |
+|---|--------|------:|-------|
+| 1 | [TEDx — Raymond Fu, Learning SE During the Era of AI](https://www.youtube.com/watch?v=w4rG5GY9IlA) | 839k | Education is not “code faster”; orchestrator, foundations, architect, AI as teammate |
+| 2 | [Tina Huang — How To Learn To Code In 2026](https://www.youtube.com/watch?v=oshQg1uSRvg) | 883k | Vibe vs agentic; analogy-first; gate before unleashing agents |
+| 3 | [Google I/O — Build core skills to thrive as an AI-era developer](https://www.youtube.com/watch?v=q_Jq4IgYImk) | 77k | Shift left on intent; spec as deliverable; *delegate tasks, not judgment* |
+| 4 | [WPU — Kenapa SEKARANG waktu terbaik belajar coding](https://www.youtube.com/watch?v=oR6Pkw87JvI) | 87k | Computational thinking *before* programming; T-shape; three tiers |
+| 5 | [Sajjaad — Become a Software Engineer in 2026 blueprint](https://www.youtube.com/watch?v=avdDEZCcluo) | 586k | Practical “if I started now” — not campus-shaped |
 
-Supporting (cite in research notes, not as primary clone): Traversy
-`lvFswfNez2o` (163k, AI-enhanced junior), PZN `Sg5YKhKfweg` (65k, mandor/tukang),
-WPU roadmap `RzNVQBfJi-A` (182k, speed-run fundamentals).
+Papers / policy (cite on camera, don’t invent numbers):
 
-## Episode map
+- Bastani et al., PNAS 2025: GPT-4 unconstrained +48% practice, **−17%** on
+  unaided exam; hint-only tutor kills the harm.
+- NUS–Google white paper 2026: CS pedagogy was built on *code scarcity*;
+  students who generate the assignment skip the thinking the course needed.
+- Northeastern Khoury: **crutch → coach → colleague**. Intro = less AI;
+  later = partner. Ban-everything and vibe-everything both fail.
+- Gupta (2026 curriculum note): CS barely teaches review/spec/security;
+  treat half the syllabus as historical context.
+- ID: Menaker skill-mismatch (~900k unemployed grads cited 2026); ITB mixed
+  ban-on-exams vs “AI wajib” — policy ≠ pedagogy.
 
-| Part | Working title | Source mix | Record folder |
-|------|---------------|------------|---------------|
-| 1 | AI gak gantiin kamu. Yang mati: tukang ketik kode | 1 + 3 | `freshgrad-ai-ep1` |
-| 2 | Junior 2026: dari CRUD monkey jadi mandor agent | 2 + PZN | `freshgrad-ai-ep2` |
-| 3 | Kenapa sekarang justru waktu terbaik belajar coding | 5 | `freshgrad-ai-ep3` |
-| 4 | Roadmap 90 hari: fundamental dulu, baru AI agent | 4 + WPU roadmap | `freshgrad-ai-ep4` |
-| 5 | Portofolio yang lolos screening (bukan to-do list) | 5 + 1 (proof) | `freshgrad-ai-ep5` |
+## Episode map (pedagogy, not career-tips order)
+
+| Part | Working title | Beat |
+|------|---------------|------|
+| 1 | Cara kampus ngajar programming masih primitive | Diagnosis |
+| 2 | Balik urutannya: intent dulu, sintaks belakangan | New sequence |
+| 3 | AI: joki, mentor, atau rekan | How to use it while learning |
+| 4 | Yang kampus skip: baca, review, tes, security | Missing skills |
+| 5 | Hijack semester ini — kuliah tetap, metode ganti | This-term homework |
+
+Do **not** open the series on “AI gak gantiin junior / 90 hari roadmap /
+portofolio to-do list”. Those are later payoffs, not the spine.
 
 ## Hard rules for agents
 
-1. Confirm radio-edit strategy before writing `edit/edl.json`.
-2. Do not paste source transcripts into the teleprompter. Rewrite in the host's
-   voice. Fair-use quote of **one** public CEO line is OK if attributed
-   (Matt Garman / AWS).
-3. No whoosh. Tutorial overlays only (chapter / emphasis / diagram / chip).
-4. Audio always from cam. Screen is visual-only if a demo is used.
+1. Confirm radio-edit before `edit/edl.json`.
+2. No pasted YouTube transcripts. Attribute Bastani / Garman / Google I/O
+   in one sentence if you quote a number or slogan.
+3. Tutorial overlays only. Audio from cam.
