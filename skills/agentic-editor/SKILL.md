@@ -258,7 +258,7 @@ the A-roll. Put the extra motion on existing overlays instead:
 |------|--------|
 | `chapter` | kicker pop + accent line draws under the title |
 | `emphasis` | last-word pop; numbers count up; underline draws; strike only on `tidak` / `no` / `off` / `deny` |
-| `diagram` | vertical rail grows with steps; token rides the rail; each step pops + short connector |
+| `diagram` | rail + token in the gutter **right of the index** (never through glyphs); each step pops + short connector |
 | `chip` | accent dot scale-pop |
 | `callout` | value counts (Rp / dotted thousands) + underline |
 

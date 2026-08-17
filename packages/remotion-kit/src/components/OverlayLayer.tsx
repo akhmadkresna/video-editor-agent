@@ -358,6 +358,36 @@ function resolveStepAtSec(
   return Array.from({ length: n }, (_, i) => lead + (span * i) / (n - 1));
 }
 
+/** Index | rail gutter | label — rail must never cross the digits. */
+function diagramListMetrics(h: number, n: number, stepSizeCqh: number) {
+  const fontPx = Math.round(h * (stepSizeCqh / 100));
+  const numCol = Math.max(Math.round(fontPx * 1.25), 28);
+  const railCol = 22;
+  const colGap = 10;
+  const rowGap = Math.round(h * 0.012);
+  const rowH = Math.max(Math.round(h * 0.048), fontPx + 8);
+  const railW = 2;
+  const token = 10;
+  const railLeft = numCol + colGap + (railCol - railW) / 2;
+  const tokenLeft = numCol + colGap + (railCol - token) / 2;
+  const railTop = rowH / 2;
+  const railH = n > 1 ? (n - 1) * (rowH + rowGap) : 0;
+  return {
+    fontPx,
+    numCol,
+    railCol,
+    colGap,
+    rowGap,
+    rowH,
+    railW,
+    token,
+    railLeft,
+    tokenLeft,
+    railTop,
+    railH,
+  };
+}
+
 const DiagramStep: React.FC<{
   step: string;
   index: number;
@@ -365,8 +395,8 @@ const DiagramStep: React.FC<{
   durationSec: number;
   exitStartSec?: number;
   accent?: string;
-  h: number;
-}> = ({ step, index, atSec, durationSec, exitStartSec, accent, h }) => {
+  metrics: ReturnType<typeof diagramListMetrics>;
+}> = ({ step, index, atSec, durationSec, exitStartSec, accent, metrics }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const startF = Math.max(0, Math.round(atSec * fps));
@@ -398,12 +428,13 @@ const DiagramStep: React.FC<{
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "auto 18px 1fr",
-        gap: 10,
+        gridTemplateColumns: `${metrics.numCol}px ${metrics.railCol}px 1fr`,
+        columnGap: metrics.colGap,
         alignItems: "center",
+        minHeight: metrics.rowH,
         fontFamily: UI,
         fontWeight: 700,
-        fontSize: Math.round(h * 0.036),
+        fontSize: metrics.fontPx,
         opacity,
         transform: `translateY(${local < 0 ? 14 : y}px)`,
       }}
@@ -411,19 +442,30 @@ const DiagramStep: React.FC<{
       <span
         style={{
           color: accent,
-          display: "inline-block",
+          display: "block",
+          width: "100%",
+          textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
           transform: `scale(${local < 0 ? 0.4 : numScale})`,
-          transformOrigin: "center",
+          transformOrigin: "right center",
         }}
       >
         {index + 1}
       </span>
-      <DrawnLine
-        progress={local < 0 ? 0 : tick}
-        widthPx={16}
-        heightPx={2}
-        color={accent || "#7dd3fc"}
-      />
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+        }}
+      >
+        <DrawnLine
+          progress={local < 0 ? 0 : tick}
+          widthPx={12}
+          heightPx={2}
+          color={accent || "#7dd3fc"}
+        />
+      </div>
       <span>{step}</span>
     </div>
   );
@@ -441,17 +483,16 @@ const Diagram: React.FC<{
   const left = style.diagram?.leftCqw ?? 4.5;
   const top = style.diagram?.topCqh ?? 10;
   const maxW = style.diagram?.maxWidthCqw ?? 40;
-  const rowGap = Math.round(h * 0.012);
-  const rowH = Math.round(h * 0.048);
+  const stepSizeCqh = style.diagram?.stepSizeCqh ?? 3.6;
   const n = steps.length;
+  const metrics = diagramListMetrics(h, n, stepSizeCqh);
   const firstF = Math.round((stepAt[0] ?? 0.2) * fps);
   const lastF = Math.round((stepAt[Math.max(0, n - 1)] ?? 1) * fps);
   const railP = interpolate(frame, [firstF, Math.max(firstF + 1, lastF)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const railH = Math.max(0, n * rowH + Math.max(0, n - 1) * rowGap);
-  const tokenY = railH * railP;
+  const tokenY = metrics.railH * railP;
   return (
     <div
       style={{
@@ -489,36 +530,38 @@ const Diagram: React.FC<{
           {ov.title || ov.text}
         </div>
       </EnterExit>
-      <div style={{ position: "relative", paddingLeft: 4 }}>
-        <div
-          style={{
-            position: "absolute",
-            left: 11,
-            top: 6,
-            width: 2,
-            height: railH,
-            overflow: "hidden",
-            pointerEvents: "none",
-          }}
-        >
-          <DrawnLine
-            progress={n ? railP : 0}
-            widthPx={2}
-            heightPx={railH}
-            color={style.accent}
-            axis="y"
-            origin="top center"
-          />
-        </div>
+      <div style={{ position: "relative" }}>
+        {n > 1 ? (
+          <div
+            style={{
+              position: "absolute",
+              left: metrics.railLeft,
+              top: metrics.railTop,
+              width: metrics.railW,
+              height: metrics.railH,
+              overflow: "hidden",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          >
+            <DrawnLine
+              progress={railP}
+              widthPx={metrics.railW}
+              heightPx={metrics.railH}
+              color={style.accent}
+              axis="y"
+              origin="top center"
+            />
+          </div>
+        ) : null}
         {n ? (
           <div
             style={{
               position: "absolute",
-              left: 6,
-              top: 6 + tokenY,
-              width: 12,
-              height: 12,
-              marginTop: -6,
+              left: metrics.tokenLeft,
+              top: metrics.railTop + tokenY - metrics.token / 2,
+              width: metrics.token,
+              height: metrics.token,
               borderRadius: "50%",
               background: style.accent,
               boxShadow: `0 0 12px ${style.accent}`,
@@ -527,10 +570,11 @@ const Diagram: React.FC<{
                 extrapolateRight: "clamp",
               }),
               pointerEvents: "none",
+              zIndex: 2,
             }}
           />
         ) : null}
-        <div style={{ display: "grid", gap: rowGap }}>
+        <div style={{ display: "grid", rowGap: metrics.rowGap, position: "relative", zIndex: 1 }}>
           {steps.map((step, i) => (
             <DiagramStep
               key={`${i}-${step}`}
@@ -540,7 +584,7 @@ const Diagram: React.FC<{
               durationSec={ov.durationSec}
               exitStartSec={ov.exitStartSec}
               accent={style.accent}
-              h={h}
+              metrics={metrics}
             />
           ))}
         </div>
