@@ -75,6 +75,10 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     - `series: ai-youtube-idr` → `styles/series/ai-youtube-idr/thumbnail.md`. Accent
       `#7dd3fc`, Rp title from public estimators (SocialCounts-high preferred), evidence
       screenshot background, export **1280×720**.
+    - `series: freshgrad-ai-dev` → `styles/series/freshgrad-ai-dev/thumbnail.md`.
+      Accent `#facc15`, host RIGHT / copy LEFT, export **1280×720**. Talking-head
+      stays `style: tutorial` (Bold + MG `#7dd3fc`). Do not paste source YouTube
+      transcripts into the teleprompter — rewrite the angle.
     Agents must not redesign per episode.
 13. **Portrait social cut:** never mutate the confirmed long-form EDL/cover.
     After confirming the short strategy, write sibling `edit/social/edl.json` and
