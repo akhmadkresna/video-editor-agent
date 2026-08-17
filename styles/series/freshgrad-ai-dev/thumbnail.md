@@ -66,32 +66,33 @@ forbidden:
   - purple / cream / newspaper looks
   - aspect ratios other than 16:9
   - "I'M COOKED" / skull / fake layoff dashboards
+  - judging copy: PRIMITIVE, KAMPUS GAGAL, JOKI, HIJACK
 parts:
   1:
     badge: "PART 1"
-    title: ["KAMPUS MASIH", "PRIMITIVE"]
-    payoff: "CARA BELAJAR CODING HARUS GANTI"
-    chips: ["SINTAKS ≠ PRODUK", "JOKI", "LARANG AI"]
+    title: ["CARA BELAJAR", "PERLU BERUBAH"]
+    payoff: "KEKHAWATIRAN YANG MASUK AKAL"
+    chips: ["LATIHAN BARU", "SPEC + BACA", "TETAP KULIAH"]
   2:
     badge: "PART 2"
-    title: ["INTENT DULU", "KODE KEMUDIAN"]
-    payoff: "SPEC = TUGAS SEBENARNYA"
+    title: ["INTENT DULU", "KODE MENYUSUL"]
+    payoff: "SATU HALAMAN SEBELUM IDE"
     chips: ["SHIFT LEFT", "AADP", "DELEGATE TASKS"]
   3:
     badge: "PART 3"
-    title: ["JOKI", "ATAU MENTOR"]
-    payoff: "CRUTCH → COACH → COLLEAGUE"
-    chips: ["HINT BUKAN JAWAB", "+48% / −17%", "ANALOGI"]
+    title: ["PELATIH", "BUKAN PENGGANTI"]
+    payoff: "HINT DULU, KODE KEMUDIAN"
+    chips: ["CRUTCH → COACH", "+48% / −17%", "ANALOGI"]
   4:
     badge: "PART 4"
-    title: ["YANG KAMPUS", "SKIP"]
+    title: ["YANG PERLU", "DILATIH"]
     payoff: "BACA · REVIEW · SECURITY"
     chips: ["READ > WRITE", "TES", "SISTEM"]
   5:
     badge: "PART 5"
-    title: ["HIJACK", "SEMESTER INI"]
-    payoff: "KULIAH TETAP, METODE GANTI"
-    chips: ["LOG PROSES", "USER NYATA", "JANGAN TUNGGU"]
+    title: ["LENGKAPI", "SEMESTER INI"]
+    payoff: "KULIAH TETAP, METODE DITAMBAH"
+    chips: ["LOG PROSES", "USER NYATA", "SATU BUKTI"]
 ```
 
 **Plate + draw:** never ask an image generator for the finished thumb. Generate a

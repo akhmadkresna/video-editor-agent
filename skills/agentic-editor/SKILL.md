@@ -77,8 +77,9 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
       screenshot background, export **1280×720**.
     - `series: freshgrad-ai-dev` → `styles/series/freshgrad-ai-dev/thumbnail.md`.
       Accent `#facc15`, host RIGHT / copy LEFT, export **1280×720**. Talking-head
-      stays `style: tutorial` (Bold + MG `#7dd3fc`). Do not paste source YouTube
-      transcripts into the teleprompter — rewrite the angle.
+      stays `style: tutorial` (Bold + MG `#7dd3fc`). Humble voice: concern +
+      solutions, no “kampus primitive” / roasting lecturers. Do not paste source
+      YouTube transcripts into the teleprompter — rewrite the angle.
     Agents must not redesign per episode.
 13. **Portrait social cut:** never mutate the confirmed long-form EDL/cover.
     After confirming the short strategy, write sibling `edit/social/edl.json` and
