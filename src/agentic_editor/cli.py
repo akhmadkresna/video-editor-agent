@@ -33,11 +33,6 @@ from agentic_editor.cover.evidence_suggest import (
     suggest_evidence_events,
 )
 from agentic_editor.cover.overlay_suggest import suggest_overlays, write_overlay_suggest
-from agentic_editor.cover.cutaway_suggest import (
-    merge_cutaways_into_cover,
-    suggest_cutaways,
-    write_cutaway_suggest,
-)
 from agentic_editor.cover.sfx_suggest import (
     merge_sfx_into_cover,
     suggest_sfx,
@@ -432,81 +427,16 @@ def cmd_overlay_suggest(args: argparse.Namespace) -> int:
 
 
 def cmd_cutaway_suggest(args: argparse.Namespace) -> int:
-    episode = resolve_episode(args.episode)
-    suggestion = suggest_cutaways(episode)
-    out = write_cutaway_suggest(episode, suggestion)
-    meta = suggestion.get("_meta") or {}
-    counts = meta.get("counts") or {}
-    cutaways = suggestion.get("cutaways") or []
+    resolve_episode(args.episode)
     print(
-        f"Wrote {out.relative_to(episode)} "
-        f"({counts.get('total', len(cutaways))} cutaway(s))"
+        "cutaway-suggest is retired for tutorial talking-head: "
+        "do not use picture-takeover MG. Put count / line-draw / pop motion "
+        "on existing overlays instead."
     )
-    if not meta.get("has_cover"):
-        print("Note: no edit/cover.json yet — prefer cover before cutaways.")
-    skipped = meta.get("skipped") or {}
-    if skipped:
-        print(f"Skipped: {skipped}")
-    print("Propose/adjust with the user, then confirm before writing cover.json.")
-    print(
-        "After confirm: ae cutaway-suggest . --apply  "
-        "(merges cutaways[] into cover.json, rebuilds timeline.json)"
-    )
-    if args.apply and cutaways:
-        cover_path = episode / "edit" / "cover.json"
-        if cover_path.is_file():
-            cover = json.loads(cover_path.read_text(encoding="utf-8"))
-        else:
-            cover = example_cover()
-        cover = merge_cutaways_into_cover(cover, list(cutaways))
-        cover_path.write_text(json.dumps(cover, indent=2) + "\n", encoding="utf-8")
+    if args.apply:
         print(
-            f"Wrote {len(cutaways)} cutaway(s) into "
-            f"{cover_path.relative_to(episode)} (--apply)"
+            "Skipped --apply. If cover.cutaways[] is leftover, delete it and run ae cover."
         )
-        edl_path = episode / "edit" / "edl.json"
-        if edl_path.is_file():
-            cfg = load_project(episode)
-            edl = load_edl(edl_path)
-            sources: dict[str, str] = {}
-            for name, rel in (cfg.get("sources") or {}).items():
-                p = Path(rel)
-                sources[name] = str(
-                    (episode / p).resolve() if not p.is_absolute() else p
-                )
-            edit = episode / "edit"
-            for name, rel in edl["sources"].items():
-                sources.setdefault(
-                    name,
-                    str(
-                        (edit / rel).resolve()
-                        if not Path(rel).is_absolute()
-                        else rel
-                    ),
-                )
-            edl["sources"] = sources
-            style_name = str(cfg.get("style") or "tutorial")
-            timeline = build_timeline_from_edl_and_cover(
-                edl,
-                cover,
-                fps=int(cfg.get("fps", 30)),
-                width=int(cfg.get("width", 1920)),
-                height=int(cfg.get("height", 1080)),
-                screen_explainer=load_screen_explainer(style_name),
-                overlays=load_overlays(style_name),
-                episode=episode,
-            )
-            tl_path = edit / "timeline.json"
-            write_timeline(tl_path, timeline)
-            n_cut = len(timeline.get("cutaways") or [])
-            print(
-                f"Rebuilt {tl_path.relative_to(episode)} "
-                f"({n_cut} timeline cutaway(s))"
-            )
-        else:
-            print(
-                "Note: no edit/edl.json — skipped timeline rebuild; run ae cover after EDL"
-            )
     return 0
 
 
@@ -916,15 +846,15 @@ def build_parser() -> argparse.ArgumentParser:
     csug = sub.add_parser(
         "cutaway-suggest",
         help=(
-            "Suggest generative MG cutaways (family + VisualBrief) from ASR; "
-            "confirm before --apply"
+            "Retired: do not use picture-takeover MG on tutorial talking-head "
+            "(motion lives on overlays)"
         ),
     )
     csug.add_argument("episode", nargs="?", default=".")
     csug.add_argument(
         "--apply",
         action="store_true",
-        help="Merge suggested cutaways[] into edit/cover.json (after user confirm)",
+        help="No-op (cutaways retired); kept so old scripts do not fail",
     )
     csug.set_defaults(func=cmd_cutaway_suggest)
 

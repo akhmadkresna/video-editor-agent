@@ -61,6 +61,9 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Gaps ~50s chapter / ~10s emphasis; density ~1 sting / 32s keep; same-label min gap ~45s
     (keeps “Roadmap” etc. from spam). Quiet keep stretches >55s get gap-fill. Emphasis
     `bottomCqh` default **28** (was too low vs PIP).
+    Motion is Remotion-side on these overlays (count, line-draw, accent pop, diagram rail)
+    — do not invent extra cover fields for it. **Do not** use picture-takeover
+    `cover.cutaways[]` / `ae cutaway-suggest` on tutorial talking-head.
 12. **Series YouTube thumbnails:**
     - `series: odoo-studio-agentic-ai` → `styles/series/odoo-studio-agentic-ai/thumbnail.md`
       (+ `refs/*-canonical.png`). Accent `#3dbff3`, export **1280×720**.
@@ -235,76 +238,27 @@ Framing presets simulate a 2–3 camera setup from one cam. Propose a camera-pla
 
 **Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + soft round (`borderRadiusPx: 24`) + `crop.mode: none`. Host supplies clean full-frame screen; do not run smart window detect. Optional static `crop.inset` only for tiny capture-edge trash. PIP anchors to the **frame** lower-right.
 
-### Generated MG cutaways (`cover.cutaways[]`)
+### Overlay motion (Remotion, no extra cover fields)
 
-A cutaway is a **generated scene that takes over the picture** for a few seconds
-while cam VO keeps playing (cam clips stay mounted underneath — never mute them).
-Not B-roll footage, not a text overlay.
+Tutorial talking-head keeps the host on camera. Do **not** author `cover.cutaways[]`
+or run `ae cutaway-suggest` — picture-takeover MG reads as fake B-roll and fights
+the A-roll. Put the extra motion on existing overlays instead:
 
-**One engine for every brief:** Remotion always renders `InterfaceStage`. Family
-ids (`document`, `flow`, `minimal`, …) are labels for Sequence names and QA —
-they do **not** pick a different component. Board layout is inferred from the
-data:
+| Kind | Motion |
+|------|--------|
+| `chapter` | kicker pop + accent line draws under the title |
+| `emphasis` | last-word pop; numbers count up; underline draws; strike only on `tidak` / `no` / `off` / `deny` |
+| `diagram` | vertical rail grows with steps; token rides the rail; each step pops + short connector |
+| `chip` | accent dot scale-pop |
+| `callout` | value counts (Rp / dotted thousands) + underline |
 
-- labels only → **catalog** (tiles; live tile fills black)
-- numeric values → **ledger** (running total + inserting rows; live row goes red)
-- `state` allow/deny → **access** (full-bleed poster)
-- proof image + entity `focus` → **shot** (screenshot with a shaking highlight)
+Same locked look: Bold + accent `#7dd3fc`. No whoosh. Do not invent a new overlay
+kind for this.
 
-Print recipe defaults to `style: press` (cream stock, black ink, one red).
-Backdrop defaults to live `cam_blur` at `dim: 0.22` (no `src` — CSS
-`backdrop-filter` so the cam under the Sequence shows through). Lab stills may
-set `backdrop.src` to a freeze-frame.
+### Generated MG cutaways — do not use (tutorial)
 
-**New VO = new VisualBrief data.** Do not add a React component per topic.
-
-```json
-{
-  "cutaways": [
-    {
-      "family": "document",
-      "intent": "prove",
-      "start": 406.4,
-      "end": 427.6,
-      "style": "press",
-      "copy": { "kicker": "Buku kas", "title": "Tercatat otomatis",
-                "lockLabel": "Tidak bisa diedit", "stampLabel": "TERVALIDASI" },
-      "entities": [{ "label": "Penjualan", "value": 4850000, "at": 412.94, "icon": "cart" }],
-      "cues": { "open": 406.54, "total": 416.52, "lock": 419.74,
-                "reject": [422.34, 423.02], "stamp": 425.96 },
-      "backdrop": { "kind": "cam_blur", "blurPx": 34, "dim": 0.22 }
-    }
-  ]
-}
-```
-
-Legacy `scene` aliases still collect: `receipt_tape`→document, `ledger_flow`→flow,
-`kinetic_figures`→kinetic_type, `blueprint_nodes`→system_map.
-
-Pipeline:
-
-1. After cover (and preferably overlays): `ae cutaway-suggest .`
-2. Review `edit/cutaways.suggest.json` with the user — allow `none` / drop weak ideas
-3. Confirm → `ae cutaway-suggest . --apply`
-4. `ae compose .` remaps cues, injects press + cam_blur defaults when omitted,
-   stages stills into `public/ae-media/cutaways/`, writes
-   `edit/cutaway_contact_plan.json`, and quality-gates copy length + asset paths
-
-Rules:
-
-- Times are **cam source seconds**; remap converts cues/entities to scene-local seconds.
-- Snap every beat to the word that earns it.
-- Author `copy` + `entities` (+ `state` / `value` / `focus` as the board needs).
-- Motion is on the **live control** (pop + damped shake), not a Ken Burns of the board.
-- `start`/`end` is the **allowed** VO window. Picture takeover ends shortly after
-  the last beat (settle + ~0.45s hold + dissolve). Do not leave a still graphic
-  up while VO continues. A stamp parked at window end with no nearby motion is
-  pulled to the last feed.
-- Preview: `CutawayLab` (`npx remotion still src/index.ts CutawayLab out.png --frame=N`).
-- Image assets: episode paths under `edit/cutaway_assets/` (or absolute) are staged by
-  `ae compose` to `ae-media/cutaways/…`. Glyphs stay code-drawn (`icon`).
-- Omit `backdrop.src` in production so live cam blurs through; the field stays
-  transparent (do not paint `#000` behind the stage).
+`cover.cutaways[]` is leftover picture-takeover machinery. Leave it empty. If an
+old episode still has entries, delete the array and rebuild with `ae cover .`.
 
 ## Promote
 

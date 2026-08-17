@@ -30,20 +30,142 @@ function useStyle(style?: OverlayStyle) {
   };
 }
 
+/** Softer than the old 140-stiffness snap. */
+function softSpring(frame: number, fps: number, delay = 0) {
+  return spring({
+    frame: Math.max(0, frame - delay),
+    fps,
+    config: { damping: 20, stiffness: 80 },
+  });
+}
+
+function popSpring(frame: number, fps: number, delay = 0) {
+  return spring({
+    frame: Math.max(0, frame - delay),
+    fps,
+    config: { damping: 11, stiffness: 240 },
+  });
+}
+
+/** Accent rule that draws left → right (or top → bottom). */
+const DrawnLine: React.FC<{
+  progress: number;
+  widthPx: number;
+  heightPx?: number;
+  color?: string;
+  axis?: "x" | "y";
+  origin?: string;
+}> = ({
+  progress,
+  widthPx,
+  heightPx = 3,
+  color = "#7dd3fc",
+  axis = "x",
+  origin = "left center",
+}) => {
+  const p = Math.max(0, Math.min(1, progress));
+  return (
+    <div
+      style={{
+        width: widthPx,
+        height: heightPx,
+        background: color,
+        transform: axis === "y" ? `scaleY(${p})` : `scaleX(${p})`,
+        transformOrigin: origin,
+        borderRadius: Math.min(widthPx, heightPx),
+      }}
+    />
+  );
+};
+
+const ID_THOUSANDS = /\d{1,3}(?:\.\d{3})+/;
+
+function findCountable(
+  text: string,
+): { raw: string; index: number } | null {
+  const dotted = text.match(ID_THOUSANDS);
+  if (dotted && dotted.index != null) {
+    return { raw: dotted[0], index: dotted.index };
+  }
+  const re = /\d{2,}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const before = m.index > 0 ? text[m.index - 1] : "";
+    const afterIdx = m.index + m[0].length;
+    const after = afterIdx < text.length ? text[afterIdx] : "";
+    if (/[\d.]/.test(before) || /[\d.]/.test(after)) continue;
+    return { raw: m[0], index: m.index };
+  }
+  return null;
+}
+
+/** Animate a number inside a label (Rp 3.500.000, 250000, …). */
+const CountLabel: React.FC<{
+  text: string;
+  progress: number;
+  style?: React.CSSProperties;
+}> = ({ text, progress, style }) => {
+  const match = findCountable(text);
+  if (!match) {
+    return <span style={style}>{text}</span>;
+  }
+  const { raw, index } = match;
+  const target = Number(raw.replace(/\./g, ""));
+  if (!Number.isFinite(target)) {
+    return <span style={style}>{text}</span>;
+  }
+  const p = Math.max(0, Math.min(1, progress));
+  const current = Math.round(target * p);
+  const body = current.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return (
+    <span style={style}>
+      {text.slice(0, index)}
+      {body}
+      {text.slice(index + raw.length)}
+    </span>
+  );
+};
+
+const AccentPop: React.FC<{
+  children: React.ReactNode;
+  delay?: number;
+  color?: string;
+}> = ({ children, delay = 4, color }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const s = popSpring(frame, fps, delay);
+  const scale = interpolate(s, [0, 1], [0.62, 1]);
+  const y = interpolate(s, [0, 1], [8, 0]);
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        color,
+        transform: `translateY(${y}px) scale(${scale})`,
+        transformOrigin: "left bottom",
+      }}
+    >
+      {children}
+    </span>
+  );
+};
+
 function EnterExit({
   children,
   durationSec,
   exitStartSec,
+  style,
 }: {
   children: React.ReactNode;
   durationSec: number;
   /** Prefer holding content until this local second, then fade. */
   exitStartSec?: number;
+  style?: React.CSSProperties;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const s = spring({ frame, fps, config: { damping: 18, stiffness: 140 } });
-  const y = interpolate(s, [0, 1], [14, 0]);
+  const s = softSpring(frame, fps);
+  const y = interpolate(s, [0, 1], [18, 0]);
   const fadeIn = interpolate(frame, [0, 8], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -60,7 +182,9 @@ function EnterExit({
   });
   const opacity = Math.min(fadeIn, fadeOut);
   return (
-    <div style={{ opacity, transform: `translateY(${y}px)` }}>{children}</div>
+    <div style={{ opacity, transform: `translateY(${y}px)`, ...style }}>
+      {children}
+    </div>
   );
 }
 
@@ -68,52 +192,67 @@ const Chapter: React.FC<{
   ov: TimelineOverlay;
   style: ReturnType<typeof useStyle>;
   h: number;
-}> = ({ ov, style, h }) => {
+  w: number;
+}> = ({ ov, style, h, w }) => {
+  const frame = useCurrentFrame();
   const left = style.chapter?.leftCqw ?? 4.5;
   const top = style.chapter?.topCqh ?? 12;
   const maxW = style.chapter?.maxWidthCqw ?? 42;
   const kickerSize = style.chapter?.kickerSizeCqh ?? 2.4;
   const titleSize = style.chapter?.titleSizeCqh ?? 9;
+  const line = interpolate(frame, [10, 28], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
-  <div
-    style={{
-      position: "absolute",
-      left: `${left}%`,
-      top: `${top}%`,
-      maxWidth: `${maxW}%`,
-      color: style.ink,
-      textShadow: "0 8px 28px rgba(0,0,0,0.55)",
-    }}
-  >
-    <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
-      {ov.kicker ? (
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}%`,
+        top: `${top}%`,
+        maxWidth: `${maxW}%`,
+        color: style.ink,
+        textShadow: "0 8px 28px rgba(0,0,0,0.55)",
+      }}
+    >
+      <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
+        {ov.kicker ? (
+          <div
+            style={{
+              fontFamily: UI,
+              fontSize: Math.round(h * (kickerSize / 100)),
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: style.accent,
+              marginBottom: Math.round(h * 0.012),
+            }}
+          >
+            <AccentPop delay={2} color={style.accent}>
+              {ov.kicker}
+            </AccentPop>
+          </div>
+        ) : null}
         <div
           style={{
-            fontFamily: UI,
-            fontSize: Math.round(h * (kickerSize / 100)),
-            fontWeight: 600,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: style.accent,
-            marginBottom: Math.round(h * 0.012),
+            fontFamily: DISPLAY,
+            fontWeight: 800,
+            fontSize: Math.round(h * (titleSize / 100)),
+            lineHeight: 0.98,
+            letterSpacing: "-0.03em",
           }}
         >
-          {ov.kicker}
+          {ov.text || ov.title}
         </div>
-      ) : null}
-      <div
-        style={{
-          fontFamily: DISPLAY,
-          fontWeight: 800,
-          fontSize: Math.round(h * (titleSize / 100)),
-          lineHeight: 0.98,
-          letterSpacing: "-0.03em",
-        }}
-      >
-        {ov.text || ov.title}
-      </div>
-    </EnterExit>
-  </div>
+        <div style={{ marginTop: Math.round(h * 0.018) }}>
+          <DrawnLine
+            progress={line}
+            widthPx={Math.round(w * 0.16)}
+            color={style.accent}
+          />
+        </div>
+      </EnterExit>
+    </div>
   );
 };
 
@@ -124,7 +263,11 @@ const Emphasis: React.FC<{
   w: number;
 }> = ({ ov, style, h, w }) => {
   const frame = useCurrentFrame();
-  const line = interpolate(frame, [6, 18], [0, 1], {
+  const line = interpolate(frame, [8, 24], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const count = interpolate(frame, [2, 22], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -136,6 +279,11 @@ const Emphasis: React.FC<{
   const top = style.emphasis?.topCqh;
   const sizeCqh = style.emphasis?.sizeCqh ?? 16;
   const maxW = style.emphasis?.maxWidthCqw ?? 55;
+  const strike = /^(tidak|no|off|deny)$/i.test(tail);
+  const strikeP = interpolate(frame, [14, 26], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
     <div
       style={{
@@ -157,25 +305,36 @@ const Emphasis: React.FC<{
             letterSpacing: "-0.04em",
           }}
         >
-          {head ? (
-            <>
-              {head}{" "}
-              <span style={{ color: style.accent }}>{tail}</span>
-            </>
-          ) : (
-            <span style={{ color: style.accent }}>{tail}</span>
-          )}
+          {head ? <>{head} </> : null}
+          <span style={{ position: "relative", display: "inline-block" }}>
+            <AccentPop delay={3} color={style.accent}>
+              <CountLabel text={tail} progress={count} />
+            </AccentPop>
+            {strike ? (
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: "48%",
+                  height: 4,
+                  background: style.accent,
+                  transform: `scaleX(${strikeP})`,
+                  transformOrigin: "left center",
+                  borderRadius: 4,
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+          </span>
         </div>
-        <div
-          style={{
-            marginTop: Math.round(h * 0.02),
-            width: Math.round(w * 0.22),
-            height: 3,
-            background: style.accent,
-            transform: `scaleX(${line})`,
-            transformOrigin: "left center",
-          }}
-        />
+        <div style={{ marginTop: Math.round(h * 0.02) }}>
+          <DrawnLine
+            progress={line}
+            widthPx={Math.round(w * 0.22)}
+            color={style.accent}
+          />
+        </div>
       </EnterExit>
     </div>
   );
@@ -212,12 +371,13 @@ const DiagramStep: React.FC<{
   const { fps } = useVideoConfig();
   const startF = Math.max(0, Math.round(atSec * fps));
   const local = frame - startF;
-  const s = spring({
-    frame: Math.max(0, local),
-    fps,
-    config: { damping: 16, stiffness: 160 },
+  const s = softSpring(local, fps);
+  const pop = popSpring(local, fps);
+  const y = interpolate(s, [0, 1], [14, 0]);
+  const tick = interpolate(local, [0, 10], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
   });
-  const y = interpolate(s, [0, 1], [12, 0]);
   const fadeIn = interpolate(local, [0, 7], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -233,21 +393,37 @@ const DiagramStep: React.FC<{
     extrapolateRight: "clamp",
   });
   const opacity = local < 0 ? 0 : Math.min(fadeIn, fadeOut);
+  const numScale = interpolate(pop, [0, 1], [0.4, 1]);
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "auto 1fr",
-        gap: 14,
+        gridTemplateColumns: "auto 18px 1fr",
+        gap: 10,
         alignItems: "center",
         fontFamily: UI,
         fontWeight: 700,
         fontSize: Math.round(h * 0.036),
         opacity,
-        transform: `translateY(${local < 0 ? 12 : y}px)`,
+        transform: `translateY(${local < 0 ? 14 : y}px)`,
       }}
     >
-      <span style={{ color: accent }}>{index + 1}</span>
+      <span
+        style={{
+          color: accent,
+          display: "inline-block",
+          transform: `scale(${local < 0 ? 0.4 : numScale})`,
+          transformOrigin: "center",
+        }}
+      >
+        {index + 1}
+      </span>
+      <DrawnLine
+        progress={local < 0 ? 0 : tick}
+        widthPx={16}
+        heightPx={2}
+        color={accent || "#7dd3fc"}
+      />
       <span>{step}</span>
     </div>
   );
@@ -258,11 +434,24 @@ const Diagram: React.FC<{
   style: ReturnType<typeof useStyle>;
   h: number;
 }> = ({ ov, style, h }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const steps = ov.steps || [];
   const stepAt = resolveStepAtSec(steps, ov);
   const left = style.diagram?.leftCqw ?? 4.5;
   const top = style.diagram?.topCqh ?? 10;
   const maxW = style.diagram?.maxWidthCqw ?? 40;
+  const rowGap = Math.round(h * 0.012);
+  const rowH = Math.round(h * 0.048);
+  const n = steps.length;
+  const firstF = Math.round((stepAt[0] ?? 0.2) * fps);
+  const lastF = Math.round((stepAt[Math.max(0, n - 1)] ?? 1) * fps);
+  const railP = interpolate(frame, [firstF, Math.max(firstF + 1, lastF)], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const railH = Math.max(0, n * rowH + Math.max(0, n - 1) * rowGap);
+  const tokenY = railH * railP;
   return (
     <div
       style={{
@@ -300,19 +489,61 @@ const Diagram: React.FC<{
           {ov.title || ov.text}
         </div>
       </EnterExit>
-      <div style={{ display: "grid", gap: Math.round(h * 0.012) }}>
-        {steps.map((step, i) => (
-          <DiagramStep
-            key={`${i}-${step}`}
-            step={step}
-            index={i}
-            atSec={stepAt[i] ?? 0.55}
-            durationSec={ov.durationSec}
-            exitStartSec={ov.exitStartSec}
-            accent={style.accent}
-            h={h}
+      <div style={{ position: "relative", paddingLeft: 4 }}>
+        <div
+          style={{
+            position: "absolute",
+            left: 11,
+            top: 6,
+            width: 2,
+            height: railH,
+            overflow: "hidden",
+            pointerEvents: "none",
+          }}
+        >
+          <DrawnLine
+            progress={n ? railP : 0}
+            widthPx={2}
+            heightPx={railH}
+            color={style.accent}
+            axis="y"
+            origin="top center"
           />
-        ))}
+        </div>
+        {n ? (
+          <div
+            style={{
+              position: "absolute",
+              left: 6,
+              top: 6 + tokenY,
+              width: 12,
+              height: 12,
+              marginTop: -6,
+              borderRadius: "50%",
+              background: style.accent,
+              boxShadow: `0 0 12px ${style.accent}`,
+              opacity: interpolate(frame, [firstF, firstF + 6], [0, 1], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }),
+              pointerEvents: "none",
+            }}
+          />
+        ) : null}
+        <div style={{ display: "grid", gap: rowGap }}>
+          {steps.map((step, i) => (
+            <DiagramStep
+              key={`${i}-${step}`}
+              step={step}
+              index={i}
+              atSec={stepAt[i] ?? 0.55}
+              durationSec={ov.durationSec}
+              exitStartSec={ov.exitStartSec}
+              accent={style.accent}
+              h={h}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -323,38 +554,44 @@ const Chip: React.FC<{
   style: ReturnType<typeof useStyle>;
   h: number;
 }> = ({ ov, style, h }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const left = style.chip?.leftCqw ?? 4.5;
   const top = style.chip?.topCqh ?? 10;
   const sizeCqh = style.chip?.sizeCqh ?? 3.4;
+  const pop = popSpring(frame, fps, 2);
+  const scale = interpolate(pop, [0, 1], [0.15, 1]);
   return (
-  <div
-    style={{
-      position: "absolute",
-      left: `${left}%`,
-      top: `${top}%`,
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 10,
-      color: style.ink,
-      fontFamily: UI,
-      fontWeight: 600,
-      fontSize: Math.round(h * (sizeCqh / 100)),
-      textShadow: "0 6px 18px rgba(0,0,0,0.5)",
-    }}
-  >
-    <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
-      <span
-        style={{
-          width: Math.round(h * 0.016),
-          height: Math.round(h * 0.016),
-          borderRadius: "50%",
-          background: style.accent,
-          display: "inline-block",
-        }}
-      />
-      {ov.text}
-    </EnterExit>
-  </div>
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}%`,
+        top: `${top}%`,
+        color: style.ink,
+        fontFamily: UI,
+        fontWeight: 600,
+        fontSize: Math.round(h * (sizeCqh / 100)),
+        textShadow: "0 6px 18px rgba(0,0,0,0.5)",
+      }}
+    >
+      <EnterExit
+        durationSec={ov.durationSec}
+        exitStartSec={ov.exitStartSec}
+        style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+      >
+        <span
+          style={{
+            width: Math.round(h * 0.016),
+            height: Math.round(h * 0.016),
+            borderRadius: "50%",
+            background: style.accent,
+            display: "inline-block",
+            transform: `scale(${scale})`,
+          }}
+        />
+        {ov.text}
+      </EnterExit>
+    </div>
   );
 };
 
@@ -362,7 +599,9 @@ const Callout: React.FC<{
   ov: TimelineOverlay;
   style: ReturnType<typeof useStyle>;
   h: number;
-}> = ({ ov, style, h }) => {
+  w: number;
+}> = ({ ov, style, h, w }) => {
+  const frame = useCurrentFrame();
   const left = style.callout?.leftCqw ?? 4.5;
   const bottom = style.callout?.bottomCqh ?? 22;
   const top = style.callout?.topCqh;
@@ -371,6 +610,14 @@ const Callout: React.FC<{
   const maxW = style.callout?.maxWidthCqw ?? 48;
   const value = ov.value || ov.text || "";
   const sourceLabel = ov.sourceLabel || ov.kicker || "";
+  const count = interpolate(frame, [3, 28], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const line = interpolate(frame, [10, 26], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   return (
     <div
       style={{
@@ -406,7 +653,14 @@ const Callout: React.FC<{
             lineHeight: 1.05,
           }}
         >
-          {value}
+          <CountLabel text={value} progress={count} />
+        </div>
+        <div style={{ marginTop: Math.round(h * 0.016) }}>
+          <DrawnLine
+            progress={line}
+            widthPx={Math.round(w * 0.18)}
+            color={style.accent}
+          />
         </div>
         {ov.title ? (
           <div
@@ -432,11 +686,13 @@ const OneOverlay: React.FC<{
 }> = ({ ov, styleTokens }) => {
   const { height, width } = useVideoConfig();
   const style = useStyle(styleTokens);
-  if (ov.kind === "chapter") return <Chapter ov={ov} style={style} h={height} />;
+  if (ov.kind === "chapter")
+    return <Chapter ov={ov} style={style} h={height} w={width} />;
   if (ov.kind === "emphasis")
     return <Emphasis ov={ov} style={style} h={height} w={width} />;
   if (ov.kind === "diagram") return <Diagram ov={ov} style={style} h={height} />;
-  if (ov.kind === "callout") return <Callout ov={ov} style={style} h={height} />;
+  if (ov.kind === "callout")
+    return <Callout ov={ov} style={style} h={height} w={width} />;
   if (ov.kind === "chip") return <Chip ov={ov} style={style} h={height} />;
   return null;
 };
