@@ -25,6 +25,7 @@ from agentic_editor.compose import (
     prepare_draft,
     render_compose,
     render_draft,
+    render_mg_review,
     run_studio,
 )
 from agentic_editor.compose.mezzanine import build_mezzanines
@@ -694,6 +695,13 @@ def cmd_compose(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mg_review(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    out = render_mg_review(episode, gl=args.gl)
+    print(f"Wrote {out}")
+    return 0
+
+
 def cmd_social(args: argparse.Namespace) -> int:
     """Prepare, preview, or render the confirmed 9:16 social cut."""
     episode = resolve_episode(args.episode)
@@ -1001,6 +1009,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Chrome GL backend for faster frame render (Windows: try angle)",
     )
     com.set_defaults(func=cmd_compose)
+
+    mgr = sub.add_parser(
+        "mg-review",
+        help="Render a real still per glass MG overlay + a labeled HTML gallery for review",
+    )
+    mgr.add_argument("episode", nargs="?", default=".")
+    mgr.add_argument(
+        "--gl",
+        choices=("angle", "egl", "swiftshader", "vulkan", "angle-egl"),
+        default=None,
+        help="Chrome GL backend for faster frame render (Windows: try angle)",
+    )
+    mgr.set_defaults(func=cmd_mg_review)
 
     social = sub.add_parser(
         "social",

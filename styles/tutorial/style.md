@@ -2,7 +2,52 @@
 
 Defaults for tech talking-head + screen recordings.
 
-**Locked A-roll MG:** Bold type + cool mist sky accent. Do not invent episode-local forks.
+**Locked A-roll MG (2026-08+):** `glass` preset — frosted overlay-on-continuous-A-roll
+(rgba(0,0,0,0.2) + blur(16px) "image-slot" scrim), teal/amber tokens, Instrument
+Sans/Serif + IBM Plex Mono. Do not invent episode-local forks; promote changes here.
+
+Kinds: `title` · `stat` · `lower_third` · `tag` · `divider` · `quote` · `code` ·
+`illustration`. Components live in
+`packages/remotion-kit/src/components/glass/GlassOverlays.tsx`; tokens in
+`glass/tokens.ts` (decoded from the Kresna design system —
+`oklch()` colors, `Instrument Serif` for the wordmark, `--ease-punch` /
+`--ease-out` motion, `--duration-fast/base/slow` = 120/220/420ms). Author
+cover.json `overlays[]` the same way as before (`start`/`end` cam-source
+seconds, word-snapped); the Python remap (`ae cover`) passes `text` /
+`title` / `kicker` / `steps` / `value` / `sourceLabel` / `note` / `tone` /
+`accent` through unchanged. Field mapping:
+
+| Kind | Fields used |
+|------|-------------|
+| `title` | `text` (headline) + optional `kicker`, `accent` (2nd-color headline continuation), `steps` (tag row). No `kicker`/`accent` → renders as the design's outro/subscribe layout (wordmark + `text` line + tags) instead of a hero headline. |
+| `stat` | `value` (big number, **counts up from 0**) + `sourceLabel` + optional `title` (descriptor line) + `tone` (teal/amber accent) |
+| `lower_third` | `text` (name) + `title` (role) + `steps` (tag row, tone-cycled) — renders as a full-width bottom band, not a floating card |
+| `tag` | `text` (standalone floating chip) + optional `tone` |
+| `divider` | `kicker` ("CHAPTER 01" — a trailing 2-digit number renders as an oversized ghost numeral) + `title` (heading) |
+| `quote` | `text` (quote body) + `kicker` (attribution) |
+| `code` | `steps` (code lines) + `kicker` (label) + optional `title` (filename, e.g. "query.sql") |
+| `illustration` | `title` (heading) + `steps` (labels/values) + `note: "illustration:<id>"` where id is one of `dual_timeline` / `scale_compare` / `spec_gap` / `car_no_map` / `compass` / `load_test` / `stadium_ticket` |
+
+`tone` is `"teal" | "amber" | "neutral"` — teal reads informational/positive,
+amber reads caution/estimate, neutral is plain. When an overlay carries a
+*list* of tags with no per-tag tone (title's `steps`, lower_third's `steps`),
+they cycle teal → amber → neutral by index, matching the design's own
+multi-tag examples.
+
+**Motion (exact, from the design's "Motion & diagram guide"):** title/divider
+punch in (scale 0.94→1, fade) over 220ms, ease-punch, then **hard cut** on
+exit (no fade — the Sequence unmount is the cut). Stat numbers count up from
+0 over 300ms with the same punch ease; the label fades in 80ms after the
+count finishes. Quote cards fade/rise in over 280ms and are the one kind
+with a graceful **exit**: plain 200ms ease-out fade, no punch. Chips/lower
+third slide in 12px + fade over 180ms, staggered ~60ms apart, and mirror
+that on exit. Hold time: cut once the entrance motion settles and the beat
+is read (~1.5–2.5s single stat/quote, ~3s two-up) — don't hold a static MG
+once nothing is moving and the line has passed.
+
+The legacy `bold_mist` kinds (`chapter` / `emphasis` / `diagram` / `chip` /
+`callout`, config below) still render — `OverlayLayer` dispatches by `kind` —
+but new episodes should author the `glass` kinds above.
 
 ```yaml
 captions:
@@ -16,10 +61,12 @@ voice_enhance:
   compensate_delay: true
   sample_rate: 48000
   sources: [cam]
-# Locked A-roll overlay presentation (Remotion). Bold + cool mist accent.
+# Locked A-roll overlay presentation (Remotion). glass = default (2026-08+);
+# these bold_mist tokens still style the legacy chapter/emphasis/diagram/chip/callout kinds.
 overlays:
-  preset: bold_mist
-  treatment: bold              # type-only — no glass cards
+  preset: glass
+  legacyPreset: bold_mist
+  treatment: bold              # type-only — no glass cards (legacy kinds only)
   accent: "#7dd3fc"            # cool mist sky
   accentName: cool_mist_sky
   ink: "#ffffff"
@@ -182,10 +229,10 @@ screen_explainer:
   pip:
     anchor: stage_lower_right   # frame corner — not nested inside screen
     widthRatio: 0.18
-    aspectRatio: "4:5"
+    aspectRatio: "5:6"          # near-square, rounded (2026-08+; was 4:5/14px)
     insetRightRatio: 0.035
     insetBottomRatio: 0.045
-    borderRadiusPx: 14
+    borderRadiusPx: 26
     border: none
     objectFit: cover
     objectPosition: "center 28%"
@@ -202,7 +249,8 @@ Agents must load these defaults when `project.yaml` has `style: tutorial` (frame
 
 | Layer | Locked look |
 |-------|-------------|
-| A-roll MG (chapter / emphasis / diagram / chip) | **Bold** type + accent `#7dd3fc` (cool mist sky) |
+| A-roll MG (title / stat / lower_third / tag / divider / quote / code / illustration) | `glass` preset — frosted scrim + teal/amber oklch tokens (see above) |
+| A-roll MG legacy kinds (chapter / emphasis / diagram / chip) | **Bold** type + accent `#7dd3fc` (cool mist sky) — still supported, not the default for new episodes |
 | Screen + PIP stage | Cool-mist canvas `#d9e2ec` + cozy float (soft round, no smart crop) |
 
 Run `ae cover-suggest .` after the EDL is confirmed when a `screen` source exists.

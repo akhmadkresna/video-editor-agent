@@ -94,10 +94,10 @@ DEFAULT_SCREEN_EXPLAINER: dict[str, Any] = {
     "pip": {
         "anchor": "stage_lower_right",
         "widthRatio": 0.18,
-        "aspectRatio": "4:5",
+        "aspectRatio": "5:6",
         "insetRightRatio": 0.035,
         "insetBottomRatio": 0.045,
-        "borderRadiusPx": 14,
+        "borderRadiusPx": 26,
         "border": "none",
         "objectFit": "cover",
         "objectPosition": "center 28%",

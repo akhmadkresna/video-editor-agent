@@ -20,7 +20,8 @@ asr:
   language: id
 ```
 
-Agents must not redesign the thumbnail. A-roll MG stays Bold + `#7dd3fc`.
+Agents must not redesign the thumbnail. A-roll MG uses the `glass` preset
+(see Production below) — thumbnail treatment is separate and unaffected.
 
 ## Positioning
 
@@ -119,19 +120,24 @@ Do **not** dunk on lecturers. Replace `[NAMA]` only when the host supplies it.
 
 ## Production
 
-**Picture lock:** essay talking-head. Keep `style: tutorial` (Bold +
-`#7dd3fc`, camera_play, no karaoke). Do not switch the series to
-`style: evidence` — that pack is for estimator screenshots.
+**Picture lock:** essay talking-head. Keep `style: tutorial` (`camera_play`,
+no karaoke). Do not switch the series to `style: evidence` — that pack is
+for estimator screenshots.
+
+**MG look (2026-08+):** `glass` preset — frosted overlay-on-continuous-A-roll,
+teal/amber tokens (see `styles/tutorial/style.md`). Replaces the old Bold +
+`#7dd3fc` left-rail look for this series starting with Part 1.
 
 - Full cam on Parts 1–2. No screen demo. No `cover.cutaways[]`.
-- Signature MG: `callout` (number + source on screen). Overlay-suggest
-  will not emit callouts — author them from `edit/evidence.md`.
-- Chapters + diagrams for lists. Emphasis only on thesis lines.
-- Quotes from EN/ID creators = **kartu kutipan** (`chapter` kicker =
+- Signature MG: `stat` (number + source, glass scrim). Overlay-suggest
+  will not emit these — author them from `edit/evidence.md`.
+- `divider` for chapters, `illustration` for lists/comparisons. `quote`
+  only on thesis lines and quote cards.
+- Quotes from EN/ID creators = **kartu kutipan** (`quote` kind, `kicker` =
   channel name). Default no third-party video clips (Content ID).
 - Optional later: 8–12s `evidence_with_cam` of *real* BPS / Stanford /
   LPEM page screenshots. Never AI dashboards.
-- Thumb accent `#facc15` is YouTube-only. In-video MG stays cool mist.
+- Thumb accent `#facc15` is YouTube-only. In-video MG stays `glass` teal/amber.
 - Sparser than Odoo demos: after overlay-suggest, delete most lexicon
   gap-fill. Audio from cam; shutter/click only; no hook music.
 

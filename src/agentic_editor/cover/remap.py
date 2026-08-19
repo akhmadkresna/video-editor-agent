@@ -53,6 +53,23 @@ def remap_source_window(
     return out
 
 
+#: Legacy bold_mist kinds (left-rail type, Remotion OverlayLayer's OneOverlay).
+_LEGACY_OVERLAY_KINDS = ("chapter", "emphasis", "diagram", "chip", "callout")
+#: Glass house style kinds (2026-08+) — see
+#: packages/remotion-kit/src/components/glass/GlassOverlays.tsx.
+_GLASS_OVERLAY_KINDS = (
+    "title",
+    "stat",
+    "lower_third",
+    "tag",
+    "divider",
+    "quote",
+    "code",
+    "illustration",
+)
+_ALLOWED_OVERLAY_KINDS = _LEGACY_OVERLAY_KINDS + _GLASS_OVERLAY_KINDS
+
+
 def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Overlay creatives live on cover.overlays[] (preferred)."""
     if not cover:
@@ -63,7 +80,7 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         kind = str(item.get("kind") or item.get("type") or "").lower().strip()
-        if kind not in ("chapter", "emphasis", "diagram", "chip", "callout"):
+        if kind not in _ALLOWED_OVERLAY_KINDS:
             continue
         try:
             start = float(item["start"])
@@ -94,6 +111,14 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         ).strip()
         if source_label:
             entry["sourceLabel"] = source_label
+        # "glass" kinds: tone (teal/amber/neutral accent) and title's accent
+        # (second-color headline continuation). See glass/tokens.ts.
+        tone = str(item.get("tone") or "").strip().lower()
+        if tone in ("teal", "amber", "neutral"):
+            entry["tone"] = tone
+        accent = str(item.get("accent") or "").strip()
+        if accent:
+            entry["accent"] = accent
         # Optional manual source-time cues for diagram steps (cam seconds).
         raw_starts = item.get("stepStarts") or item.get("step_starts")
         if isinstance(raw_starts, list):
@@ -691,6 +716,10 @@ def build_timeline_overlays(
             inst["value"] = ov["value"]
         if ov.get("sourceLabel"):
             inst["sourceLabel"] = ov["sourceLabel"]
+        if ov.get("tone"):
+            inst["tone"] = ov["tone"]
+        if ov.get("accent"):
+            inst["accent"] = ov["accent"]
         if kind == "diagram" and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell

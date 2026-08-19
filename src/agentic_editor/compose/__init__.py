@@ -842,6 +842,157 @@ def render_compose(
     return out
 
 
+#: "glass" house-style kinds (see packages/remotion-kit/src/components/glass/
+#: GlassOverlays.tsx) — kept in sync with cover/remap.py's _GLASS_OVERLAY_KINDS.
+_MG_REVIEW_KINDS = (
+    "title",
+    "stat",
+    "lower_third",
+    "tag",
+    "divider",
+    "quote",
+    "code",
+    "illustration",
+)
+
+#: Seconds into an overlay's fromSec where its entrance motion has settled —
+#: see styles/tutorial/style.md's "Motion (exact...)" section. stat needs
+#: longer (300ms count-up + 80ms delay + 260ms label fade ≈ 640ms); everything
+#: else settles within ~220-280ms, so 0.6s is a safe generic hold point.
+_MG_REVIEW_SETTLE_SEC = {"stat": 0.85}
+_MG_REVIEW_SETTLE_DEFAULT = 0.6
+
+
+def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = True) -> Path:
+    """Render a real Remotion still per glass MG overlay + a labeled HTML
+    gallery, so the a-roll MG plan (cover.json) can be handed off for visual
+    review without hand-maintaining a second copy of the glass CSS. Each
+    still is the actual production frame (cam + evidence + MG together) —
+    zero drift, since it's the same renderer/components as the final video.
+    """
+    prepare_compose(episode, verbose=verbose)
+    kit = remotion_kit_dir()
+    props_path = episode / "edit" / "remotion-props.json"
+    timeline = json.loads(props_path.read_text(encoding="utf-8"))["timeline"]
+    fps = int(timeline.get("fps") or 30)
+    overlays = [
+        ov
+        for ov in (timeline.get("overlays") or [])
+        if isinstance(ov, dict) and ov.get("kind") in _MG_REVIEW_KINDS
+    ]
+    if not overlays:
+        raise RuntimeError("No glass MG overlays found in cover.json — nothing to review")
+
+    out_dir = episode / "edit" / "mg-review"
+    stills_dir = out_dir / "stills"
+    stills_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env["AE_TIMELINE_PROPS"] = str(props_path)
+    env["AE_EPISODE"] = str(episode.resolve())
+    gl_args = ["--gl", str(gl)] if gl else []
+
+    tiles: list[dict[str, Any]] = []
+    for ov in overlays:
+        kind = str(ov["kind"])
+        from_sec = float(ov.get("fromSec") or 0.0)
+        exit_start = ov.get("exitStartSec")
+        settle = _MG_REVIEW_SETTLE_SEC.get(kind, _MG_REVIEW_SETTLE_DEFAULT)
+        if isinstance(exit_start, (int, float)):
+            settle = min(settle, max(0.05, float(exit_start) - 0.1))
+        frame = max(0, round((from_sec + settle) * fps))
+        still_path = stills_dir / f"{ov['id']}.png"
+        cmd = [
+            *_remotion_cli(kit),
+            "still",
+            "src/index.ts",
+            "AgenticTimeline",
+            str(still_path),
+            "--props",
+            str(props_path),
+            f"--frame={frame}",
+            *gl_args,
+        ]
+        if verbose:
+            print(f"$ cd {kit} && {' '.join(cmd)}")
+        subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+        # Full-res PNG stays on disk for close inspection; the HTML gallery
+        # embeds a downscaled JPEG so the whole page stays well under
+        # Artifact's 16MB budget (25 full-res 1080p PNGs would be ~45MB).
+        preview_path = stills_dir / f"{ov['id']}.preview.jpg"
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(still_path),
+                "-vf", "scale=960:-1",
+                "-q:v", "5",
+                str(preview_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        tiles.append({**ov, "_still": still_path, "_preview": preview_path, "_frame": frame})
+
+    html_path = out_dir / "review.html"
+    html_path.write_text(_build_mg_review_html(tiles), encoding="utf-8")
+    if verbose:
+        print(f"• mg-review → {html_path.relative_to(episode)} ({len(tiles)} overlays)")
+    return html_path
+
+
+def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
+    import base64
+    import html as _html
+
+    rows = []
+    for t in tiles:
+        img_b64 = base64.b64encode(t["_preview"].read_bytes()).decode("ascii")
+        kind = _html.escape(str(t.get("kind") or ""))
+        oid = _html.escape(str(t.get("id") or ""))
+        from_sec = float(t.get("fromSec") or 0.0)
+        tone = t.get("tone")
+        badges = f'<span class="badge">{kind}</span>'
+        if tone:
+            # b/w system: amber = dashed border (estimate/caution), else solid —
+            # matches GlassOverlays.tsx's toneBorderStyle(), no color anywhere.
+            border_style = "dashed" if tone == "amber" else "solid"
+            badges += (
+                f'<span class="badge" style="border-style:{border_style}">'
+                f"{_html.escape(str(tone))}</span>"
+            )
+        rows.append(
+            f"""
+      <figure>
+        <img src="data:image/jpeg;base64,{img_b64}" alt="{oid}" />
+        <figcaption>
+          <div class="meta">{badges}<span class="id">{oid}</span></div>
+          <div class="t">t={from_sec:.2f}s · frame {t['_frame']}</div>
+        </figcaption>
+      </figure>"""
+        )
+
+    return f"""<!doctype html>
+<html><head><meta charset="utf-8" />
+<title>MG Review</title>
+<style>
+  body {{ margin:0; background:#0c0c0b; color:#f5f4f1; font-family:-apple-system,'Segoe UI',sans-serif; padding:32px; }}
+  h1 {{ font-size:20px; font-weight:600; margin:0 0 24px; }}
+  .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:20px; }}
+  figure {{ margin:0; background:#141312; border:1px solid #333029; border-radius:8px; overflow:hidden; }}
+  figure img {{ display:block; width:100%; height:auto; }}
+  figcaption {{ padding:10px 14px; font-size:12px; }}
+  .meta {{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }}
+  .badge {{ font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px; padding:2px 8px; border:1px solid #6b6860; color:#f5f4f1; }}
+  .id {{ font-family:ui-monospace,Menlo,monospace; color:#8f8c85; }}
+  .t {{ color:#8f8c85; }}
+</style>
+</head><body>
+  <h1>MG review — {len(tiles)} overlays</h1>
+  <div class="grid">{''.join(rows)}
+  </div>
+</body></html>
+"""
+
+
 def render_draft(
     episode: Path,
     *,

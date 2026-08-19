@@ -38,6 +38,17 @@ function isImageSrc(src: string): boolean {
   return IMAGE_EXT.test(src);
 }
 
+/** Parse a "W:H" ratio string (e.g. pip.aspectRatio: "5:6") into width/height.
+ * Falls back to 4:5 if missing/malformed — the previous hardcoded default. */
+function parseAspectRatio(ratio: string | undefined, fallback = 4 / 5): number {
+  if (!ratio) return fallback;
+  const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(ratio.trim());
+  if (!m) return fallback;
+  const w = parseFloat(m[1]);
+  const h = parseFloat(m[2]);
+  return h > 0 ? w / h : fallback;
+}
+
 /** Resolve public-relative paths via staticFile; leave http(s) alone. */
 function resolveSrc(src: string): string {
   if (
@@ -205,7 +216,8 @@ export const SourceClip: React.FC<Props> = ({
     const pipW = Math.round(
       width * (pipCfg.widthRatio ?? (portrait ? (letterbox ? 0.22 : 0.36) : 0.18)),
     );
-    const pipH = Math.round(pipW * 1.25); // 4:5
+    const pipRatio = parseAspectRatio(pipCfg.aspectRatio); // width / height
+    const pipH = Math.round(pipW / pipRatio);
     const anchor = (pipCfg.anchor || "stage_lower_right").toLowerCase();
     const pinLeft = anchor.includes("left");
     const radius = pipCfg.borderRadiusPx ?? 14;

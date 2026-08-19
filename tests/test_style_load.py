@@ -7,9 +7,12 @@ from agentic_editor.cover.style_load import (
 )
 
 
-def test_overlays_locked_bold_cool_mist():
+def test_overlays_locked_glass_with_legacy_bold_cool_mist():
     ov = load_overlays("tutorial")
-    assert ov["preset"] == "bold_mist"
+    # glass is the house default (2026-08+); bold_mist tokens below still
+    # style the legacy chapter/emphasis/diagram/chip/callout kinds.
+    assert ov["preset"] == "glass"
+    assert ov["legacyPreset"] == "bold_mist"
     assert ov["treatment"] == "bold"
     assert ov["accent"] == "#7dd3fc"
     assert ov["accentName"] == "cool_mist_sky"

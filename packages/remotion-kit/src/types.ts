@@ -63,7 +63,29 @@ export type OverlayKind =
   | "emphasis"
   | "diagram"
   | "chip"
-  | "callout";
+  | "callout"
+  // "Glass" house style (2026-08) — frosted overlay-on-continuous-A-roll,
+  // not a picture-takeover. See components/glass/. Content mapping (reuses
+  // existing whitelisted TimelineOverlay fields, no remap.py changes needed):
+  //   title       -> text (+ optional kicker)
+  //   stat        -> value + sourceLabel (+ optional title = descriptor)
+  //   lower_third -> text (name) + title (role) + steps (tag badges)
+  //   tag         -> text (standalone floating chip)
+  //   divider     -> kicker ("CHAPTER 01") + title (heading)
+  //   quote       -> text (quote body) + kicker (attribution)
+  //   code        -> steps (code lines) + kicker (label)
+  //   illustration-> title (heading) + steps (labels/values) +
+  //                  note: "illustration:<id>" selects the bespoke diagram
+  //                  (dual_timeline | scale_compare | spec_gap | car_no_map |
+  //                  compass | load_test | stadium_ticket)
+  | "title"
+  | "stat"
+  | "lower_third"
+  | "tag"
+  | "divider"
+  | "quote"
+  | "code"
+  | "illustration";
 
 export type SfxKind = "typing" | "shutter" | "click";
 
@@ -87,6 +109,12 @@ export type TimelineOverlay = {
   /** Local second when fade-out begins (after list hold). */
   exitStartSec?: number;
   note?: string;
+  /** "glass" kinds only — teal (info/positive) | amber (caution/estimate) |
+   * neutral. Drives StatCallout/TagBadge/TitleCard-accent color. */
+  tone?: "teal" | "amber" | "neutral";
+  /** `title` kind only — second-color headline continuation, e.g.
+   * text="Kalau ngoding udah gampang," accent="kita dibayar buat apa?" */
+  accent?: string;
 };
 
 /** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
@@ -498,10 +526,10 @@ export const DEFAULT_SCREEN_EXPLAINER: ScreenExplainerStyle = {
   pip: {
     anchor: "stage_lower_right",
     widthRatio: 0.18,
-    aspectRatio: "4:5",
+    aspectRatio: "5:6",
     insetRightRatio: 0.035,
     insetBottomRatio: 0.045,
-    borderRadiusPx: 14,
+    borderRadiusPx: 26,
     border: "none",
     objectFit: "cover",
     objectPosition: "center 28%",

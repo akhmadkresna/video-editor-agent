@@ -12,6 +12,7 @@ import {
   type OverlayStyle,
   type TimelineOverlay,
 } from "../types";
+import { GlassOverlay, isGlassKind } from "./glass/GlassOverlays";
 
 const DISPLAY =
   'Syne, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
@@ -738,6 +739,7 @@ const OneOverlay: React.FC<{
   if (ov.kind === "callout")
     return <Callout ov={ov} style={style} h={height} w={width} />;
   if (ov.kind === "chip") return <Chip ov={ov} style={style} h={height} />;
+  if (isGlassKind(ov.kind)) return <GlassOverlay ov={ov} />;
   return null;
 };
 
@@ -753,7 +755,8 @@ export const OverlayLayer: React.FC<{
         const from = Math.round(ov.fromSec * fps);
         const duration = Math.max(1, Math.round(ov.durationSec * fps));
         // Emphasis sits in lower-third — skip left-rail veil (reduces flicker in dense packs).
-        const showVeil = ov.kind !== "emphasis";
+        // Glass kinds paint their own scrim/panel background — skip the bold_mist veil.
+        const showVeil = ov.kind !== "emphasis" && !isGlassKind(ov.kind);
         return (
           <Sequence key={ov.id} from={from} durationInFrames={duration} name={ov.id}>
             {showVeil ? (

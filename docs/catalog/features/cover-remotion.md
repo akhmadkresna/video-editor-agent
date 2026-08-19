@@ -16,7 +16,20 @@
 | Screen + soft-float PIP | `screen_with_cam` (alias `cam_pip`) | Cool-mist canvas, **cozy** floated screen (`float_centered`) + cam PIP at **stage lower-right** | Cam only |
 
 **Locked tutorial presentation** (`styles/tutorial`):
-- A-roll MG (`overlays`): **Bold** type + accent **cool mist sky** `#7dd3fc` — no glass cards, no full/karaoke captions
+- A-roll MG (`overlays`): `glass` preset, **"Design Canvas" v6 (2026-08, LOCKED)** — cool off-white
+  paper cards with an unevenly-fading ruled grid, a real folded corner (dog-ear) per card, pure ink
+  type (Archivo sans / IBM Plex mono), one indigo accent (`#4d4de8`) reserved for the text-selection
+  highlight mechanic (translucent bar + caret + handle dots, sweeps in ~340ms after the card lands —
+  never a static decoration, and never used for anything else). Tone (teal/amber/neutral) is
+  expressed via border style (dashed = estimate, solid = sourced), not color. Kinds
+  `title`/`stat`/`lower_third`/`tag`/`divider`/`quote`/`code`/`illustration` — see
+  `packages/remotion-kit/src/components/glass/GlassOverlays.tsx` + `tokens.ts` (single shared
+  implementation, applies to every episode/series automatically, not per-episode config).
+  `quote` reuses `title`'s exact treatment (meta row, italic kicker, bold display headline) with
+  the `accent` field highlighting an inline word/phrase, not the whole sentence. `code` alone stays
+  a real macOS terminal window (a screen convention, deliberately not paper). Legacy `bold_mist`
+  kinds (`chapter`/`emphasis`/`diagram`/`chip`/`callout`, **Bold** type + accent `#7dd3fc`) still
+  render for old content. No full/karaoke captions either way.
 - Screen stage (`screen_explainer`): preset **cozy** (screen width 78%), canvas **cool mist** `#d9e2ec`
 - PIP: no border, stage lower-right (not nested in the screen window)
 - Crop: `none` — supply clean full-frame screen footage; float uses soft round (`borderRadiusPx: 24`) + `objectFit: cover`
@@ -35,7 +48,9 @@
 | Remap | `ae cover` / compose → `timeline.overlays[]` (output `fromSec`) |
 | Render | Remotion `OverlayLayer` (Bold mist) |
 
-Kinds: `chapter` · `emphasis` · `diagram` · `chip`. See skill hard rule 11.
+Glass kinds (default): `title` · `stat` · `lower_third` · `tag` · `divider` ·
+`quote` · `code` · `illustration`. Legacy bold_mist kinds (still supported):
+`chapter` · `emphasis` · `diagram` · `chip`. See skill hard rule 11.
 
 **Default gate (camera / zoom play):** suggest reads `cover.json` screen windows + `camera_play`. Chapter/diagram prefer `screen_with_cam` (already wide/hold). On full-cam they emit companion `framing` medium/wide so MG does not fight close multicam crops (`faceClear`, left_third). Emphasis may use close.
 
