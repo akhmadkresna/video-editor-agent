@@ -16,20 +16,25 @@
 | Screen + soft-float PIP | `screen_with_cam` (alias `cam_pip`) | Cool-mist canvas, **cozy** floated screen (`float_centered`) + cam PIP at **stage lower-right** | Cam only |
 
 **Locked tutorial presentation** (`styles/tutorial`):
-- A-roll MG (`overlays`): `glass` preset, **"Design Canvas" v6 (2026-08, LOCKED)** — cool off-white
-  paper cards with an unevenly-fading ruled grid, a real folded corner (dog-ear) per card, pure ink
-  type (Archivo sans / IBM Plex mono), one indigo accent (`#4d4de8`) reserved for the text-selection
-  highlight mechanic (translucent bar + caret + handle dots, sweeps in ~340ms after the card lands —
-  never a static decoration, and never used for anything else). Tone (teal/amber/neutral) is
-  expressed via border style (dashed = estimate, solid = sourced), not color. Kinds
-  `title`/`stat`/`lower_third`/`tag`/`divider`/`quote`/`code`/`illustration` — see
-  `packages/remotion-kit/src/components/glass/GlassOverlays.tsx` + `tokens.ts` (single shared
-  implementation, applies to every episode/series automatically, not per-episode config).
-  `quote` reuses `title`'s exact treatment (meta row, italic kicker, bold display headline) with
-  the `accent` field highlighting an inline word/phrase, not the whole sentence. `code` alone stays
-  a real macOS terminal window (a screen convention, deliberately not paper). Legacy `bold_mist`
-  kinds (`chapter`/`emphasis`/`diagram`/`chip`/`callout`, **Bold** type + accent `#7dd3fc`) still
-  render for old content. No full/karaoke captions either way.
+- A-roll MG (`overlays`): `open_overlay` preset, **"Open Overlay" v7 (2026-08, LOCKED)** — white
+  ink straight on the a-roll, **no panel of any kind, no accent color**. Readability comes from a
+  darker scrim (`OverlayLayer`'s veil gradient) behind the text, not a card surface or a hue. The
+  only color beyond white is a translucent-white text-selection highlight on `title`/`quote` accent
+  phrases (sweeps in ~340ms after the text lands — never a static decoration, and never used for
+  anything else). Tone (teal/amber/neutral) is expressed via border style (dashed = estimate, solid
+  = sourced), not color. Superseded "Design Canvas" v6 (opaque off-white paper cards with a dog-ear
+  fold and an indigo `#4d4de8` selection accent) — same layout/type/motion per kind, just un-paneled
+  and recolored to white. All 13 kinds share this one look now:
+  `title`/`stat`/`lower_third`/`tag`/`divider`/`quote`/`code`/`illustration` (see
+  `packages/remotion-kit/src/components/glass/GlassOverlays.tsx` + `tokens.ts`) and
+  `chapter`/`emphasis`/`diagram`/`callout`/`chip` (see `OverlayLayer.tsx`'s own `OneOverlay` —
+  different component per kind's structure, same palette; these five used to keep an accent-cyan
+  kicker/rule/number and have now dropped it to match). Single shared implementation, applies to
+  every episode/series automatically, not per-episode config. `quote` reuses `title`'s exact
+  treatment (meta row, italic kicker, bold display headline) with the `accent` field highlighting
+  an inline word/phrase, not the whole sentence. `code` alone stays a real macOS terminal window (a
+  screen convention, never part of the panel family, so untouched by the panel removal). No
+  full/karaoke captions either way.
 - Screen stage (`screen_explainer`): preset **cozy** (screen width 78%), canvas **cool mist** `#d9e2ec`
 - PIP: no border, stage lower-right (not nested in the screen window)
 - Crop: `none` — supply clean full-frame screen footage; float uses soft round (`borderRadiusPx: 24`) + `objectFit: cover`
@@ -46,11 +51,13 @@
 | Confirm | Agent proposes plan → **wait** |
 | Write | `cover.json` `overlays[]` **and** companion `framing` in `events[]` (cam source time) |
 | Remap | `ae cover` / compose → `timeline.overlays[]` (output `fromSec`) |
-| Render | Remotion `OverlayLayer` (Bold mist) |
+| Render | Remotion `OverlayLayer` (Open Overlay) |
 
-Glass kinds (default): `title` · `stat` · `lower_third` · `tag` · `divider` ·
-`quote` · `code` · `illustration`. Legacy bold_mist kinds (still supported):
-`chapter` · `emphasis` · `diagram` · `chip`. See skill hard rule 11.
+`GlassOverlays.tsx`-dispatched kinds: `title` · `stat` · `lower_third` ·
+`tag` · `divider` · `quote` · `code` · `illustration`. `OneOverlay`-dispatched
+kinds: `chapter` · `emphasis` · `diagram` · `chip`. Same white-ink/no-panel
+treatment either way — the split is just which component renders the kind's
+structure, not a style choice. See skill hard rule 11.
 
 **Default gate (camera / zoom play):** suggest reads `cover.json` screen windows + `camera_play`. Chapter/diagram prefer `screen_with_cam` (already wide/hold). On full-cam they emit companion `framing` medium/wide so MG does not fight close multicam crops (`faceClear`, left_third). Emphasis may use close.
 
@@ -66,7 +73,9 @@ Glass kinds (default): `title` · `stat` · `lower_third` · `tag` · `divider` 
 - Events: `framing`, `punch_in`, `punch_out`, `screen`, `screen_with_cam`, `pip` + captions
 - `screen` / `screen_full` also force a cam PIP underlay (audio + face) — prefer writing `screen_with_cam` explicitly
 - Merges with EDL into `edit/timeline.json`
-- Remotion: per-clip scale + motion (`snap` / `ease` / `drift`), punch effects, soft-float `pip_corner`
+- Remotion: per-clip scale + motion (`snap` / `ease` / `ease_out` / `drift` / `pull_back`), punch effects, soft-float `pip_corner`
+- **`drift`** (slow push-in) auto-triggers on any static shot (`hold` or `snap`, non-`wide`) that outlasts `camera_play.drift_min_hold_sec` (default **9s**) — documentary/interview convention (PBS Frontline pushes in on every interview shot). Target zoom scales with hold duration (~1.5%/sec, 5–15% range) and eases via Sine in/out, not linear — see `useMotionScale` in `SourceClip.tsx`. **Tune the threshold against your actual clip-duration distribution, not by feel** — with `max_hold_sec: 7`, a 5s bar already catches ~94% of clips (drift becomes a constant pulse, not an occasional touch); check `timeline.json` clip durations before picking a number.
+- **`pull_back`** (slow zoom-out) is the mirror of `drift` — same rate/easing, reversed direction. Not auto-triggered; author it explicitly on a `framing` event for a deliberate reveal beat (start tight, pull back to expose context). Overusing it reads as gimmicky — convention treats push-in as the default and pull-back as a rare, content-tied choice.
 
 ### `screen_with_cam` example
 

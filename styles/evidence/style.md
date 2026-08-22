@@ -2,17 +2,17 @@
 
 Talking-head **plus** real website/YouTube evidence stills (screenshots — never AI-generated dashboards).
 
-Starts from the tutorial locked look (Bold + cool mist). Do not invent episode-local forks.
-Use when `project.yaml` has `style: evidence`. Keep `style: tutorial` as the house default for Odoo/screen demos.
+Starts from the tutorial locked look ("Open Overlay" v7 — white ink, no panel,
+no accent color). Do not invent episode-local forks. Use when `project.yaml`
+has `style: evidence`. Keep `style: tutorial` as the house default for
+Odoo/screen demos.
 
 ```yaml
 captions:
   style: off
 overlays:
-  preset: bold_mist
+  preset: open_overlay
   treatment: bold
-  accent: "#7dd3fc"
-  accentName: cool_mist_sky
   ink: "#ffffff"
   dim: "rgba(255,255,255,0.55)"
   dwell:
@@ -64,16 +64,22 @@ punch_in:
 sfx:
   enabled: true
   no_whoosh: true
-  pack: styles/tutorial/sfx
+  pack: styles/evidence/sfx      # own pack — camera_shutter/paper_page/soft_tick.mp3
   volumes:
     typing: 0.38
     shutter: 0.38
     click: 0.32
+    paper: 0.35
+    tick: 0.28
   density:
     sec_per_sfx: 30
     min_gap_sec: 1.2
     shutter_click_min_gap_sec: 0.4
     typing_merge_gap_sec: 1.5
+  paper:
+    max_sec: 0.45
+  tick:
+    max_sec: 0.15
   typing:
     enabled: false
     min_hold_sec: 4.0
@@ -89,6 +95,17 @@ sfx:
     emphasis: click
     chip: click
     callout: shutter
+    # Kinds that used to carry a paper card — a page-turn still reads well
+    # as their appear cue even after the card was dropped (v7, no panel);
+    # tag is a small chip, gets a lighter tick instead.
+    title: paper
+    stat: paper
+    lower_third: paper
+    divider: paper
+    quote: paper
+    illustration: paper
+    code: paper
+    tag: tick
 camera_play:
   snap_on_cuts: true
   home: medium

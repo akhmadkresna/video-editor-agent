@@ -53,9 +53,13 @@ def remap_source_window(
     return out
 
 
-#: Legacy bold_mist kinds (left-rail type, Remotion OverlayLayer's OneOverlay).
+#: Original left-rail kinds (Remotion OverlayLayer's OneOverlay) — same
+#: white-ink, no-panel look as the kinds below, see
+#: packages/remotion-kit/src/components/OverlayLayer.tsx.
 _LEGACY_OVERLAY_KINDS = ("chapter", "emphasis", "diagram", "chip", "callout")
-#: Glass house style kinds (2026-08+) — see
+#: Kinds dispatched to GlassOverlays.tsx (2026-08+, "Open Overlay" v7) —
+#: no panel, same palette as the kinds above, just a different component
+#: per kind's structure. See
 #: packages/remotion-kit/src/components/glass/GlassOverlays.tsx.
 _GLASS_OVERLAY_KINDS = (
     "title",
@@ -111,8 +115,9 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         ).strip()
         if source_label:
             entry["sourceLabel"] = source_label
-        # "glass" kinds: tone (teal/amber/neutral accent) and title's accent
-        # (second-color headline continuation). See glass/tokens.ts.
+        # "glass" kinds: tone (teal/amber/neutral — dashed vs solid border,
+        # not a color) and title's accent (2nd-line highlighted phrase text,
+        # not a style color). See glass/tokens.ts.
         tone = str(item.get("tone") or "").strip().lower()
         if tone in ("teal", "amber", "neutral"):
             entry["tone"] = tone
@@ -752,6 +757,14 @@ def build_timeline_sfx(
     vols = cfg.get("volumes") or {}
     shutter_max = float((cfg.get("shutter") or {}).get("max_sec", 0.22))
     click_max = float((cfg.get("click") or {}).get("max_sec", 0.18))
+    paper_max = float((cfg.get("paper") or {}).get("max_sec", 0.45))
+    tick_max = float((cfg.get("tick") or {}).get("max_sec", 0.15))
+    max_by_kind = {
+        "shutter": shutter_max,
+        "click": click_max,
+        "paper": paper_max,
+        "tick": tick_max,
+    }
     out: list[dict[str, Any]] = []
     for i, item in enumerate(cover.get("sfx") or []):
         if not isinstance(item, dict):
@@ -765,7 +778,7 @@ def build_timeline_sfx(
             continue
         end_raw = item.get("end")
         if end_raw is None:
-            end = start + (shutter_max if kind == "shutter" else click_max)
+            end = start + max_by_kind.get(kind, click_max)
         else:
             try:
                 end = float(end_raw)
@@ -784,9 +797,8 @@ def build_timeline_sfx(
             explicit=str(item["src"]) if item.get("src") else None,
         )
         dur = float(sl["durationSec"])
-        if kind in ("shutter", "click"):
-            max_sec = shutter_max if kind == "shutter" else click_max
-            dur = min(dur, max_sec)
+        if kind in max_by_kind:
+            dur = min(dur, max_by_kind[kind])
         entry: dict[str, Any] = {
             "id": str(item.get("id") or f"sfx-{kind}-{i}"),
             "kind": kind,

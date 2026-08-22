@@ -225,11 +225,11 @@ const Chapter: React.FC<{
               fontWeight: 600,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: style.accent,
+              color: style.ink,
               marginBottom: Math.round(h * 0.012),
             }}
           >
-            <AccentPop delay={2} color={style.accent}>
+            <AccentPop delay={2} color={style.ink}>
               {ov.kicker}
             </AccentPop>
           </div>
@@ -249,7 +249,7 @@ const Chapter: React.FC<{
           <DrawnLine
             progress={line}
             widthPx={Math.round(w * 0.16)}
-            color={style.accent}
+            color={style.ink}
           />
         </div>
       </EnterExit>
@@ -308,7 +308,7 @@ const Emphasis: React.FC<{
         >
           {head ? <>{head} </> : null}
           <span style={{ position: "relative", display: "inline-block" }}>
-            <AccentPop delay={3} color={style.accent}>
+            <AccentPop delay={3} color={style.ink}>
               <CountLabel text={tail} progress={count} />
             </AccentPop>
             {strike ? (
@@ -319,7 +319,7 @@ const Emphasis: React.FC<{
                   right: 0,
                   top: "48%",
                   height: 4,
-                  background: style.accent,
+                  background: style.ink,
                   transform: `scaleX(${strikeP})`,
                   transformOrigin: "left center",
                   borderRadius: 4,
@@ -333,7 +333,7 @@ const Emphasis: React.FC<{
           <DrawnLine
             progress={line}
             widthPx={Math.round(w * 0.22)}
-            color={style.accent}
+            color={style.ink}
           />
         </div>
       </EnterExit>
@@ -549,7 +549,7 @@ const Diagram: React.FC<{
               progress={railP}
               widthPx={metrics.railW}
               heightPx={metrics.railH}
-              color={style.accent}
+              color={style.ink}
               axis="y"
               origin="top center"
             />
@@ -564,8 +564,8 @@ const Diagram: React.FC<{
               width: metrics.token,
               height: metrics.token,
               borderRadius: "50%",
-              background: style.accent,
-              boxShadow: `0 0 12px ${style.accent}`,
+              background: style.ink,
+              boxShadow: `0 0 10px rgba(255,255,255,0.55)`,
               opacity: interpolate(frame, [firstF, firstF + 6], [0, 1], {
                 extrapolateLeft: "clamp",
                 extrapolateRight: "clamp",
@@ -584,7 +584,7 @@ const Diagram: React.FC<{
               atSec={stepAt[i] ?? 0.55}
               durationSec={ov.durationSec}
               exitStartSec={ov.exitStartSec}
-              accent={style.accent}
+              accent={style.ink}
               metrics={metrics}
             />
           ))}
@@ -629,7 +629,7 @@ const Chip: React.FC<{
             width: Math.round(h * 0.016),
             height: Math.round(h * 0.016),
             borderRadius: "50%",
-            background: style.accent,
+            background: style.ink,
             display: "inline-block",
             transform: `scale(${scale})`,
           }}
@@ -681,7 +681,7 @@ const Callout: React.FC<{
               fontFamily: UI,
               fontWeight: 600,
               fontSize: Math.round(h * (sourceSize / 100)),
-              color: style.accent,
+              color: style.ink,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: Math.round(h * 0.012),
@@ -704,7 +704,7 @@ const Callout: React.FC<{
           <DrawnLine
             progress={line}
             widthPx={Math.round(w * 0.18)}
-            color={style.accent}
+            color={style.ink}
           />
         </div>
         {ov.title ? (
@@ -755,8 +755,8 @@ export const OverlayLayer: React.FC<{
         const from = Math.round(ov.fromSec * fps);
         const duration = Math.max(1, Math.round(ov.durationSec * fps));
         // Emphasis sits in lower-third — skip left-rail veil (reduces flicker in dense packs).
-        // Glass kinds paint their own scrim/panel background — skip the bold_mist veil.
-        const showVeil = ov.kind !== "emphasis" && !isGlassKind(ov.kind);
+        // Code stays a real terminal window — already opaque, doesn't need a veil behind it.
+        const showVeil = ov.kind !== "emphasis" && ov.kind !== "code";
         return (
           <Sequence key={ov.id} from={from} durationInFrames={duration} name={ov.id}>
             {showVeil ? (

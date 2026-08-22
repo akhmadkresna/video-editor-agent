@@ -8,12 +8,13 @@ from typing import Any
 
 import yaml
 
+from agentic_editor.cover import _pick_base_framing
 from agentic_editor.cover.style_load import load_sfx, sfx_pack_dir
 from agentic_editor.cover.suggest import load_cam_words
 from agentic_editor.editor.edl import load_edl
 from agentic_editor.project import load_project
 
-SFX_KINDS = frozenset({"typing", "shutter", "click"})
+SFX_KINDS = frozenset({"typing", "shutter", "click", "paper", "tick"})
 FORBIDDEN = frozenset({"whoosh", "riser", "swoosh", "whoosh_in", "whoosh_out"})
 
 CLICK_DEIXIS = ("klik", "click", "tombol", "button")
@@ -33,18 +34,40 @@ TYPING_HINTS = (
     "yaml",
 )
 
-# Default MG → SFX kind (overridable via style sfx.mg).
+# Default MG → SFX kind (overridable via style sfx.mg). The original
+# chapter/diagram/emphasis/chip kinds keep shutter/click; the kinds that
+# used to carry a paper card (title/stat/lower_third/divider/quote/
+# illustration/code) still default to "paper" on appear — a page-turn read
+# well as an appear cue even after the card itself was dropped for the
+# no-panel "Open Overlay" v7 look — except "tag", a small chip that reads
+# better with a light "tick" than a full page sound.
 DEFAULT_MG_KINDS = {
     "chapter": "shutter",
     "diagram": "shutter",
     "emphasis": "click",
     "chip": "click",
+    "title": "paper",
+    "stat": "paper",
+    "lower_third": "paper",
+    "divider": "paper",
+    "quote": "paper",
+    "illustration": "paper",
+    "code": "paper",
+    "tag": "tick",
 }
 MG_PRIORITY = {
     "chapter": 4,
     "diagram": 4,
     "emphasis": 3,
     "chip": 2,
+    "title": 4,
+    "stat": 3,
+    "lower_third": 3,
+    "divider": 4,
+    "quote": 3,
+    "illustration": 3,
+    "code": 3,
+    "tag": 2,
 }
 
 
@@ -85,6 +108,10 @@ def resolve_sfx_file(
         return f"click_{(bank_index % 4) + 1:02d}.mp3"
     if kind_l == "shutter":
         return str((section or {}).get("file") or "shutter.mp3")
+    if kind_l == "paper":
+        return str((section or {}).get("file") or "paper_page.mp3")
+    if kind_l == "tick":
+        return str((section or {}).get("file") or "soft_tick.mp3")
     return str((section or {}).get("file") or "typing-thock.mp3")
 
 
@@ -101,6 +128,41 @@ def _keep_ranges(edl: dict[str, Any]) -> list[tuple[float, float]]:
 
 def _in_keep(t: float, keeps: list[tuple[float, float]]) -> bool:
     return any(s <= t < e for s, e in keeps)
+
+
+#: How far into a cut gap a candidate's nominal source-time can sit and
+#: still get snapped to the nearest kept instant instead of being dropped.
+#: Covers e.g. an intro tag/overlay authored at t=0 that lands before the
+#: first kept range because the radio edit trimmed a leading silence —
+#: the overlay itself still renders at output t=0 (its own remap is more
+#: lenient), so its SFX would otherwise silently vanish for no reason
+#: visible in cover.json. Kept small so this never yanks a genuinely
+#: mid-video cut sound far from where it was actually authored.
+_KEEP_SNAP_TOLERANCE_SEC = 3.0
+
+
+def _snap_to_keep(
+    t: float, keeps: list[tuple[float, float]], tolerance: float = _KEEP_SNAP_TOLERANCE_SEC
+) -> float | None:
+    """Return `t` if inside a kept range, else the nearest kept instant if
+    within `tolerance`, else None (genuinely cut, don't relocate it)."""
+    if not keeps:
+        return None
+    if _in_keep(t, keeps):
+        return t
+    best: float | None = None
+    best_dist = tolerance
+    for s, e in keeps:
+        if t < s:
+            dist = s - t
+            candidate = s
+        else:  # t >= e
+            dist = t - e
+            candidate = max(s, e - 1e-3)
+        if dist <= best_dist:
+            best_dist = dist
+            best = candidate
+    return best
 
 
 def _clip_to_keep(
@@ -157,6 +219,14 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
     typing_min = float(typing_cfg.get("min_hold_sec", 4.0))
     shutter_max = float((sfx_cfg.get("shutter") or {}).get("max_sec", 0.22))
     click_max = float((sfx_cfg.get("click") or {}).get("max_sec", 0.18))
+    paper_max = float((sfx_cfg.get("paper") or {}).get("max_sec", 0.45))
+    tick_max = float((sfx_cfg.get("tick") or {}).get("max_sec", 0.15))
+    max_by_kind = {
+        "shutter": shutter_max,
+        "click": click_max,
+        "paper": paper_max,
+        "tick": tick_max,
+    }
     vols = sfx_cfg.get("volumes") or {}
     mg_cfg = sfx_cfg.get("mg") or {}
     mg_enabled = bool(mg_cfg.get("enabled", True))
@@ -183,10 +253,11 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
     for ev in events:
         kind = str(ev.get("type") or "").lower()
         try:
-            start = float(ev["start"])
+            start_raw = float(ev["start"])
         except (KeyError, TypeError, ValueError):
             continue
-        if not _in_keep(start, keeps):
+        start = _snap_to_keep(start_raw, keeps)
+        if start is None:
             continue
         if kind in ("punch_in", "punch"):
             candidates.append(
@@ -209,27 +280,43 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
                 }
             )
 
+    # Shutter marks a *zoom* cut, not every cut — only fire when the fake-
+    # multicam framing actually lands on "close" or "wide" (a reset), same
+    # alternation logic the real render uses (_pick_base_framing), so a cut
+    # that just snaps between two "medium" home shots stays silent.
     camera_play = cover.get("camera_play") or {}
-    if bool(camera_play.get("snap_on_cuts", True)) and len(keeps) > 1:
-        for ks, _ke in keeps[1:]:
-            if _in_keep(ks, keeps):
-                candidates.append(
-                    {
-                        "kind": "shutter",
-                        "start": ks,
-                        "end": ks + shutter_max,
-                        "note": "cut_snap",
-                        "priority": 1,
-                    }
-                )
+    cam_ranges = [
+        (float(r["start"]), float(r["end"]), str(r.get("note") or ""))
+        for r in edl.get("ranges") or []
+        if str(r.get("source") or "cam") == "cam" and float(r["end"]) > float(r["start"])
+    ]
+    if bool(camera_play.get("snap_on_cuts", True)) and len(cam_ranges) > 1:
+        for idx, (ks, _ke, note) in enumerate(cam_ranges):
+            if idx == 0 or not _in_keep(ks, keeps):
+                continue
+            framing, motion = _pick_base_framing(
+                range_index=idx, note=note, camera_play=camera_play
+            )
+            if motion not in ("snap", "ease") or framing not in ("close", "wide"):
+                continue
+            candidates.append(
+                {
+                    "kind": "shutter",
+                    "start": ks,
+                    "end": ks + shutter_max,
+                    "note": f"cut_snap_{framing}",
+                    "priority": 1,
+                }
+            )
 
     for s, _e in screens:
-        if _in_keep(s, keeps):
+        snapped = _snap_to_keep(s, keeps)
+        if snapped is not None:
             candidates.append(
                 {
                     "kind": "click",
-                    "start": s,
-                    "end": s + click_max,
+                    "start": snapped,
+                    "end": snapped + click_max,
                     "note": "screen_enter",
                     "priority": 2,
                     "bank": click_i,
@@ -264,15 +351,16 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
             if ov_kind not in DEFAULT_MG_KINDS:
                 continue
             sfx_kind = str(mg_cfg.get(ov_kind) or DEFAULT_MG_KINDS[ov_kind]).lower()
-            if sfx_kind not in ("shutter", "click"):
+            if sfx_kind not in SFX_KINDS or sfx_kind == "typing":
                 continue
             try:
-                start = float(ov["start"])
+                start_raw = float(ov["start"])
             except (KeyError, TypeError, ValueError):
                 continue
-            if not _in_keep(start, keeps):
+            start = _snap_to_keep(start_raw, keeps)
+            if start is None:
                 continue
-            dur = shutter_max if sfx_kind == "shutter" else click_max
+            dur = max_by_kind.get(sfx_kind, click_max)
             entry: dict[str, Any] = {
                 "kind": sfx_kind,
                 "start": start,
@@ -391,6 +479,8 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
                 "typing": sum(1 for s in out_sfx if s["kind"] == "typing"),
                 "shutter": sum(1 for s in out_sfx if s["kind"] == "shutter"),
                 "click": sum(1 for s in out_sfx if s["kind"] == "click"),
+                "paper": sum(1 for s in out_sfx if s["kind"] == "paper"),
+                "tick": sum(1 for s in out_sfx if s["kind"] == "tick"),
             },
             "candidates": len(candidates),
         },

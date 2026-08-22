@@ -741,7 +741,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         "range_count": len(ranges),
         "keep_sec": round(keep_sec, 1),
         "style": style_name,
-        "preset": "bold_mist",
+        "preset": "open_overlay",
         "has_cover": bool(cover),
         "screen_event_windows": len(screen_wins),
         "punch_windows": len(punch_wins),

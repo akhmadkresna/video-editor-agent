@@ -12,22 +12,23 @@ import {
   font,
   letterSpacing,
   radius,
-  paperGridStyle,
   duration,
   toneBorderStyle,
   jitterDeg,
 } from "./tokens";
 
 /* ------------------------------------------------------------------ */
-/* "Poster Study" house style (v5) — opaque grain-textured paper cards, */
-/* pure black ink, zero shadow/blur/color. Legibility comes from the    */
-/* paper surface itself (matches every reference: ink on paper never    */
-/* needs a shadow). The one exception is `code`, which stays a real     */
-/* terminal window (a screen convention, not a print one) recolored     */
-/* into black/white/gray. Illustrations that show a comparison (dual_   */
-/* timeline, scale_compare) express it through TYPE SIZE, not bar       */
-/* charts — a bar/tick-mark widget isn't in any reference; a big        */
-/* numeral next to a small one is (see WOVE, TP-7).                     */
+/* "Open Overlay" house style (v7) — no panel: white ink sits straight  */
+/* on the a-roll, legibility held by OverlayLayer's darker scrim behind */
+/* the text instead of a paper surface. Every kind here used to carry   */
+/* an opaque PaperCard (v6) — that's gone, along with its accent color; */
+/* text-shadow now does what the paper surface used to. The one         */
+/* exception is `code`, which stays a real terminal window (a screen    */
+/* convention, not a paper one) — it was never part of the card family. */
+/* Illustrations that show a comparison (dual_timeline, scale_compare)  */
+/* express it through TYPE SIZE, not bar charts — a bar/tick-mark       */
+/* widget isn't in any reference; a big numeral next to a small one is  */
+/* (see WOVE, TP-7).                                                    */
 /*                                                                      */
 /* Face-safe placement unchanged: left-third + vertically centered      */
 /* (title/divider/quote/code/illustration) or bottom-left corner        */
@@ -124,77 +125,31 @@ const BottomLeftRail: React.FC<{ children: React.ReactNode }> = ({ children }) =
 );
 
 /* ------------------------------------------------------------------ */
-/* Paper card — opaque, unevenly-gridded, sharp corners, zero shadow    */
+/* Text block — no panel: white ink straight on the a-roll, readability */
+/* held by the darker scrim OverlayLayer paints behind every overlay    */
+/* (not a panel of its own) plus a text-shadow. display:table is the    */
+/* shrink-wrap mechanism (width:fit-content resolves wrong when its own */
+/* containing block is also auto-sized, e.g. nested one level inside a  */
+/* plain rail wrapper, which every card here is).                       */
 /* ------------------------------------------------------------------ */
 
-/** Base dog-ear size in px, plus a small per-card jitter (same deterministic
- * hash as the grid/highlight rotation) so cards don't all read as an
- * identical die-cut shape — a real folded corner varies card to card. */
-const FOLD_BASE = 22;
-
-const PaperCard: React.FC<{ children: React.ReactNode; maxWidth?: string | number; id?: string }> = ({
+const TextBlock: React.FC<{ children: React.ReactNode; maxWidth?: string | number }> = ({
   children,
   maxWidth = "62%",
-  id = "card",
-}) => {
-  const fold = FOLD_BASE + Math.abs(jitterDeg(id, 7));
-  return (
-    <div
-      style={{
-        position: "relative",
-        // Verified by isolated repro: width:fit-content resolves wrong
-        // (too narrow) whenever this box's own containing block is ALSO
-        // auto/shrink-to-fit-sized (e.g. nested one level inside a plain
-        // wrapper div, as every non-stat card already was) — the
-        // "available space" fit-content clamps against goes indefinite
-        // and it silently undershoots. display:table is the old,
-        // boringly reliable shrink-wrap mechanism and doesn't have that
-        // failure mode at any nesting depth — use it instead everywhere.
-        display: "table",
-        maxWidth,
-        background: color.paper,
-        color: color.ink,
-        // clip-path alone can leave a stray sliver on some out-of-flow
-        // descendants (e.g. the selection-highlight's caret handles) in
-        // headless Chromium — overflow:hidden backs it up so nothing ever
-        // paints past the card's own shape.
-        overflow: "hidden",
-        clipPath: `polygon(0 0, calc(100% - ${fold}px) 0, 100% ${fold}px, 100% 100%, 0 100%)`,
-      }}
-    >
-      <div style={{ position: "absolute", inset: 0, ...paperGridStyle, pointerEvents: "none" }} />
-      {/* Folded corner — a real dog-ear, not a rectangle: the paper's
-       * underside triangle plus a thin crease line along the fold. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: 0,
-          height: 0,
-          borderStyle: "solid",
-          borderWidth: `0 ${fold}px ${fold}px 0`,
-          borderColor: "transparent rgba(16,18,20,0.16) transparent transparent",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: fold,
-          width: fold * 1.42,
-          height: 1,
-          background: "rgba(16,18,20,0.3)",
-          transform: "rotate(45deg)",
-          transformOrigin: "left top",
-        }}
-      />
-      <div style={{ position: "relative", padding: "48px 56px" }}>{children}</div>
-    </div>
-  );
-};
+}) => (
+  <div
+    style={{
+      display: "table",
+      maxWidth,
+      color: color.ink,
+      textShadow: "0 8px 28px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
+    }}
+  >
+    {children}
+  </div>
+);
 
-/** Text-selection highlight — translucent indigo bar + thin caret line +
+/** Text-selection highlight — translucent white bar + thin caret line +
  * round handle dot (top and bottom) at each end of the range. This is the
  * mobile/OS text-select pattern (long-press to select), not a design-tool
  * resize box — deliberately not a rectangular border with 8 square
@@ -237,14 +192,14 @@ const SelectionHighlight: React.FC<{ children: React.ReactNode; id: string; dela
     top: "-8%",
     bottom: "-8%",
     width: 2,
-    background: color.accent,
+    background: color.ink,
   };
   const dot = (pos: "top" | "bottom", reveal: number): React.CSSProperties => ({
     position: "absolute",
     width: 9,
     height: 9,
     borderRadius: "50%",
-    background: color.accent,
+    background: color.ink,
     left: "50%",
     transform: `translateX(-50%) scale(${reveal})`,
     [pos]: -4.5,
@@ -258,7 +213,7 @@ const SelectionHighlight: React.FC<{ children: React.ReactNode; id: string; dela
           right: "-3%",
           top: "6%",
           bottom: "2%",
-          background: color.accentSoft,
+          background: color.highlight,
           zIndex: -1,
           transform: `scaleX(${sweep}) rotate(${rot}deg)`,
           transformOrigin: "left center",
@@ -349,7 +304,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <LeftRail>
       <div style={{ transform: `scale(${scale})`, opacity }}>
-        <PaperCard maxWidth="64%" id={ov.id}>
+        <TextBlock maxWidth="64%">
           {isOutro ? (
             <>
               <div
@@ -437,7 +392,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
               ))}
             </div>
           ) : null}
-        </PaperCard>
+        </TextBlock>
       </div>
     </LeftRail>
   );
@@ -446,7 +401,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
 /* ------------------------------------------------------------------ */
 /* Stat callout — number counts up from 0 over 300ms (punch ease),      */
 /* label fades in 80ms after. Mono bracket badge (dashed = estimate),   */
-/* numeral, rule, mono caps caption. Paper card, bottom-left.           */
+/* numeral, rule, mono caps caption. No panel, bottom-left.             */
 /* ------------------------------------------------------------------ */
 
 const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
@@ -464,14 +419,11 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const displayValue = ov.value ? countUpText(ov.value, countProgress) : "";
   return (
     <BottomLeftRail>
-      {/* PaperCard must never be the *direct* flex child of a rail — a
-       * flex item's display is blockified per spec, which was silently
-       * defeating width:fit-content on the card and letting the nowrap
-       * stat number get clipped by the card's own overflow:hidden. Every
-       * other card kind already wraps PaperCard in a plain div; this one
-       * didn't, which is why it was the one still breaking. */}
+      {/* Wrapped in a plain div, not a direct flex child of the rail —
+       * keeps display:table's shrink-wrap consistent with every other
+       * kind here. */}
       <div>
-        <PaperCard maxWidth="64%" id={ov.id}>
+        <TextBlock maxWidth="64%">
         {ov.sourceLabel ? (
           <div style={{ opacity: labelOpacity }}>
             <MonoBadge tone={ov.tone}>{ov.sourceLabel}</MonoBadge>
@@ -520,14 +472,14 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
             </div>
           </>
         ) : null}
-        </PaperCard>
+        </TextBlock>
       </div>
     </BottomLeftRail>
   );
 };
 
 /* ------------------------------------------------------------------ */
-/* Lower third — paper card, bottom-left; name + mono role + tag row    */
+/* Lower third — no panel, bottom-left; name + mono role + tag row      */
 /* ------------------------------------------------------------------ */
 
 const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
@@ -538,7 +490,7 @@ const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <BottomLeftRail>
       <div style={{ opacity: main.opacity, transform: `translateY(${main.y}px)` }}>
-        <PaperCard maxWidth="none" id={ov.id}>
+        <TextBlock maxWidth="none">
           <div style={{ fontFamily: font.sans, fontWeight: 900, fontSize: 36, letterSpacing: letterSpacing.tight }}>
             {ov.text}
           </div>
@@ -564,7 +516,7 @@ const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
               ))}
             </div>
           ) : null}
-        </PaperCard>
+        </TextBlock>
       </div>
     </BottomLeftRail>
   );
@@ -581,11 +533,11 @@ const TagBadge: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <AbsoluteFill style={{ alignItems: "flex-start", justifyContent: "flex-start", padding: "8%" }}>
       <div style={{ opacity: s.opacity, transform: `translateY(${s.y}px)` }}>
-        <PaperCard maxWidth="none" id={ov.id}>
+        <TextBlock maxWidth="none">
           <span style={{ fontFamily: font.mono, fontWeight: 600, fontSize: 14, letterSpacing: letterSpacing.caps }}>
             {ov.text}
           </span>
-        </PaperCard>
+        </TextBlock>
       </div>
     </AbsoluteFill>
   );
@@ -614,7 +566,7 @@ const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <LeftRail>
       <div style={{ transform: `scale(${scale})`, opacity, position: "relative", maxWidth: "64%" }}>
-        <PaperCard maxWidth="none" id={ov.id}>
+        <TextBlock maxWidth="none">
           {numeral ? (
             <div
               style={{
@@ -626,7 +578,7 @@ const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
                 fontSize: 170,
                 lineHeight: 1,
                 color: color.ink,
-                opacity: 0.07,
+                opacity: 0.14,
                 userSelect: "none",
               }}
             >
@@ -659,7 +611,7 @@ const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
               {ov.title || ov.text}
             </div>
           </div>
-        </PaperCard>
+        </TextBlock>
       </div>
     </LeftRail>
   );
@@ -705,7 +657,7 @@ const QuoteCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <LeftRail>
       <div style={{ transform: `scale(${scale})`, opacity }}>
-        <PaperCard maxWidth="64%" id={ov.id}>
+        <TextBlock maxWidth="64%">
           <div
             style={{
               display: "flex",
@@ -742,7 +694,7 @@ const QuoteCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           >
             {renderTextWithAccent(ov.text || "", ov.accent, ov.id)}
           </div>
-        </PaperCard>
+        </TextBlock>
       </div>
     </LeftRail>
   );
@@ -967,8 +919,8 @@ const CarNoMap: React.FC<{ labels: string[] }> = ({ labels }) => {
         <line x1="0" y1="78" x2="340" y2="78" stroke={color.inkFaint} strokeWidth={2.5} strokeDasharray="10 8" />
         <g transform={`translate(${drive},0)`}>
           <rect x="40" y="50" width="66" height="24" rx="6" fill={color.ink} />
-          <circle cx="54" cy="76" r="9" fill={color.paper} stroke={color.ink} strokeWidth={2.5} />
-          <circle cx="92" cy="76" r="9" fill={color.paper} stroke={color.ink} strokeWidth={2.5} />
+          <circle cx="54" cy="76" r="9" fill="none" stroke={color.ink} strokeWidth={2.5} />
+          <circle cx="92" cy="76" r="9" fill="none" stroke={color.ink} strokeWidth={2.5} />
         </g>
       </svg>
       <div style={{ fontFamily: font.sans, fontWeight: 800, fontSize: 19, color: color.ink, marginTop: 6, maxWidth: 340 }}>{title}</div>
@@ -1086,7 +1038,7 @@ const Illustration: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   return (
     <LeftRail>
       <div style={{ opacity }}>
-        <PaperCard maxWidth={usesContrastPair ? "74%" : "none"} id={ov.id}>
+        <TextBlock maxWidth={usesContrastPair ? "74%" : "none"}>
           {ov.title ? (
             <div
               style={{
@@ -1102,7 +1054,7 @@ const Illustration: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
             </div>
           ) : null}
           {body}
-        </PaperCard>
+        </TextBlock>
       </div>
     </LeftRail>
   );

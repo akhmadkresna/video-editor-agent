@@ -446,8 +446,6 @@ export const ScreenExplainerSchema = z.object({
 export const OverlayStyleSchema = z.object({
   preset: z.string().optional(),
   treatment: z.string().optional(),
-  accent: z.string().optional(),
-  accentName: z.string().optional(),
   ink: z.string().optional(),
   dim: z.string().optional(),
   fonts: z

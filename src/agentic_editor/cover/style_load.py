@@ -10,12 +10,14 @@ import yaml
 
 from agentic_editor.paths import framework_home
 
-# Locked A-roll MG = bold type + cool mist sky accent
+# Locked A-roll MG (2026-08+, "Open Overlay" v7) = white ink straight on the
+# a-roll, no panel, no accent color — readability from the veil scrim behind
+# the text. One look, shared by every kind (title/stat/lower_third/tag/
+# divider/quote/code/illustration/chapter/emphasis/diagram/callout/chip) and
+# every style pack. See packages/remotion-kit/src/components/glass/tokens.ts.
 DEFAULT_OVERLAYS: dict[str, Any] = {
-    "preset": "bold_mist",
+    "preset": "open_overlay",
     "treatment": "bold",
-    "accent": "#7dd3fc",
-    "accentName": "cool_mist_sky",
     "ink": "#ffffff",
     "dim": "rgba(255,255,255,0.55)",
     # Readable on-screen time (OverlayLayer fades out; do not hard-cut early)
@@ -131,7 +133,7 @@ def _load_style_yaml(style_name: str) -> dict[str, Any]:
 
 
 def load_overlays(style_name: str = "tutorial") -> dict[str, Any]:
-    """Return A-roll overlay tokens (bold + cool mist accent — locked)."""
+    """Return A-roll overlay tokens (white ink, no panel, no accent — locked)."""
     cfg = _deep_merge({}, DEFAULT_OVERLAYS)
     parsed = _load_style_yaml(style_name)
     ov = parsed.get("overlays")
@@ -154,7 +156,7 @@ DEFAULT_SFX: dict[str, Any] = {
     "enabled": True,
     "no_whoosh": True,
     "pack": "styles/tutorial/sfx",
-    "volumes": {"typing": 0.38, "shutter": 0.38, "click": 0.32},
+    "volumes": {"typing": 0.38, "shutter": 0.38, "click": 0.32, "paper": 0.35, "tick": 0.28},
     "density": {
         "sec_per_sfx": 30,
         "min_gap_sec": 1.2,
@@ -165,6 +167,9 @@ DEFAULT_SFX: dict[str, Any] = {
     "typing": {"enabled": False, "min_hold_sec": 4.0, "tile_sec": 1.2},
     "shutter": {"max_sec": 0.22},
     "click": {"max_sec": 0.22},
+    # paper = MG appear (glass kinds); tick = small "tag" chip appear.
+    "paper": {"max_sec": 0.45},
+    "tick": {"max_sec": 0.15},
     # One-shot at MG appear (cover.overlays).
     "mg": {
         "enabled": True,

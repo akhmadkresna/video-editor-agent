@@ -43,9 +43,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     SFX (typing / shutter / click) is additive under cam VO via `cover.sfx[]` — modern tech only,
     **no whoosh**. Run `ae sfx-suggest .` after cover; confirm then `--apply`.
 10. **Locked look (`style: tutorial`):** house default for Odoo/tech screen demos.
-    A-roll MG = **Bold** type + accent `#7dd3fc` (cool mist sky). Screen stage = cool-mist
-    canvas. No full/karaoke captions. Do not invent episode-local colors/fonts — change
-    `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
+    A-roll MG = **"Open Overlay" v7** — white ink straight on the a-roll, no panel,
+    no accent color; readability from a darker veil scrim behind the text, not a card
+    surface or a hue. Screen stage = cool-mist canvas. No full/karaoke captions.
+    Do not invent episode-local colors/fonts — change `styles/tutorial/style.md`
+    (+ `style_load.py` / remotion-kit theme) instead.
 10b. **Evidence episodes (`style: evidence`):** start with **`ae brief`** (script + research)
     then **`ae evidence-gather`** (real screenshots into `raw/evidence/`). Never AI-generate
     fake dashboards. Host records from `edit/script.md` speaking `[[EVIDENCE:]]` cues aloud.
@@ -262,8 +264,8 @@ the A-roll. Put the extra motion on existing overlays instead:
 | `chip` | accent dot scale-pop |
 | `callout` | value counts (Rp / dotted thousands) + underline |
 
-Same locked look: Bold + accent `#7dd3fc`. No whoosh. Do not invent a new overlay
-kind for this.
+Same locked look: white ink, no panel, no accent color — see rule 10. No whoosh.
+Do not invent a new overlay kind for this.
 
 ### Generated MG cutaways — do not use (tutorial)
 

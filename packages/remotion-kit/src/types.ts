@@ -5,7 +5,8 @@ export type FramingMotion =
   | "ease"
   | "ease_in"
   | "ease_out"
-  | "drift";
+  | "drift"
+  | "pull_back";
 
 export type ClipLayout =
   | "full"
@@ -110,7 +111,7 @@ export type TimelineOverlay = {
   exitStartSec?: number;
   note?: string;
   /** "glass" kinds only — teal (info/positive) | amber (caution/estimate) |
-   * neutral. Drives StatCallout/TagBadge/TitleCard-accent color. */
+   * neutral. Drives StatCallout's mono-badge border style (dashed = amber). */
   tone?: "teal" | "amber" | "neutral";
   /** `title` kind only — second-color headline continuation, e.g.
    * text="Kalau ngoding udah gampang," accent="kita dibayar buat apa?" */
@@ -377,12 +378,12 @@ export type ScreenExplainerStyle = {
   };
 };
 
-/** Locked A-roll MG: bold type + cool mist sky accent (mirror styles/tutorial). */
+/** Locked A-roll MG (mirror styles/tutorial): white ink straight on the
+ * a-roll, no panel, no accent color — readability from the veil scrim,
+ * not a surface. One look, shared by every kind and every style pack. */
 export type OverlayStyle = {
   preset?: string;
   treatment?: "bold";
-  accent?: string;
-  accentName?: string;
   ink?: string;
   dim?: string;
   fonts?: { display?: string; ui?: string };
@@ -425,10 +426,8 @@ export type OverlayStyle = {
 };
 
 export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
-  preset: "bold_mist",
+  preset: "open_overlay",
   treatment: "bold",
-  accent: "#7dd3fc",
-  accentName: "cool_mist_sky",
   ink: "#ffffff",
   dim: "rgba(255,255,255,0.55)",
   fonts: {

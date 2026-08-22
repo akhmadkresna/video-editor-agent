@@ -58,7 +58,7 @@ def test_timeline_includes_remapped_overlays():
     }
     tl = build_timeline_from_edl_and_cover(edl, cover, fps=30)
     assert tl["presentation"]["overlays"]["treatment"] == "bold"
-    assert tl["presentation"]["overlays"]["accent"] == "#7dd3fc"
+    assert tl["presentation"]["overlays"]["ink"] == "#ffffff"
     ov = tl["overlays"]
     assert len(ov) == 2
     assert ov[0]["kind"] == "chapter"

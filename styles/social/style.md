@@ -30,10 +30,8 @@ captions:
   # Centered in the bottom black letterbox bar.
   safeBottomRatio: 0.17
 overlays:
-  preset: bold_mist
+  preset: open_overlay
   treatment: bold
-  accent: "#7dd3fc"
-  accentName: cool_mist_sky
   ink: "#ffffff"
   dim: "rgba(255,255,255,0.58)"
   dwell:
