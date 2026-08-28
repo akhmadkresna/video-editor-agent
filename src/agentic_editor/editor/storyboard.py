@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import os
 import subprocess
 import webbrowser
 from pathlib import Path
@@ -19,6 +20,14 @@ from agentic_editor.project import load_project, resolve_source
 
 def plan_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _html_rel_path(base: Path, target: Path) -> str:
+    """Path from ``base`` (storyboard dir) to ``target`` for ``<img src>``."""
+    try:
+        return target.relative_to(base).as_posix()
+    except ValueError:
+        return Path(os.path.relpath(target, base)).as_posix()
 
 
 def format_clock(seconds: float) -> str:
@@ -378,7 +387,7 @@ def render_mg_stack_html(
         if still_index and tile_id and dashboard is not None:
             preview = still_index.get(tile_id)
             if preview is not None and preview.is_file():
-                preview_rel = preview.relative_to(dashboard).as_posix()
+                preview_rel = _html_rel_path(dashboard, preview)
 
         if preview_rel and render_mode == "remotion":
             kind = html.escape(
