@@ -1,4 +1,4 @@
-"""ae CLI — doctor, new, ingest, brief, evidence-gather, edl-suggest, cut, cover, cover-suggest, overlay-suggest, cutaway-suggest, sfx-suggest, evidence-suggest, voice, mezzanine, draft, compose, qa, promote-check."""
+"""ae CLI — doctor, new, ingest, brief, evidence-gather, edl-suggest, storyboard, cut, cover, cover-suggest, overlay-suggest, cutaway-suggest, sfx-suggest, evidence-suggest, voice, mezzanine, draft, compose, qa, promote-check."""
 
 from __future__ import annotations
 
@@ -49,6 +49,7 @@ from agentic_editor.cover.suggest import suggest_cover, write_cover_suggest
 from agentic_editor.editor.edl import example_edl, load_edl
 from agentic_editor.editor.qa import qa_episode_preview
 from agentic_editor.editor.render import render_edl
+from agentic_editor.editor.storyboard import generate_storyboard
 from agentic_editor.paths import framework_home, resolve_episode
 from agentic_editor.preprod import build_brief, gather_evidence, write_brief_bundle
 from agentic_editor.project import load_project, resolve_source
@@ -143,6 +144,10 @@ def cmd_new(args: argparse.Namespace) -> int:
     else:
         (episode / "raw").mkdir(exist_ok=True)
         (episode / "edit").mkdir(exist_ok=True)
+
+    # Always ensure pipeline dirs exist (template may lack empty dirs on some checkouts).
+    (episode / "raw").mkdir(exist_ok=True)
+    (episode / "edit").mkdir(exist_ok=True)
 
     yaml_path = episode / "project.yaml"
     if not yaml_path.exists() or args.force:
@@ -334,6 +339,7 @@ def cmd_edl_suggest(args: argparse.Namespace) -> int:
         f"wait_clamp={meta.get('clamped_wait', 0)}/{meta.get('dropped_wait', 0)})"
     )
     print("Review with the user, then: ae edl-suggest . --apply   # or copy into edit/edl.json")
+    print("Review visually: ae storyboard .")
     print("Next: ae cut .")
     if args.apply and ranges:
         edl_path = episode / "edit" / "edl.json"
@@ -467,7 +473,9 @@ def cmd_sfx_suggest(args: argparse.Namespace) -> int:
         f"({counts.get('total', len(sfx))} sfx: "
         f"typing={counts.get('typing', 0)}, "
         f"shutter={counts.get('shutter', 0)}, "
-        f"click={counts.get('click', 0)}; "
+        f"click={counts.get('click', 0)}, "
+        f"paper={counts.get('paper', 0)}, "
+        f"tick={counts.get('tick', 0)}; "
         f"no_whoosh={meta.get('no_whoosh', True)})"
     )
     print("Propose/adjust with the user, then confirm before writing cover.json.")
@@ -754,6 +762,12 @@ def cmd_qa(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_storyboard(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    generate_storyboard(episode, open_browser=not args.no_open)
+    return 0
+
+
 def cmd_promote_check(args: argparse.Namespace) -> int:
     episode = resolve_episode(args.episode)
     path = episode / "edit" / "promotions.md"
@@ -826,6 +840,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write edit/edl.json after user confirm (still review suggest first)",
     )
     es.set_defaults(func=cmd_edl_suggest)
+
+    sb = sub.add_parser(
+        "storyboard",
+        help="Build edit/storyboard/index.html to review EDL plan before apply/cut",
+    )
+    sb.add_argument("episode", nargs="?", default=".")
+    sb.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Write HTML only; do not open the default browser",
+    )
+    sb.set_defaults(func=cmd_storyboard)
 
     cov = sub.add_parser("cover", help="Merge EDL + cover.json → timeline.json")
     cov.add_argument("episode", nargs="?", default=".")
@@ -1091,7 +1117,23 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _force_utf8_streams() -> None:
+    """Windows consoles default to a legacy codepage (e.g. cp1252) that
+    can't encode characters like the arrows/bullets used in status output,
+    crashing mid-command with UnicodeEncodeError. Force UTF-8 so `ae` runs
+    the same on Windows terminals without callers having to set
+    PYTHONIOENCODING themselves."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_streams()
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

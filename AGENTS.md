@@ -41,8 +41,9 @@ editing rules.
   `faster-whisper`, so a missing `whisper.cpp`/`ggml-*.bin` is expected and fine.
 
 ### End-to-end pipeline (the "run the app" flow)
-`ae new <ep>` → drop `raw/cam.mp4` → `ae ingest <ep>` → write `<ep>/edit/edl.json`
-(non-empty `ranges`) → `ae cut <ep>` → `ae cover <ep>` → `ae compose <ep>` (renders
+`ae new <ep>` → drop `raw/cam.mp4` → `ae ingest <ep>` → `ae edl-suggest <ep>` →
+`ae storyboard <ep>` (review `edit/storyboard/index.html`) → `ae edl-suggest <ep> --apply`
+→ `ae cut <ep>` → `ae cover <ep>` → `ae compose <ep>` (renders
 `edit/final.mp4`) or `ae compose <ep> --studio` (interactive Remotion Studio server).
 Always launch Studio via `ae compose --studio` (it stages media into
 `packages/remotion-kit/public/ae-media` and passes `--props`); a bare

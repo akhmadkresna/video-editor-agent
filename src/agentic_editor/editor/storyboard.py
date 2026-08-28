@@ -1,0 +1,424 @@
+"""Static HTML storyboard for reviewing EDL / cover plans before apply."""
+
+from __future__ import annotations
+
+import hashlib
+import html
+import json
+import subprocess
+import webbrowser
+from pathlib import Path
+from typing import Any
+
+from agentic_editor.asr.ingest import ffprobe_summary
+from agentic_editor.cover.suggest import load_cam_words
+from agentic_editor.editor.qa import extract_frame
+from agentic_editor.project import load_project, resolve_source
+
+
+def plan_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def format_clock(seconds: float) -> str:
+    total = max(0, round(seconds))
+    minutes, secs = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def _thumbnail_path(
+    dashboard: Path,
+    source: Path,
+    *,
+    start: float,
+    end: float,
+) -> Path:
+    stat = source.stat()
+    identity = (
+        f"{source.resolve()}|{stat.st_size}|{stat.st_mtime_ns}|"
+        f"{start:.3f}|{end:.3f}"
+    )
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+    return dashboard / "assets" / f"thumb_{digest}.jpg"
+
+
+def _resolve_edl_path(episode: Path) -> tuple[Path, dict[str, Any]]:
+    edit = episode / "edit"
+    suggest = edit / "edl.suggest.json"
+    edl_path = edit / "edl.json"
+    if suggest.is_file():
+        return suggest, json.loads(suggest.read_text(encoding="utf-8"))
+    if edl_path.is_file():
+        return edl_path, json.loads(edl_path.read_text(encoding="utf-8"))
+    raise FileNotFoundError(
+        "Missing edit plan. Run `ae edl-suggest .` first (or provide edit/edl.json)."
+    )
+
+
+def _resolve_cover(episode: Path) -> dict[str, Any] | None:
+    edit = episode / "edit"
+    cover_path = edit / "cover.json"
+    suggest_path = edit / "cover.suggest.json"
+    if cover_path.is_file():
+        try:
+            return json.loads(cover_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+    if suggest_path.is_file():
+        try:
+            return json.loads(suggest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+    return None
+
+
+def _resolve_source_video(episode: Path, edl: dict[str, Any], source_name: str) -> Path | None:
+    rel = (edl.get("sources") or {}).get(source_name)
+    if rel:
+        path = resolve_source(episode, str(rel))
+        if path.is_file():
+            return path
+    cfg = load_project(episode)
+    rel = (cfg.get("sources") or {}).get(source_name)
+    if rel:
+        path = resolve_source(episode, str(rel))
+        if path.is_file():
+            return path
+    return None
+
+
+def _probe_duration(video: Path) -> float | None:
+    try:
+        summary = ffprobe_summary(video)
+        dur = float((summary.get("format") or {}).get("duration") or 0)
+        return dur if dur > 0 else None
+    except (OSError, json.JSONDecodeError, subprocess.CalledProcessError, ValueError):
+        return None
+
+
+def speech_for_range(
+    words: list[dict[str, Any]],
+    start: float,
+    end: float,
+    *,
+    max_chars: int = 280,
+) -> str:
+    """Return transcript text overlapping [start, end]."""
+    parts: list[str] = []
+    for w in words:
+        ws, we = float(w["start"]), float(w["end"])
+        if we <= start or ws >= end:
+            continue
+        text = str(w.get("text") or "").strip()
+        if text:
+            parts.append(text)
+    speech = " ".join(parts).strip()
+    if len(speech) > max_chars:
+        return speech[: max_chars - 1].rstrip() + "…"
+    return speech
+
+
+def _interval_overlaps(start: float, end: float, a: float, b: float) -> bool:
+    return a < end and b > start
+
+
+def cover_badges_for_range(
+    cover: dict[str, Any] | None,
+    start: float,
+    end: float,
+) -> list[dict[str, str]]:
+    if not cover:
+        return []
+    badges: list[dict[str, str]] = []
+    for event in cover.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        es, ee = float(event.get("start", 0)), float(event.get("end", 0))
+        if not _interval_overlaps(start, end, es, ee):
+            continue
+        etype = str(event.get("type") or "event")
+        note = str(event.get("note") or "").strip()
+        badges.append({"kind": "event", "label": etype, "detail": note})
+    for overlay in cover.get("overlays") or []:
+        if not isinstance(overlay, dict):
+            continue
+        os, oe = float(overlay.get("start", 0)), float(overlay.get("end", 0))
+        if not _interval_overlaps(start, end, os, oe):
+            continue
+        kind = str(overlay.get("kind") or "overlay")
+        title = str(overlay.get("title") or overlay.get("text") or "").strip()
+        badges.append({"kind": "overlay", "label": kind, "detail": title})
+    for sfx in cover.get("sfx") or []:
+        if not isinstance(sfx, dict):
+            continue
+        ss = float(sfx.get("start", 0))
+        se = float(sfx.get("end") or ss + 0.2)
+        if not _interval_overlaps(start, end, ss, se):
+            continue
+        kind = str(sfx.get("kind") or "sfx")
+        note = str(sfx.get("note") or "").strip()
+        badges.append({"kind": "sfx", "label": kind, "detail": note})
+    return badges
+
+
+def _cover_badges_html(badges: list[dict[str, str]]) -> str:
+    if not badges:
+        return ""
+    chips = []
+    for badge in badges:
+        label = html.escape(badge["label"])
+        detail = html.escape(badge.get("detail") or "")
+        title = f' title="{detail}"' if detail else ""
+        css = badge.get("kind") or "event"
+        chips.append(f'<span class="badge badge-{css}"{title}>{label}</span>')
+    return f'<div class="badges">{"".join(chips)}</div>'
+
+
+def render_cut_gap_html(
+    *,
+    gap_start: float,
+    gap_end: float,
+    duration: float,
+) -> str:
+    return (
+        '<div class="cut-gap">'
+        f'<span class="cut-gap-label">Cut</span>'
+        f'<span class="cut-gap-span">{gap_start:.1f}s → {gap_end:.1f}s</span>'
+        f'<span class="cut-gap-dur">· {duration:.1f}s removed</span>'
+        "</div>"
+    )
+
+
+def render_range_card_html(
+    *,
+    index: int,
+    source_name: str,
+    timeline_start: float,
+    timeline_end: float,
+    duration: float,
+    source_start: float,
+    source_end: float,
+    note: str,
+    speech: str,
+    thumb_relative: str | None,
+    badges: list[dict[str, str]],
+) -> str:
+    if thumb_relative:
+        media = f'<img src="{thumb_relative}" alt="">'
+    else:
+        media = '<div class="thumb-missing">No preview</div>'
+    return (
+        '<article class="card">'
+        f"{media}"
+        f'<div class="body">'
+        f"<strong>#{index} · {html.escape(source_name)}</strong>"
+        f'<div class="time">Edit {format_clock(timeline_start)} → '
+        f"{format_clock(timeline_end)} · {duration:.2f}s</div>"
+        f'<div class="source">Source {source_start:.2f}s → {source_end:.2f}s</div>'
+        f"{_cover_badges_html(badges)}"
+        f'<p class="note">{html.escape(note)}</p>'
+        f'<p class="speech">{html.escape(speech) if speech else "(no speech)"}</p>'
+        "</div></article>"
+    )
+
+
+def _cover_summary_html(cover: dict[str, Any] | None) -> str:
+    if not cover:
+        return ""
+    events = [e for e in (cover.get("events") or []) if isinstance(e, dict)]
+    overlays = [o for o in (cover.get("overlays") or []) if isinstance(o, dict)]
+    sfx = [s for s in (cover.get("sfx") or []) if isinstance(s, dict)]
+    screen = sum(
+        1
+        for e in events
+        if str(e.get("type") or "").lower() in ("screen_with_cam", "screen", "screen_full")
+    )
+    return (
+        "<p><strong>Cover plan:</strong> "
+        f"{len(events)} event(s) ({screen} screen), "
+        f"{len(overlays)} overlay(s), {len(sfx)} sfx</p>"
+    )
+
+
+def _meta_stats_html(meta: dict[str, Any]) -> str:
+    if not meta:
+        return ""
+    gclass = meta.get("gap_classes") or {}
+    parts = [
+        f"breath={gclass.get('breath', 0)}",
+        f"think={gclass.get('think', 0)}",
+        f"ai_wait={gclass.get('ai_wait', 0)}",
+        f"retake={gclass.get('retake', 0)}",
+    ]
+    extras = []
+    for key in ("dropped_repeat", "clamped_wait", "dropped_wait"):
+        if key in meta:
+            extras.append(f"{key}={meta[key]}")
+    extra_html = f" · {', '.join(extras)}" if extras else ""
+    return (
+        f"<p><strong>Gap classes:</strong> {', '.join(parts)}{extra_html}</p>"
+    )
+
+
+def _build_cards(
+    episode: Path,
+    edl: dict[str, Any],
+    *,
+    dashboard: Path,
+    words: list[dict[str, Any]],
+    cover: dict[str, Any] | None,
+) -> tuple[str, set[Path]]:
+    cards: list[str] = []
+    used_assets: set[Path] = set()
+    ranges = [r for r in (edl.get("ranges") or []) if isinstance(r, dict)]
+    timeline_cursor = 0.0
+    prev_end: float | None = None
+
+    for idx, rng in enumerate(ranges, start=1):
+        source_name = str(rng.get("source") or "cam")
+        start = float(rng["start"])
+        end = float(rng["end"])
+        duration = end - start
+
+        if prev_end is not None and start > prev_end + 0.05:
+            gap_dur = start - prev_end
+            cards.append(
+                render_cut_gap_html(gap_start=prev_end, gap_end=start, duration=gap_dur)
+            )
+
+        video = _resolve_source_video(episode, edl, source_name)
+        thumb_relative: str | None = None
+        if video is not None:
+            thumb_path = _thumbnail_path(dashboard, video, start=start, end=end)
+            mid = (start + end) / 2
+            if not thumb_path.is_file() or thumb_path.stat().st_size == 0:
+                try:
+                    extract_frame(video, mid, thumb_path)
+                except (OSError, subprocess.CalledProcessError):
+                    pass
+            if thumb_path.is_file() and thumb_path.stat().st_size > 0:
+                used_assets.add(thumb_path)
+                thumb_relative = thumb_path.relative_to(dashboard).as_posix()
+
+        timeline_start = timeline_cursor
+        timeline_end = timeline_cursor + duration
+        timeline_cursor = timeline_end
+        prev_end = end
+
+        speech = speech_for_range(words, start, end)
+        badges = cover_badges_for_range(cover, start, end)
+        note = str(rng.get("note") or "speech")
+
+        cards.append(
+            render_range_card_html(
+                index=idx,
+                source_name=source_name,
+                timeline_start=timeline_start,
+                timeline_end=timeline_end,
+                duration=duration,
+                source_start=start,
+                source_end=end,
+                note=note,
+                speech=speech,
+                thumb_relative=thumb_relative,
+                badges=badges,
+            )
+        )
+
+    grid = f'<div class="grid">{"".join(cards)}</div>'
+    return grid, used_assets
+
+
+def generate_storyboard(episode: Path, *, open_browser: bool = True) -> Path:
+    edl_path, edl = _resolve_edl_path(episode)
+    cfg = load_project(episode)
+    edit = episode / "edit"
+    cover = _resolve_cover(episode)
+    words = load_cam_words(edit)
+    meta = edl.get("_meta") if isinstance(edl.get("_meta"), dict) else {}
+
+    dashboard = edit / "storyboard"
+    dashboard.mkdir(parents=True, exist_ok=True)
+    cards_html, used_assets = _build_cards(
+        episode,
+        edl,
+        dashboard=dashboard,
+        words=words,
+        cover=cover,
+    )
+
+    assets = dashboard / "assets"
+    if assets.is_dir():
+        for old in assets.glob("*.jpg"):
+            if old not in used_assets:
+                old.unlink()
+
+    keep_sec = float(meta.get("keep_sec") or sum(
+        float(r["end"]) - float(r["start"]) for r in (edl.get("ranges") or [])
+    ))
+    cam_video = _resolve_source_video(episode, edl, "cam")
+    source_dur: float | None = None
+    if cam_video is not None:
+        source_dur = _probe_duration(cam_video)
+    compress_pct = ""
+    if source_dur and source_dur > 0:
+        compress_pct = f" · {100 * keep_sec / source_dur:.0f}% kept"
+
+    title = str(cfg.get("id") or episode.name)
+    plan_label = edl_path.name
+    digest = plan_digest(edl_path)[:12]
+    range_count = len(edl.get("ranges") or [])
+
+    page = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{html.escape(title)} — Storyboard</title>
+<style>
+*{{box-sizing:border-box}} body{{margin:0;background:#0e1116;color:#e8edf4;
+font:15px/1.5 system-ui,sans-serif}} header,main{{max-width:1400px;margin:auto;padding:28px}}
+header{{background:#171d27;border-bottom:1px solid #293242}} h1{{margin:0 0 8px}}
+.meta,.description{{color:#9ca9ba}} .grid{{display:grid;
+grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:8px}}
+.card{{background:#171d27;border:1px solid #293242;border-radius:10px;overflow:hidden}}
+.card>img{{width:100%;aspect-ratio:16/9;object-fit:cover;background:#080a0d;display:block}}
+.thumb-missing{{width:100%;aspect-ratio:16/9;background:#080a0d;color:#6b7280;
+display:flex;align-items:center;justify-content:center;font-size:13px}}
+.body{{padding:14px}} .time{{font:13px ui-monospace;color:#7dd3fc;margin-top:6px}}
+.source{{font:12px ui-monospace;color:#9ca9ba;margin-top:4px}}
+.note{{margin:8px 0 0;color:#c6d0db}} .speech{{color:#e8bd72;margin:6px 0 0}}
+code{{color:#7dd3fc}}
+.badges{{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}}
+.badge{{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;
+border:1px solid #334155;background:#101826;color:#c7d2fe}}
+.badge-overlay{{border-color:#6366f1}} .badge-event{{border-color:#2dd4bf;color:#99f6e4}}
+.badge-sfx{{border-color:#fbbf24;color:#fde68a}}
+.cut-gap{{display:flex;align-items:center;gap:10px;grid-column:1/-1;margin:4px 0;
+padding:10px 16px;border:1px dashed #7c3a2a;border-radius:8px;background:#1c1210;color:#fca5a5}}
+.cut-gap-label{{font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.06em}}
+.cut-gap-span{{font:13px ui-monospace}} .cut-gap-dur{{font-size:13px;opacity:.9}}
+.next-steps{{margin-top:12px;padding:10px 12px;border-radius:8px;background:#101826;
+border:1px solid #293242;font-size:14px}}
+</style></head>
+<body><header>
+<h1>{html.escape(title)}</h1>
+<div class="meta">{range_count} keep range(s) · {keep_sec:.1f}s output
+{compress_pct}
+{f" · source {source_dur:.1f}s" if source_dur else ""}
+· Plan <code>{html.escape(plan_label)}</code> <code>{digest}</code></div>
+{_meta_stats_html(meta)}
+{_cover_summary_html(cover)}
+<div class="next-steps">After reviewing:
+<code>ae edl-suggest . --apply</code> → <code>ae cut .</code> →
+<code>ae cover-suggest .</code> / <code>ae compose . --studio</code></div>
+</header>
+<main>{cards_html}</main></body></html>"""
+
+    output = dashboard / "index.html"
+    output.write_text(page, encoding="utf-8")
+    if open_browser:
+        webbrowser.open(output.as_uri())
+    print(f"Wrote {output}")
+    return output
