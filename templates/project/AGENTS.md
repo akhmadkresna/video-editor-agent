@@ -15,6 +15,7 @@ This folder is the **episode**. The framework lives in `$AGENTIC_EDITOR_HOME`.
 ```bash
 ae doctor
 ae ingest .
+ae storyboard .   # HTML plan review (after edl-suggest)
 ae cut .          # needs edit/edl.json; enhances cam VO
 ae voice .        # optional standalone DeepFilterNet pass
 ae cover .        # needs edit/cover.json (cam/screen/punch_in)
@@ -22,6 +23,23 @@ ae mezzanine .    # 1080p30 proxies + enhanced cam audio
 ae compose . --studio
 ae qa .
 ```
+
+## OpenCode + local model (offline agent)
+
+This episode is also wired for [OpenCode](https://opencode.ai) driven by a local
+Ollama model (see `$AGENTIC_EDITOR_HOME/templates/opencode/README.md`). You talk
+to it in plain language — no need to remember command names:
+
+> "footage-nya sudah saya taruh di raw, potong jeda dan bagian yang ngulang"
+> "show me storyboard" / "storyboard please" / "tampilin storyboard"
+
+`.opencode/agent/editor.md` maps intent like that to `ae ingest` → `ae edl-suggest` →
+`ae storyboard`, summarises the plan, and **waits** for your approval before `--apply` → `ae cut`.
+`opencode.json` sets the local model. `.opencode/command/{autocut,shownotes}.md`
+are saved-prompt shortcuts for the same thing.
+
+The model only orchestrates and writes text; `ae edl-suggest` / `ae cut` do the
+actual cut. Always confirm the plan before `--apply`.
 
 ## Promote to framework
 

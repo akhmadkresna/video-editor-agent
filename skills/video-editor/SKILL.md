@@ -1,14 +1,14 @@
 ---
 name: video-editor
 description: >
-  Edit videos: scaffold episode (ae new), transcribe, auto-cut, cover, render.
-  Use for new project / folder creation — never freestyle mkdir.
+  Edit videos: scaffold episode (ae new), transcribe, auto-cut, storyboard plan
+  review, cover, render. Use for new project / folder creation — never freestyle mkdir.
 version: 0.1.2
 platforms: [macos, linux, windows]
 metadata:
   hermes:
     category: media
-    tags: [video, editing, youtube, transcription, radio-edit, ffmpeg, remotion, scaffold]
+    tags: [video, editing, youtube, transcription, radio-edit, storyboard, ffmpeg, remotion, scaffold]
     requires_tools: [bash]
 ---
 
@@ -22,8 +22,8 @@ orchestrate and explain, you do **not** hand-author cut ranges.
 ## When to Use
 
 - The user wants raw camera footage cut down: silences, thinking pauses, retakes.
-- The user asks for a preview, a Remotion Studio review, screen-share cover, or
-  YouTube title / description / chapters for an episode.
+- The user asks for a **storyboard** / visual edit plan, a preview, a Remotion Studio
+  review, screen-share cover, or YouTube title / description / chapters for an episode.
 - Trigger with `/video-editor <what you want>`, or any request naming an episode
   folder plus footage.
 
@@ -78,9 +78,10 @@ An **episode** is a folder with `project.yaml` + `raw/` + `edit/`. `cd` into it;
 | "bikin project / folder", "scaffold", "buat episode", "mulai video baru" | `ae new <path>` only (see 0b + `references/scaffold.md`) |
 | "footage sudah di raw", "transkrip dulu", "ingest" | `ae ingest .` |
 | "potong footage", "buang jeda / yang ngulang", "auto cut", "radio edit" | `ae ingest .` → `ae edl-suggest .` → `ae storyboard .` → **summarise, then STOP** |
-| "lebih rapat", "jangan agresif", "sisakan jeda mikir" | re-run `ae edl-suggest .` with adjusted flags (`--gap-cut`, `--hold`, `--min-keep`), summarise, STOP |
+| "storyboard", "show me storyboard", "storyboard please", "tampilin storyboard", "lihat rencana edit", "visualize the plan", "buka storyboard", "refresh storyboard" | If no `edit/edl.suggest.json` or `edit/edl.json`: `ae edl-suggest .` first. Then `ae storyboard .` and point at `edit/storyboard/index.html` |
+| "lebih rapat", "jangan agresif", "sisakan jeda mikir" | re-run `ae edl-suggest .` with adjusted flags (`--gap-cut`, `--hold`, `--min-keep`), `ae storyboard .`, summarise, STOP |
 | "oke", "terapkan", "apply", "lanjut" | `ae edl-suggest . --apply` → `ae cut .` |
-| "lihat hasilnya", "preview", "studio" | `ae compose . --studio` (or open `edit/preview.mp4`) |
+| "lihat hasilnya", "preview video", "studio" | `ae compose . --studio` (or open `edit/preview.mp4` after `ae cut .`) |
 | "tampilin layar", "cover", "bagian demo" | `ae cover-suggest .` → propose ranges → STOP → `ae cover .` |
 | "cek potongan", "QA" | `ae qa .`, then point at `edit/verify/` |
 | "judul / deskripsi / chapter", "shownotes" | read `edit/takes_packed.md`, write `edit/shownotes.md` (see `references/pipeline.md`) |

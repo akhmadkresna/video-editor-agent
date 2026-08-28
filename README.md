@@ -45,6 +45,22 @@ After setup, open an **episode** folder in Cursor (not only the framework), drop
 
 ---
 
+## Local model agent (offline, no cloud)
+
+Drive the pipeline with a **local** LLM instead of a cloud coding agent — same
+`ae` commands, offline, zero per-token cost. Talk to it in plain language; it
+maps intent to `ae` and waits for you before applying a cut.
+
+- **Hermes Agent / Hermes Desktop** (recommended — one window, adds cron/Routines):
+  register the repo skill via `skills.external_dirs`. See
+  [`docs/catalog/features/hermes-agent.md`](docs/catalog/features/hermes-agent.md).
+  Skill: [`skills/video-editor/`](skills/video-editor/).
+- **OpenCode**: [`templates/opencode/README.md`](templates/opencode/README.md) ·
+  [`docs/catalog/features/opencode-local.md`](docs/catalog/features/opencode-local.md).
+  `ae new` scaffolds `opencode.json` + `.opencode/` into every episode.
+
+---
+
 ## ASR backends
 
 | `asr.backend` | Machine | Engine |
@@ -72,6 +88,8 @@ Default ASR language is **Indonesian** (`asr.language: id`); override per episod
 | `ae doctor` | Check deps + chosen ASR backend |
 | `ae new <path>` | Scaffold episode |
 | `ae ingest .` | Probe + ASR + `takes_packed.md` |
+| `ae edl-suggest .` | Gap-class radio-edit proposal → `edit/edl.suggest.json` |
+| `ae storyboard .` | Visual HTML plan review → `edit/storyboard/index.html` |
 | `ae cut .` | EDL → `edit/preview.mp4` (enhances cam VO first) |
 | `ae cover .` | EDL + cover → `timeline.json` |
 | `ae voice .` | DeepFilterNet cam VO → `edit/audio/cam.voice.wav` (raw untouched) |

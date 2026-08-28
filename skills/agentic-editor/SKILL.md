@@ -2,9 +2,9 @@
 name: agentic-editor
 description: >
   Local agentic YouTube editor. Ingest cam/screen footage, ASR (whisper.cpp on Mac,
-  faster-whisper on Windows), radio-edit via EDL, dual-source cover, Remotion compose.
-  Use when editing talking-head or tutorial videos, building EDLs, or promoting fixes
-  into the agentic-editor framework.
+  faster-whisper on Windows), radio-edit via EDL, storyboard plan review, dual-source
+  cover, Remotion compose. Use when editing talking-head or tutorial videos, building
+  EDLs, reviewing edit plans ("storyboard"), or promoting fixes into the framework.
 ---
 
 # Agentic Editor
@@ -133,6 +133,9 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 1. **Inventory** — `ae ingest .` → `edit/takes_packed.md`
 2. **Converse** — describe material; ask shaped questions
 3. **Propose** radio-edit strategy (4–8 sentences) → **wait for confirm**
+3a. **Storyboard** — on request ("storyboard", "show me the plan", etc.) or after
+   `ae edl-suggest`: `ae storyboard .` → `edit/storyboard/index.html` (keep ranges,
+   cut gaps, speech). Re-run after any EDL tweak.
 4. **Write** `edit/edl.json` (`sources` + `ranges[]` with `source`/`start`/`end`)
 5. **Cut** — `ae cut .` → `edit/preview.mp4` (enhances cam VO first)
 6. **Cover** (if `sources.screen` exists):

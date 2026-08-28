@@ -39,6 +39,7 @@ Adjustments in plain language → flags:
 - "lebih rapat / lebih agresif" → lower `--gap-cut`, lower `--min-keep`
 - "jangan buru-buru motong" / "sisakan jeda mikir" → raise `--gap-cut`, add `--hold-if-gap`
 - "cuma bagian tengah" → `--source-start` / `--source-end`
+- "storyboard" / "show me storyboard" / "tampilin storyboard" / "visualize the plan" → `ae storyboard .` (run `ae edl-suggest .` first if no plan file yet)
 
 ## `edit/edl.suggest.json` shape
 
