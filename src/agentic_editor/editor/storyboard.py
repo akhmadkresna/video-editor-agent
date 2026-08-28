@@ -49,10 +49,11 @@ def _resolve_edl_path(episode: Path) -> tuple[Path, dict[str, Any]]:
     edit = episode / "edit"
     suggest = edit / "edl.suggest.json"
     edl_path = edit / "edl.json"
-    if suggest.is_file():
-        return suggest, json.loads(suggest.read_text(encoding="utf-8"))
+    # Applied cut (edl.json) wins over draft suggest once both exist.
     if edl_path.is_file():
         return edl_path, json.loads(edl_path.read_text(encoding="utf-8"))
+    if suggest.is_file():
+        return suggest, json.loads(suggest.read_text(encoding="utf-8"))
     raise FileNotFoundError(
         "Missing edit plan. Run `ae edl-suggest .` first (or provide edit/edl.json)."
     )
@@ -130,6 +131,7 @@ def cover_badges_for_range(
     start: float,
     end: float,
 ) -> list[dict[str, str]]:
+    """Compact chips for camera / sfx cues (MG uses render_mg_stack_html)."""
     if not cover:
         return []
     badges: list[dict[str, str]] = []
@@ -139,18 +141,10 @@ def cover_badges_for_range(
         es, ee = float(event.get("start", 0)), float(event.get("end", 0))
         if not _interval_overlaps(start, end, es, ee):
             continue
-        etype = str(event.get("type") or "event")
-        note = str(event.get("note") or "").strip()
-        badges.append({"kind": "event", "label": etype, "detail": note})
-    for overlay in cover.get("overlays") or []:
-        if not isinstance(overlay, dict):
-            continue
-        os, oe = float(overlay.get("start", 0)), float(overlay.get("end", 0))
-        if not _interval_overlaps(start, end, os, oe):
-            continue
-        kind = str(overlay.get("kind") or "overlay")
-        title = str(overlay.get("title") or overlay.get("text") or "").strip()
-        badges.append({"kind": "overlay", "label": kind, "detail": title})
+        etype = str(event.get("type") or "event").lower()
+        if etype in ("punch_in", "punch_out", "framing"):
+            note = str(event.get("note") or "").strip()
+            badges.append({"kind": "event", "label": etype, "detail": note})
     for sfx in cover.get("sfx") or []:
         if not isinstance(sfx, dict):
             continue
@@ -162,6 +156,202 @@ def cover_badges_for_range(
         note = str(sfx.get("note") or "").strip()
         badges.append({"kind": "sfx", "label": kind, "detail": note})
     return badges
+
+
+def cover_mg_items_for_range(
+    cover: dict[str, Any] | None,
+    start: float,
+    end: float,
+) -> list[dict[str, Any]]:
+    """MG creatives (overlays + evidence stills) overlapping a keep range."""
+    if not cover:
+        return []
+    items: list[dict[str, Any]] = []
+    for overlay in cover.get("overlays") or []:
+        if not isinstance(overlay, dict):
+            continue
+        os, oe = float(overlay.get("start", 0)), float(overlay.get("end", 0))
+        if not _interval_overlaps(start, end, os, oe):
+            continue
+        items.append({"category": "overlay", **overlay})
+    for event in cover.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        etype = str(event.get("type") or "").lower()
+        if etype != "evidence_with_cam":
+            continue
+        es, ee = float(event.get("start", 0)), float(event.get("end", 0))
+        if not _interval_overlaps(start, end, es, ee):
+            continue
+        items.append({"category": "evidence", **event})
+    items.sort(
+        key=lambda it: (
+            float(it.get("start") or 0),
+            0 if it.get("category") == "overlay" else 1,
+            str(it.get("kind") or it.get("type") or ""),
+        )
+    )
+    return items
+
+
+def _evidence_rel_path(episode: Path, src: str) -> str | None:
+    name = Path(str(src or "").strip()).name
+    if not name:
+        return None
+    path = episode / "raw" / "evidence" / name
+    if path.is_file():
+        return Path("../../raw/evidence") / name
+    return None
+
+
+def _mg_steps_html(steps: list[Any]) -> str:
+    rows = []
+    for step in steps or []:
+        text = html.escape(str(step).strip())
+        if text:
+            rows.append(f'<li class="mg-step">{text}</li>')
+    if not rows:
+        return ""
+    return f'<ul class="mg-steps">{"".join(rows)}</ul>'
+
+
+def _render_mg_overlay_panel(overlay: dict[str, Any]) -> str:
+    kind = str(overlay.get("kind") or "overlay")
+    kicker = html.escape(str(overlay.get("kicker") or "").strip())
+    title = html.escape(str(overlay.get("title") or "").strip())
+    text = html.escape(str(overlay.get("text") or "").strip())
+    value = html.escape(str(overlay.get("value") or "").strip())
+    source = html.escape(str(overlay.get("sourceLabel") or "").strip())
+    accent = html.escape(str(overlay.get("accent") or "").strip())
+    tone = html.escape(str(overlay.get("tone") or "neutral").strip())
+    steps = overlay.get("steps") if isinstance(overlay.get("steps"), list) else []
+    note = html.escape(str(overlay.get("note") or "").strip())
+
+    body_parts: list[str] = []
+    if kind == "tag":
+        body_parts.append(f'<div class="mg-display mg-display-sm">{text or title or value}</div>')
+    elif kind == "callout":
+        if value:
+            body_parts.append(f'<div class="mg-display mg-display-lg">{value}</div>')
+        if source:
+            body_parts.append(f'<div class="mg-meta">{source}</div>')
+    elif kind == "stat":
+        if value:
+            body_parts.append(f'<div class="mg-display mg-display-xl">{value}</div>')
+        if source:
+            body_parts.append(f'<div class="mg-meta">{source}</div>')
+    elif kind == "divider":
+        if kicker:
+            body_parts.append(f'<div class="mg-kicker">{kicker}</div>')
+        if title:
+            body_parts.append(f'<div class="mg-display mg-display-md">{title}</div>')
+    elif kind == "quote":
+        if kicker:
+            body_parts.append(f'<div class="mg-kicker">{kicker}</div>')
+        raw_text = str(overlay.get("text") or "")
+        if raw_text:
+            raw_accent = str(overlay.get("accent") or "")
+            if raw_accent and raw_accent in raw_text:
+                before, after = raw_text.split(raw_accent, 1)
+                line = (
+                    f'{html.escape(before)}'
+                    f'<span class="mg-accent">{html.escape(raw_accent)}</span>'
+                    f'{html.escape(after)}'
+                )
+            else:
+                line = html.escape(raw_text)
+            body_parts.append(f'<div class="mg-display mg-display-md mg-italic">{line}</div>')
+    elif kind == "title":
+        if kicker:
+            body_parts.append(f'<div class="mg-kicker">{kicker}</div>')
+        raw_text = str(overlay.get("text") or "")
+        if raw_text:
+            raw_accent = str(overlay.get("accent") or "")
+            if raw_accent and raw_accent in raw_text:
+                before, after = raw_text.split(raw_accent, 1)
+                line = (
+                    f'{html.escape(before)}'
+                    f'<span class="mg-accent">{html.escape(raw_accent)}</span>'
+                    f'{html.escape(after)}'
+                )
+            else:
+                line = html.escape(raw_text)
+            body_parts.append(f'<div class="mg-display mg-display-md">{line}</div>')
+    elif kind == "lower_third":
+        if title:
+            body_parts.append(f'<div class="mg-kicker">{title}</div>')
+        if text:
+            body_parts.append(f'<div class="mg-display mg-display-sm">{text}</div>')
+        body_parts.append(_mg_steps_html(steps))
+    elif kind == "illustration":
+        if title:
+            body_parts.append(f'<div class="mg-kicker">{title}</div>')
+        body_parts.append(_mg_steps_html(steps))
+    elif kind in ("chapter", "emphasis", "diagram", "chip"):
+        if kicker:
+            body_parts.append(f'<div class="mg-kicker">{kicker}</div>')
+        headline = title or text or value
+        if headline:
+            body_parts.append(f'<div class="mg-display mg-display-md">{headline}</div>')
+        body_parts.append(_mg_steps_html(steps))
+        if source:
+            body_parts.append(f'<div class="mg-meta">{source}</div>')
+    else:
+        headline = title or text or value
+        if headline:
+            body_parts.append(f'<div class="mg-display">{headline}</div>')
+
+    timing = (
+        f'{float(overlay.get("start", 0)):.1f}s–{float(overlay.get("end", 0)):.1f}s'
+    )
+    note_html = f'<div class="mg-note">{note}</div>' if note else ""
+    return (
+        f'<div class="mg-panel mg-{html.escape(kind)} mg-tone-{tone}">'
+        f'<div class="mg-head"><span class="mg-kind">{html.escape(kind)}</span>'
+        f'<span class="mg-time">{timing}</span></div>'
+        f'<div class="mg-body">{"".join(body_parts)}</div>'
+        f"{note_html}"
+        "</div>"
+    )
+
+
+def _render_mg_evidence_panel(episode: Path, event: dict[str, Any]) -> str:
+    src = str(event.get("src") or "").strip()
+    rel = _evidence_rel_path(episode, src)
+    note = html.escape(str(event.get("note") or "").strip())
+    timing = f'{float(event.get("start", 0)):.1f}s–{float(event.get("end", 0)):.1f}s'
+    if rel is not None:
+        media = f'<img class="mg-evidence-img" src="{rel.as_posix()}" alt="">'
+    else:
+        media = f'<div class="mg-evidence-missing">{html.escape(src or "evidence")}</div>'
+    note_html = f'<div class="mg-note">{note}</div>' if note else ""
+    return (
+        '<div class="mg-panel mg-evidence">'
+        '<div class="mg-head"><span class="mg-kind">evidence</span>'
+        f'<span class="mg-time">{timing}</span></div>'
+        f"{media}"
+        f'<div class="mg-meta">{html.escape(Path(src).name if src else "screenshot")}</div>'
+        f"{note_html}"
+        "</div>"
+    )
+
+
+def render_mg_stack_html(
+    items: list[dict[str, Any]],
+    *,
+    episode: Path | None = None,
+) -> str:
+    if not items:
+        return ""
+    panels: list[str] = []
+    for item in items:
+        if item.get("category") == "evidence" and episode is not None:
+            panels.append(_render_mg_evidence_panel(episode, item))
+        elif item.get("category") == "overlay":
+            panels.append(_render_mg_overlay_panel(item))
+    if not panels:
+        return ""
+    return f'<div class="mg-stack"><div class="mg-stack-label">MG on this clip</div>{"".join(panels)}</div>'
 
 
 def _cover_badges_html(badges: list[dict[str, str]]) -> str:
@@ -205,6 +395,7 @@ def render_range_card_html(
     speech: str,
     thumb_relative: str | None,
     badges: list[dict[str, str]],
+    mg_stack_html: str = "",
 ) -> str:
     if thumb_relative:
         media = f'<img src="{thumb_relative}" alt="">'
@@ -218,6 +409,7 @@ def render_range_card_html(
         f'<div class="time">Edit {format_clock(timeline_start)} → '
         f"{format_clock(timeline_end)} · {duration:.2f}s</div>"
         f'<div class="source">Source {source_start:.2f}s → {source_end:.2f}s</div>'
+        f"{mg_stack_html}"
         f"{_cover_badges_html(badges)}"
         f'<p class="note">{html.escape(note)}</p>'
         f'<p class="speech">{html.escape(speech) if speech else "(no speech)"}</p>'
@@ -310,6 +502,8 @@ def _build_cards(
 
         speech = speech_for_range(words, start, end)
         badges = cover_badges_for_range(cover, start, end)
+        mg_items = cover_mg_items_for_range(cover, start, end)
+        mg_stack = render_mg_stack_html(mg_items, episode=episode)
         note = str(rng.get("note") or "speech")
 
         cards.append(
@@ -325,6 +519,7 @@ def _build_cards(
                 speech=speech,
                 thumb_relative=thumb_relative,
                 badges=badges,
+                mg_stack_html=mg_stack,
             )
         )
 
@@ -395,6 +590,36 @@ code{{color:#7dd3fc}}
 border:1px solid #334155;background:#101826;color:#c7d2fe}}
 .badge-overlay{{border-color:#6366f1}} .badge-event{{border-color:#2dd4bf;color:#99f6e4}}
 .badge-sfx{{border-color:#fbbf24;color:#fde68a}}
+.mg-stack{{margin-top:10px;padding:10px;border-radius:8px;background:#0a0d12;
+border:1px solid #334155}}
+.mg-stack-label{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+color:#94a3b8;margin-bottom:8px}}
+.mg-panel{{margin-top:8px;padding:10px 12px;border-radius:6px;background:linear-gradient(135deg,#1a2030 0%,#121820 100%);
+border-left:3px solid #6366f1;color:#f8fafc}}
+.mg-panel:first-of-type{{margin-top:0}}
+.mg-evidence{{border-left-color:#2dd4bf}}
+.mg-stat,.mg-callout{{border-left-color:#38bdf8}}
+.mg-quote{{border-left-color:#fbbf24}}
+.mg-divider{{border-left-color:#a78bfa}}
+.mg-illustration{{border-left-color:#34d399}}
+.mg-head{{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}}
+.mg-kind{{font-size:11px;font-weight:700;text-transform:uppercase;color:#c7d2fe}}
+.mg-time{{font:11px ui-monospace;color:#64748b}}
+.mg-kicker{{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+color:#94a3b8;margin-bottom:4px}}
+.mg-display{{font-weight:700;line-height:1.25;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.35)}}
+.mg-display-sm{{font-size:14px}} .mg-display-md{{font-size:18px}} .mg-display-lg{{font-size:22px}}
+.mg-display-xl{{font-size:26px;letter-spacing:-.02em}}
+.mg-italic{{font-style:italic;font-weight:600}}
+.mg-accent{{text-decoration:underline;text-underline-offset:3px}}
+.mg-meta{{margin-top:6px;font-size:12px;color:#cbd5e1;opacity:.85}}
+.mg-steps{{margin:6px 0 0;padding-left:18px;color:#e2e8f0;font-size:13px}}
+.mg-step{{margin:2px 0}}
+.mg-note{{margin-top:6px;font-size:11px;color:#64748b;font-style:italic}}
+.mg-evidence-img{{width:100%;margin-top:6px;border-radius:4px;border:1px solid #293242;
+background:#080a0d;aspect-ratio:16/9;object-fit:cover}}
+.mg-evidence-missing{{margin-top:6px;padding:16px;text-align:center;font:12px ui-monospace;
+color:#64748b;background:#080a0d;border:1px dashed #334155;border-radius:4px}}
 .cut-gap{{display:flex;align-items:center;gap:10px;grid-column:1/-1;margin:4px 0;
 padding:10px 16px;border:1px dashed #7c3a2a;border-radius:8px;background:#1c1210;color:#fca5a5}}
 .cut-gap-label{{font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.06em}}

@@ -8,9 +8,11 @@ import yaml
 from agentic_editor.editor.storyboard import (
     _thumbnail_path,
     cover_badges_for_range,
+    cover_mg_items_for_range,
     format_clock,
     generate_storyboard,
     render_cut_gap_html,
+    render_mg_stack_html,
     render_range_card_html,
     speech_for_range,
 )
@@ -78,6 +80,7 @@ def test_cover_badges_for_range_filters_by_overlap() -> None:
     cover = {
         "events": [
             {"type": "screen_with_cam", "start": 5.0, "end": 12.0, "note": "demo"},
+            {"type": "punch_in", "start": 6.0, "end": 7.0, "note": "hook"},
         ],
         "overlays": [
             {"kind": "chapter", "start": 0.0, "end": 4.0, "title": "Intro"},
@@ -88,9 +91,71 @@ def test_cover_badges_for_range_filters_by_overlap() -> None:
     }
     badges = cover_badges_for_range(cover, 6.0, 14.0)
     labels = {b["label"] for b in badges}
-    assert "screen_with_cam" in labels
+    assert "screen_with_cam" not in labels
+    assert "punch_in" in labels
     assert "click" in labels
     assert "chapter" not in labels
+
+
+def test_cover_mg_items_for_range_includes_overlays_and_evidence() -> None:
+    cover = {
+        "overlays": [
+            {"kind": "stat", "start": 10.0, "end": 14.0, "value": "92%"},
+        ],
+        "events": [
+            {
+                "type": "evidence_with_cam",
+                "start": 11.0,
+                "end": 15.0,
+                "src": "microsoft-wti-92.png",
+            },
+        ],
+    }
+    items = cover_mg_items_for_range(cover, 10.5, 13.0)
+    kinds = {
+        (it["category"], it.get("kind") or it.get("type"))
+        for it in items
+    }
+    assert ("overlay", "stat") in kinds
+    assert ("evidence", "evidence_with_cam") in kinds
+
+
+def test_render_mg_stack_html_shows_overlay_content() -> None:
+    html_out = render_mg_stack_html(
+        [
+            {
+                "category": "overlay",
+                "kind": "callout",
+                "start": 36.0,
+                "end": 42.0,
+                "value": "92% pakai GenAI",
+                "sourceLabel": "Microsoft WTI 2024",
+            }
+        ]
+    )
+    assert "MG on this clip" in html_out
+    assert "92% pakai GenAI" in html_out
+    assert "Microsoft WTI 2024" in html_out
+    assert "mg-callout" in html_out
+
+
+def test_render_range_card_html_includes_mg_stack() -> None:
+    html_out = render_range_card_html(
+        index=1,
+        source_name="cam",
+        timeline_start=0.0,
+        timeline_end=12.5,
+        duration=12.5,
+        source_start=10.0,
+        source_end=22.5,
+        note="hook",
+        speech="intro line",
+        thumb_relative="assets/thumb_abc.jpg",
+        badges=[{"kind": "event", "label": "punch_in", "detail": "92%"}],
+        mg_stack_html='<div class="mg-stack">MG preview</div>',
+    )
+    assert "MG preview" in html_out
+    assert "punch_in" in html_out
 
 
 def _write_min_episode(tmp_path: Path) -> Path:
@@ -134,6 +199,21 @@ def _write_min_episode(tmp_path: Path) -> Path:
 
 def test_generate_storyboard_writes_html_with_cut_gap(tmp_path: Path, monkeypatch) -> None:
     episode = _write_min_episode(tmp_path)
+    (episode / "edit" / "cover.json").write_text(
+        json.dumps(
+            {
+                "overlays": [
+                    {
+                        "kind": "tag",
+                        "start": 0.0,
+                        "end": 2.5,
+                        "text": "REAL DATA",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr("agentic_editor.editor.storyboard.extract_frame", lambda *a, **k: None)
     monkeypatch.setattr("agentic_editor.editor.storyboard._probe_duration", lambda *a, **k: 20.0)
 
@@ -147,3 +227,5 @@ def test_generate_storyboard_writes_html_with_cut_gap(tmp_path: Path, monkeypatc
     assert "alpha" in page
     assert "beta" in page
     assert "breath=2" in page
+    assert "MG on this clip" in page
+    assert "REAL DATA" in page
