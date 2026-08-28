@@ -44,7 +44,7 @@ ae brief . --channel TheAIGRID
 
 uv sync --extra evidence && uv run playwright install chromium   # once
 ae evidence-gather .
-# → raw/evidence/*.png    real page screenshots
+# → raw/evidence/*.png    real page screenshots (scroll_to_text per shot when one URL has many stats)
 # → edit/evidence.json    provenance
 ```
 
