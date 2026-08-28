@@ -146,6 +146,9 @@ def _clear_remotion_cache() -> None:
                 _wipe_dir(child)
     _wipe_dir(remotion_kit_dir() / "node_modules" / ".cache")
     _clear_os_temp_remotion_dirs()
+    # Remotion/pnpm subprocesses use TEMP/TMP — never leave the scratch tmp
+    # directory missing after wiping bundle leftovers (mg-review batch runs).
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
 
 def probe_video_aspect(path: Path) -> float | None:
@@ -1101,6 +1104,7 @@ def _render_remotion_still_tile(
     still_path: Path,
     preview_path: Path,
     verbose: bool,
+    clear_cache: bool = True,
 ) -> tuple[Path | None, Path | None, bool]:
     cmd = [
         *_remotion_cli(kit),
@@ -1121,7 +1125,8 @@ def _render_remotion_still_tile(
             try:
                 subprocess.run(cmd, cwd=str(kit), env=env, check=True)
             finally:
-                _clear_remotion_cache()
+                if clear_cache:
+                    _clear_remotion_cache()
             subprocess.run(
                 [
                     "ffmpeg",
@@ -1140,6 +1145,8 @@ def _render_remotion_still_tile(
             return still_path, preview_path, False
         except subprocess.CalledProcessError as exc:
             last_err = exc
+            if clear_cache:
+                _clear_remotion_cache()
             if verbose:
                 print(
                     f"  ! {tile_id} attempt {attempt}/{_MG_REVIEW_RETRIES} "
@@ -1271,6 +1278,7 @@ def render_mg_review_tiles(
             still_path=still_path,
             preview_path=preview_path,
             verbose=verbose,
+            clear_cache=False,
         )
         if failed:
             tiles.append({**item, "_still": None, "_preview": None, "_failed": True})
@@ -1283,6 +1291,8 @@ def render_mg_review_tiles(
                 "_failed": False,
             }
         )
+
+    _clear_remotion_cache()
 
     html_path = out_dir / "review.html"
     html_path.write_text(_build_mg_review_html(tiles), encoding="utf-8")
