@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,132 @@ from agentic_editor.project import load_project, resolve_source
 
 # Absolute / drive-letter paths are not loadable in Remotion Studio (browser).
 _ABS_PATH = re.compile(r"^(?:/|[A-Za-z]:[\\/]|\\\\)")
+
+
+def _remotion_scratch_root() -> Path:
+    """House scratch dir for Remotion temp + browser binaries (prefer G: on Windows)."""
+    if raw := os.environ.get("REMOTION_SCRATCH_ROOT"):
+        return Path(raw)
+    if os.name == "nt":
+        root = Path("G:/AI/remotion-cache")
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+    return framework_home() / ".cache" / "remotion-scratch"
+
+
+def _remotion_env() -> dict[str, str]:
+    """Env for subprocess calls into the Remotion CLI.
+
+    Remotion's webpack bundle + frame-extraction cache land in the OS temp
+    dir by default (os.tmpdir(), which Node resolves from TEMP/TMP on
+    Windows). Each `still`/`render` invocation leaves a multi-GB
+    `remotion-webpack-bundle-*` / `remotion-v*-assets*` dir behind that is
+    never cleaned up automatically, so repeated mg-review/compose calls can
+    silently fill the system drive (hit in production: 461 leftover dirs,
+    218GB, ENOSPC) even though the project's own drive has plenty of room.
+    Point TEMP/TMP at a folder under REMOTION_SCRATCH_ROOT (G:/AI/remotion-cache
+    on this house Windows PC) instead of C:.
+    """
+    env = os.environ.copy()
+    scratch = _remotion_scratch_root()
+    cache_dir = scratch / "tmp"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (scratch / "binaries").mkdir(parents=True, exist_ok=True)
+    cache_str = str(cache_dir)
+    env["TEMP"] = cache_str
+    env["TMP"] = cache_str
+    env["TMPDIR"] = cache_str
+    env.setdefault("REMOTION_CACHE_DIR", str(scratch / "bundle-cache"))
+    binaries = scratch / "binaries"
+    binaries.mkdir(parents=True, exist_ok=True)
+    remotion_exe = binaries / ("remotion.exe" if os.name == "nt" else "remotion")
+    if remotion_exe.is_file():
+        env.setdefault("REMOTION_BINARIES_DIR", str(binaries))
+    return env
+
+
+def _wipe_dir(path: Path) -> None:
+    """Best-effort delete of a file or directory tree."""
+    try:
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        elif path.is_file() or path.is_symlink():
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _clear_os_temp_remotion_dirs() -> None:
+    """Remove Remotion leftovers in the *process* TEMP (often C:)."""
+    roots: list[Path] = []
+    for key in ("TEMP", "TMP", "TMPDIR"):
+        raw = os.environ.get(key)
+        if raw:
+            roots.append(Path(raw))
+    local_app = os.environ.get("LOCALAPPDATA")
+    if local_app:
+        roots.append(Path(local_app) / "Temp")
+    seen: set[Path] = set()
+    for root in roots:
+        try:
+            resolved = root.resolve()
+        except OSError:
+            continue
+        if resolved in seen or not resolved.is_dir():
+            continue
+        seen.add(resolved)
+        try:
+            children = list(resolved.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            name = child.name.lower()
+            if name.startswith("remotion-") or name.startswith("remotion_"):
+                _wipe_dir(child)
+
+
+def cleanup_remotion_after_final(*, verbose: bool = True) -> None:
+    """After a successful final mp4, drop staged copies and Remotion caches.
+
+    ``public/ae-media`` is a full copy of cam/screen (can be tens of GB). Keep
+    it during Studio / draft / MG review; delete it once the final file
+    has been written.
+    """
+    _clear_remotion_cache()
+    staged = remotion_kit_dir() / "public" / "ae-media"
+    existed = staged.exists()
+    if existed:
+        _wipe_dir(staged)
+    if verbose:
+        if existed:
+            print(f"• cleaned Remotion staged media → {staged}")
+        else:
+            print("• cleaned Remotion webpack/temp cache")
+
+
+def _clear_remotion_cache() -> None:
+    """Delete webpack/frame caches so they cannot pile up across renders.
+
+    Moving the cache off C: (see `_remotion_env`) stopped it from filling the
+    system drive, but each render/still invocation still leaves its
+    multi-GB bundle+assets dir behind with nothing to clean it up — it just
+    piles up on the project drive instead (hit in production: 123GB across
+    83 leftover dirs after one evening of mg-review/compose calls). Call
+    this after every Remotion CLI invocation finishes (success or failure)
+    so the cache never accumulates past what the *current* call needed.
+    """
+    cache_dir = _remotion_scratch_root() / "tmp"
+    if cache_dir.is_dir():
+        for child in cache_dir.iterdir():
+            _wipe_dir(child)
+    extra = os.environ.get("REMOTION_CACHE_DIR")
+    if extra:
+        extra_path = Path(extra)
+        if extra_path.is_dir():
+            for child in extra_path.iterdir():
+                _wipe_dir(child)
+    _wipe_dir(remotion_kit_dir() / "node_modules" / ".cache")
+    _clear_os_temp_remotion_dirs()
 
 
 def probe_video_aspect(path: Path) -> float | None:
@@ -548,7 +675,7 @@ def run_studio(episode: Path) -> None:
     if errors:
         raise RuntimeError("refusing to start Studio:\n  - " + "\n  - ".join(errors))
 
-    env = os.environ.copy()
+    env = _remotion_env()
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     if not (kit / "package.json").is_file():
@@ -562,7 +689,10 @@ def run_studio(episode: Path) -> None:
     ]
     print(f"$ cd {kit} && {' '.join(cmd)}")
     print("  (always pass --props — without it Studio shows a ~3s black empty timeline)")
-    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    try:
+        subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    finally:
+        _clear_remotion_cache()
 
 
 def _ffmpeg_encoders_blob(ffmpeg_exe: Path) -> str:
@@ -811,6 +941,32 @@ def remotion_render_accel_args(
 
 
 
+def _warn_if_mg_review_stale(episode: Path) -> None:
+    """Full compose renders are expensive (minutes, GB of output) — if
+    cover.json's MG plan changed since the last `ae mg-review` (or no
+    review has ever been run), print a loud warning instead of silently
+    rendering an unreviewed overlay plan. Not a hard block: sometimes a
+    full render is wanted regardless (e.g. re-rendering after a cut-only
+    change), so this stays advisory, matching the rest of the pipeline's
+    "confirm before" convention rather than a hard gate.
+    """
+    cover_path = episode / "edit" / "cover.json"
+    if not cover_path.is_file():
+        return
+    stamp_path = episode / "edit" / "mg-review" / ".cover_sha256"
+    current = hashlib.sha256(cover_path.read_bytes()).hexdigest()
+    reviewed = stamp_path.read_text(encoding="utf-8").strip() if stamp_path.is_file() else None
+    if reviewed == current:
+        return
+    reason = "no `ae mg-review` has been run yet" if reviewed is None else "cover.json changed since the last `ae mg-review`"
+    print(
+        f"! WARNING: {reason} — about to full-render an unreviewed MG plan.\n"
+        f"  Run `ae mg-review .` and check edit/mg-review/review.html first, "
+        f"or continue if you're sure.",
+        file=sys.stderr,
+    )
+
+
 def render_compose(
     episode: Path,
     *,
@@ -818,12 +974,13 @@ def render_compose(
     nvenc: bool = False,
     gl: str | None = None,
 ) -> Path:
+    _warn_if_mg_review_stale(episode)
     prepare_compose(episode)
     kit = remotion_kit_dir()
     props = episode / "edit" / "remotion-props.json"
     out = output or (episode / "edit" / "final.mp4")
     out.parent.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
+    env = _remotion_env()
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     accel = remotion_render_accel_args(nvenc=nvenc, gl=gl)
@@ -838,7 +995,11 @@ def render_compose(
         *accel,
     ]
     print(f"$ cd {kit} && {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    try:
+        subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    finally:
+        _clear_remotion_cache()
+    cleanup_remotion_after_final()
     return out
 
 
@@ -861,6 +1022,10 @@ _MG_REVIEW_KINDS = (
 #: else settles within ~220-280ms, so 0.6s is a safe generic hold point.
 _MG_REVIEW_SETTLE_SEC = {"stat": 0.85}
 _MG_REVIEW_SETTLE_DEFAULT = 0.6
+#: Per-still retry count — see the comment at the retry loop in
+#: render_mg_review for why this class of failure is expected to be
+#: transient rather than deterministic.
+_MG_REVIEW_RETRIES = 3
 
 
 def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = True) -> Path:
@@ -887,7 +1052,7 @@ def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = Tr
     stills_dir = out_dir / "stills"
     stills_dir.mkdir(parents=True, exist_ok=True)
 
-    env = os.environ.copy()
+    env = _remotion_env()
     env["AE_TIMELINE_PROPS"] = str(props_path)
     env["AE_EPISODE"] = str(episode.resolve())
     gl_args = ["--gl", str(gl)] if gl else []
@@ -915,7 +1080,33 @@ def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = Tr
         ]
         if verbose:
             print(f"$ cd {kit} && {' '.join(cmd)}")
-        subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+        # `still` cold-starts its own dev/proxy server per invocation; the
+        # first video-frame fetch occasionally stalls past the delay-render
+        # timeout while that server warms up (seen in production: flaky
+        # "Fetching .../proxy" TimeoutError that succeeds on a bare retry).
+        # Retry a couple of times before giving up on this one tile.
+        last_err: subprocess.CalledProcessError | None = None
+        ok = False
+        for attempt in range(1, _MG_REVIEW_RETRIES + 1):
+            try:
+                try:
+                    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+                finally:
+                    _clear_remotion_cache()
+                ok = True
+                break
+            except subprocess.CalledProcessError as exc:
+                last_err = exc
+                if verbose:
+                    print(
+                        f"  ! {ov['id']} attempt {attempt}/{_MG_REVIEW_RETRIES} "
+                        f"failed (likely a transient proxy-server timeout), retrying"
+                    )
+        if not ok:
+            if verbose:
+                print(f"  x {ov['id']} gave up after {_MG_REVIEW_RETRIES} attempts — {last_err}")
+            tiles.append({**ov, "_still": None, "_preview": None, "_frame": frame, "_failed": True})
+            continue
         # Full-res PNG stays on disk for close inspection; the HTML gallery
         # embeds a downscaled JPEG so the whole page stays well under
         # Artifact's 16MB budget (25 full-res 1080p PNGs would be ~45MB).
@@ -930,12 +1121,41 @@ def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = Tr
             check=True,
             capture_output=True,
         )
-        tiles.append({**ov, "_still": still_path, "_preview": preview_path, "_frame": frame})
+        tiles.append(
+            {**ov, "_still": still_path, "_preview": preview_path, "_frame": frame, "_failed": False}
+        )
 
+    # Always (re)write the gallery, even on partial failure — an old
+    # review.html left untouched on disk after a crash is indistinguishable
+    # from a fresh one at a glance, and that exact confusion (reviewing a
+    # stale gallery while believing it reflects the current cover.json)
+    # already burned a review cycle once. A stamp of the current cover.json
+    # hash also lets `ae compose` warn if the MG plan changed since the
+    # last reviewed gallery.
     html_path = out_dir / "review.html"
     html_path.write_text(_build_mg_review_html(tiles), encoding="utf-8")
+    cover_path = episode / "edit" / "cover.json"
+    if cover_path.is_file():
+        (out_dir / ".cover_sha256").write_text(
+            hashlib.sha256(cover_path.read_bytes()).hexdigest(), encoding="utf-8"
+        )
+    failed = [t for t in tiles if t.get("_failed")]
+    ok_count = len(tiles) - len(failed)
     if verbose:
-        print(f"• mg-review → {html_path.relative_to(episode)} ({len(tiles)} overlays)")
+        print(
+            f"• mg-review → {html_path.relative_to(episode)} "
+            f"({ok_count}/{len(tiles)} overlays rendered"
+            + (f", {len(failed)} FAILED: {', '.join(t['id'] for t in failed)}" if failed else "")
+            + ")"
+        )
+    if failed:
+        raise RuntimeError(
+            f"{len(failed)}/{len(tiles)} overlay(s) failed to render after "
+            f"{_MG_REVIEW_RETRIES} attempts each: {', '.join(t['id'] for t in failed)}. "
+            f"Gallery at {html_path} still has all {len(tiles)} tiles — the {ok_count} that "
+            "succeeded plus a visible FAILED placeholder for the rest. Re-run `ae mg-review` "
+            "(it re-renders everything, but the retries usually clear a transient failure)."
+        )
     return html_path
 
 
@@ -945,10 +1165,24 @@ def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
 
     rows = []
     for t in tiles:
-        img_b64 = base64.b64encode(t["_preview"].read_bytes()).decode("ascii")
         kind = _html.escape(str(t.get("kind") or ""))
         oid = _html.escape(str(t.get("id") or ""))
         from_sec = float(t.get("fromSec") or 0.0)
+        if t.get("_failed"):
+            # Visible placeholder, not a silently-missing tile — a crashed
+            # render must never look the same as "nothing changed here".
+            rows.append(
+                f"""
+      <figure class="failed">
+        <div class="failbox">RENDER FAILED</div>
+        <figcaption>
+          <div class="meta"><span class="badge">{kind}</span><span class="id">{oid}</span></div>
+          <div class="t">t={from_sec:.2f}s · frame {t['_frame']}</div>
+        </figcaption>
+      </figure>"""
+            )
+            continue
+        img_b64 = base64.b64encode(t["_preview"].read_bytes()).decode("ascii")
         tone = t.get("tone")
         badges = f'<span class="badge">{kind}</span>'
         if tone:
@@ -970,15 +1204,28 @@ def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
       </figure>"""
         )
 
+    from datetime import datetime, timezone
+
+    n_failed = sum(1 for t in tiles if t.get("_failed"))
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    status_line = (
+        f"{len(tiles) - n_failed}/{len(tiles)} rendered · {n_failed} FAILED"
+        if n_failed
+        else f"{len(tiles)} overlays · all rendered"
+    )
     return f"""<!doctype html>
 <html><head><meta charset="utf-8" />
 <title>MG Review</title>
 <style>
   body {{ margin:0; background:#0c0c0b; color:#f5f4f1; font-family:-apple-system,'Segoe UI',sans-serif; padding:32px; }}
-  h1 {{ font-size:20px; font-weight:600; margin:0 0 24px; }}
+  h1 {{ font-size:20px; font-weight:600; margin:0 0 4px; }}
+  .status {{ font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#8f8c85; margin:0 0 24px; }}
+  .status.has-failures {{ color:#e0674b; }}
   .grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:20px; }}
   figure {{ margin:0; background:#141312; border:1px solid #333029; border-radius:8px; overflow:hidden; }}
+  figure.failed {{ border-color:#e0674b; }}
   figure img {{ display:block; width:100%; height:auto; }}
+  .failbox {{ aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; color:#e0674b; font-weight:700; letter-spacing:.08em; font-size:13px; background:repeating-linear-gradient(45deg,#1a1211,#1a1211 10px,#241715 10px,#241715 20px); }}
   figcaption {{ padding:10px 14px; font-size:12px; }}
   .meta {{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }}
   .badge {{ font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px; padding:2px 8px; border:1px solid #6b6860; color:#f5f4f1; }}
@@ -986,7 +1233,8 @@ def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
   .t {{ color:#8f8c85; }}
 </style>
 </head><body>
-  <h1>MG review — {len(tiles)} overlays</h1>
+  <h1>MG review</h1>
+  <div class="status{' has-failures' if n_failed else ''}">{status_line} · generated {generated_at}</div>
   <div class="grid">{''.join(rows)}
   </div>
 </body></html>
@@ -1015,7 +1263,7 @@ def render_draft(
         .get("fps", 30)
     )
     last_frame = max(0, int(round(limit_sec * fps)) - 1)
-    env = os.environ.copy()
+    env = _remotion_env()
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     accel = remotion_render_accel_args(nvenc=nvenc, gl=gl, verbose=verbose)
@@ -1032,7 +1280,10 @@ def render_draft(
         *accel,
     ]
     print(f"$ cd {kit} && {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    try:
+        subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    finally:
+        _clear_remotion_cache()
     return out
 
 

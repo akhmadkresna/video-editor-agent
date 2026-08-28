@@ -37,6 +37,9 @@ editing rules.
   warning is normal.
 - `ae compose` / `pnpm -r run build` download **Chrome Headless Shell** for Remotion on
   first render (cached under the Remotion cache). Expect a one-time download.
+- **Windows (G: house layout):** pnpm store lives at `G:/AI/caches/pnpm-store`
+  (see `scripts/setup-remotion-windows.ps1`). Remotion temp + browser binaries
+  default to `G:/AI/remotion-cache` via `REMOTION_SCRATCH_ROOT` in `ae compose`.
 - `whisper.cpp` is the macOS-only ASR path; on Linux the `auto` backend is always
   `faster-whisper`, so a missing `whisper.cpp`/`ggml-*.bin` is expected and fine.
 

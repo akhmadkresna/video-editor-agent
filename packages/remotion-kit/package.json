@@ -9,13 +9,13 @@
     "build": "remotion compositions src/index.ts"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.241",
+    "@remotion/cli": "4.0.506",
     "@remotion/google-fonts": "4.0.506",
-    "@remotion/media-utils": "^4.0.241",
+    "@remotion/media-utils": "4.0.506",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "remotion": "^4.0.241",
-    "zod": "^3.24.1"
+    "remotion": "4.0.506",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
