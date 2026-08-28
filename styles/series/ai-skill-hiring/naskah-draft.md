@@ -199,7 +199,7 @@ Melainkan:
 
 Ini yang menurut saya paling penting.
 
-Di banyak lowongan — termasuk role AI di Jobstreet — muncul:
+Di banyak lowongan — termasuk role marketing yang nyebut AI di Joblum — muncul:
 
 **"Kemampuan menjelaskan ke non-teknis."**
 
