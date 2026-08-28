@@ -233,6 +233,17 @@ def _remotion_cli(kit: Path) -> list[str]:
     return [_pnpm_cmd(), "exec", "remotion"]
 
 
+def _reset_ae_media_dir(public: Path) -> None:
+    """Clear staged media without deleting the root folder.
+
+    On Windows, ``shutil.rmtree(public)`` often fails with Access denied when
+    Remotion/webpack still has ``cam.mp4`` open. Wipe children in-place instead.
+    """
+    public.mkdir(parents=True, exist_ok=True)
+    for entry in list(public.iterdir()):
+        _wipe_dir(entry)
+
+
 def stage_sources_for_remotion(
     abs_sources: dict[str, str], *, verbose: bool = True
 ) -> dict[str, str]:
@@ -247,9 +258,7 @@ def stage_sources_for_remotion(
     See https://www.remotion.dev/docs/miscellaneous/absolute-paths
     """
     public = remotion_kit_dir() / "public" / "ae-media"
-    if public.exists():
-        shutil.rmtree(public)
-    public.mkdir(parents=True, exist_ok=True)
+    _reset_ae_media_dir(public)
 
     staged: dict[str, str] = {}
     for name, abs_path in abs_sources.items():
@@ -258,8 +267,14 @@ def stage_sources_for_remotion(
             raise FileNotFoundError(f"Source {name!r} missing: {src}")
         dest_name = f"{name}{src.suffix.lower()}"
         dest = public / dest_name
-        if dest.exists() or dest.is_symlink():
-            dest.unlink()
+        try:
+            if dest.exists() or dest.is_symlink():
+                dest.unlink()
+        except OSError:
+            # File may be locked by a lingering Remotion/webpack process — use
+            # a fresh name so staging can proceed without touching the open file.
+            dest = public / f"{name}.stage{src.suffix.lower()}"
+            dest_name = dest.name
         shutil.copy2(src, dest)
         if not dest.is_file():
             raise RuntimeError(f"Failed to stage source {name!r} into {dest}")
