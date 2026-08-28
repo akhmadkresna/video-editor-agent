@@ -133,7 +133,7 @@ def test_render_mg_stack_html_shows_overlay_content() -> None:
             }
         ]
     )
-    assert "MG on this clip" in html_out
+    assert "MG plan (text preview)" in html_out
     assert "92% pakai GenAI" in html_out
     assert "Microsoft WTI 2024" in html_out
     assert "mg-callout" in html_out
@@ -227,5 +227,5 @@ def test_generate_storyboard_writes_html_with_cut_gap(tmp_path: Path, monkeypatc
     assert "alpha" in page
     assert "beta" in page
     assert "breath=2" in page
-    assert "MG on this clip" in page
     assert "REAL DATA" in page
+    assert "MG feedback" in page or "MG plan" in page

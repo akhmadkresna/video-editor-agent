@@ -764,7 +764,13 @@ def cmd_qa(args: argparse.Namespace) -> int:
 
 def cmd_storyboard(args: argparse.Namespace) -> int:
     episode = resolve_episode(args.episode)
-    generate_storyboard(episode, open_browser=not args.no_open)
+    generate_storyboard(
+        episode,
+        open_browser=not args.no_open,
+        render_mg=bool(args.render_mg),
+        force_mg=bool(args.force_mg),
+        gl=args.gl,
+    )
     return 0
 
 
@@ -850,6 +856,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-open",
         action="store_true",
         help="Write HTML only; do not open the default browser",
+    )
+    sb.add_argument(
+        "--render-mg",
+        action="store_true",
+        help=(
+            "Render exact Remotion stills per MG overlay (via prepare_compose + "
+            "mg-review) and embed them on each clip card"
+        ),
+    )
+    sb.add_argument(
+        "--force-mg",
+        action="store_true",
+        help="Re-render MG stills even when edit/mg-review matches cover.json",
+    )
+    sb.add_argument(
+        "--gl",
+        choices=("angle", "egl", "swiftshader", "vulkan", "angle-egl"),
+        default=None,
+        help="Chrome GL backend for MG still renders (Windows: try angle)",
     )
     sb.set_defaults(func=cmd_storyboard)
 
@@ -1038,7 +1063,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     mgr = sub.add_parser(
         "mg-review",
-        help="Render a real still per glass MG overlay + a labeled HTML gallery for review",
+        help="Render a real still per MG overlay + evidence hold + labeled HTML gallery for review",
     )
     mgr.add_argument("episode", nargs="?", default=".")
     mgr.add_argument(

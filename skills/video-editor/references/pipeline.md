@@ -13,7 +13,8 @@ an **episode** folder (`project.yaml` + `raw/` + `edit/`); `.` = the episode.
 | `ae new <path>` | Scaffold an episode (only valid way to create the tree) | — | `project.yaml`, `raw/`, `edit/`, agent config |
 | `ae ingest .` | Probe + ASR (whisper.cpp on macOS, faster-whisper else) | `raw/cam.mp4` | `edit/takes_packed.md`, cached transcript |
 | `ae edl-suggest .` | Gap-class radio-edit proposal | transcript | `edit/edl.suggest.json` |
-| `ae storyboard .` | Visual HTML review of EDL plan (keep ranges + cut gaps + MG preview panels from `cover.json`) | `edit/edl.suggest.json` or `edit/edl.json` | `edit/storyboard/index.html` |
+| `ae storyboard .` | Visual HTML review of EDL + MG (text preview; add `--render-mg` for exact Remotion stills) | `edit/edl.json` + `edit/cover.json` | `edit/storyboard/index.html` |
+| `ae mg-review .` | Full MG gallery — one production Remotion still per overlay/evidence hold | after `ae cover .` | `edit/mg-review/review.html` |
 | `ae edl-suggest . --apply` | Promote proposal to runtime EDL (**after user confirm**) | `edit/edl.suggest.json` | `edit/edl.json` |
 | `ae cut .` | Render EDL → preview; enhances cam VO (DeepFilterNet) first; 30 ms fades | `edit/edl.json` | `edit/preview.mp4`, `edit/audio/cam.voice.wav` |
 | `ae cover-suggest .` | Propose `screen_with_cam` ranges from deixis + screen activity | transcript, `screen` source | `edit/cover.suggest.json` |

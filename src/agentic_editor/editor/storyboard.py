@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from agentic_editor.asr.ingest import ffprobe_summary
+from agentic_editor.cover.remap import collect_overlay_defs
 from agentic_editor.cover.suggest import load_cam_words
 from agentic_editor.editor.qa import extract_frame
 from agentic_editor.project import load_project, resolve_source
@@ -158,6 +159,14 @@ def cover_badges_for_range(
     return badges
 
 
+def _overlay_id_lookup(cover: dict[str, Any] | None) -> dict[tuple[str, float, float], str]:
+    lookup: dict[tuple[str, float, float], str] = {}
+    for ov in collect_overlay_defs(cover):
+        key = (str(ov["kind"]), float(ov["start"]), float(ov["end"]))
+        lookup[key] = str(ov["id"])
+    return lookup
+
+
 def cover_mg_items_for_range(
     cover: dict[str, Any] | None,
     start: float,
@@ -166,6 +175,7 @@ def cover_mg_items_for_range(
     """MG creatives (overlays + evidence stills) overlapping a keep range."""
     if not cover:
         return []
+    id_lookup = _overlay_id_lookup(cover)
     items: list[dict[str, Any]] = []
     for overlay in cover.get("overlays") or []:
         if not isinstance(overlay, dict):
@@ -173,7 +183,14 @@ def cover_mg_items_for_range(
         os, oe = float(overlay.get("start", 0)), float(overlay.get("end", 0))
         if not _interval_overlaps(start, end, os, oe):
             continue
-        items.append({"category": "overlay", **overlay})
+        kind = str(overlay.get("kind") or "overlay")
+        item = {"category": "overlay", **overlay}
+        item["id"] = str(
+            overlay.get("id")
+            or id_lookup.get((kind, os, oe))
+            or f"ov-{kind}-?"
+        )
+        items.append(item)
     for event in cover.get("events") or []:
         if not isinstance(event, dict):
             continue
@@ -183,7 +200,15 @@ def cover_mg_items_for_range(
         es, ee = float(event.get("start", 0)), float(event.get("end", 0))
         if not _interval_overlaps(start, end, es, ee):
             continue
-        items.append({"category": "evidence", **event})
+        src = str(event.get("src") or "").strip()
+        stem = Path(src).stem or "evidence"
+        items.append(
+            {
+                "category": "evidence",
+                "id": f"ev-{stem}",
+                **event,
+            }
+        )
     items.sort(
         key=lambda it: (
             float(it.get("start") or 0),
@@ -340,18 +365,55 @@ def render_mg_stack_html(
     items: list[dict[str, Any]],
     *,
     episode: Path | None = None,
+    still_index: dict[str, Path] | None = None,
+    dashboard: Path | None = None,
+    render_mode: str = "mock",
 ) -> str:
     if not items:
         return ""
     panels: list[str] = []
     for item in items:
-        if item.get("category") == "evidence" and episode is not None:
+        tile_id = str(item.get("id") or "")
+        preview_rel: str | None = None
+        if still_index and tile_id and dashboard is not None:
+            preview = still_index.get(tile_id)
+            if preview is not None and preview.is_file():
+                preview_rel = preview.relative_to(dashboard).as_posix()
+
+        if preview_rel and render_mode == "remotion":
+            kind = html.escape(
+                str(item.get("kind") or item.get("type") or item.get("category") or "mg")
+            )
+            timing = (
+                f'{float(item.get("start", 0)):.1f}s–{float(item.get("end", 0)):.1f}s'
+            )
+            note = html.escape(str(item.get("note") or "").strip())
+            note_html = f'<div class="mg-note">{note}</div>' if note else ""
+            panels.append(
+                f'<div class="mg-panel mg-render mg-{kind}">'
+                f'<div class="mg-head"><span class="mg-kind">{kind}</span>'
+                f'<span class="mg-time">{timing}</span>'
+                f'<span class="mg-render-badge">Remotion</span></div>'
+                f'<img class="mg-render-still" src="{html.escape(preview_rel)}" alt="">'
+                f"{note_html}"
+                "</div>"
+            )
+        elif item.get("category") == "evidence" and episode is not None:
             panels.append(_render_mg_evidence_panel(episode, item))
         elif item.get("category") == "overlay":
             panels.append(_render_mg_overlay_panel(item))
     if not panels:
         return ""
-    return f'<div class="mg-stack"><div class="mg-stack-label">MG on this clip</div>{"".join(panels)}</div>'
+    label = (
+        "MG render (Remotion still)"
+        if render_mode == "remotion"
+        else "MG plan (text preview)"
+    )
+    return (
+        f'<div class="mg-stack mg-mode-{html.escape(render_mode)}">'
+        f'<div class="mg-stack-label">{label}</div>'
+        f'{"".join(panels)}</div>'
+    )
 
 
 def _cover_badges_html(badges: list[dict[str, str]]) -> str:
@@ -462,6 +524,8 @@ def _build_cards(
     dashboard: Path,
     words: list[dict[str, Any]],
     cover: dict[str, Any] | None,
+    still_index: dict[str, Path] | None = None,
+    mg_render_mode: str = "mock",
 ) -> tuple[str, set[Path]]:
     cards: list[str] = []
     used_assets: set[Path] = set()
@@ -503,7 +567,13 @@ def _build_cards(
         speech = speech_for_range(words, start, end)
         badges = cover_badges_for_range(cover, start, end)
         mg_items = cover_mg_items_for_range(cover, start, end)
-        mg_stack = render_mg_stack_html(mg_items, episode=episode)
+        mg_stack = render_mg_stack_html(
+            mg_items,
+            episode=episode,
+            still_index=still_index,
+            dashboard=dashboard,
+            render_mode=mg_render_mode,
+        )
         note = str(rng.get("note") or "speech")
 
         cards.append(
@@ -527,13 +597,77 @@ def _build_cards(
     return grid, used_assets
 
 
-def generate_storyboard(episode: Path, *, open_browser: bool = True) -> Path:
+def _mg_review_banner_html(
+    *,
+    render_mg: bool,
+    mg_render_mode: str,
+    still_count: int,
+    episode: Path,
+) -> str:
+    review_html = episode / "edit" / "mg-review" / "review.html"
+    if mg_render_mode == "remotion" and still_count:
+        return (
+            f'<p class="mg-banner mg-banner-ok"><strong>MG renders:</strong> '
+            f"{still_count} Remotion still(s) embedded — exact Open Overlay v7 on A-roll. "
+            f'Full gallery: <a href="../mg-review/review.html">edit/mg-review/review.html</a></p>'
+        )
+    if render_mg:
+        return (
+            '<p class="mg-banner mg-banner-warn"><strong>MG renders:</strong> '
+            "Remotion still export failed or was skipped — showing text previews only. "
+            "Re-run with <code>ae storyboard . --render-mg --force-mg</code></p>"
+        )
+    if review_html.is_file():
+        return (
+            '<p class="mg-banner"><strong>MG renders:</strong> cached gallery at '
+            '<a href="../mg-review/review.html">edit/mg-review/review.html</a> '
+            "(may be stale). Refresh with <code>ae storyboard . --render-mg</code></p>"
+        )
+    return (
+        '<p class="mg-banner"><strong>MG feedback:</strong> run '
+        "<code>ae storyboard . --render-mg</code> for exact Remotion stills on each clip, "
+        "or <code>ae mg-review .</code> for the full overlay gallery</p>"
+    )
+
+
+def generate_storyboard(
+    episode: Path,
+    *,
+    open_browser: bool = True,
+    render_mg: bool = False,
+    force_mg: bool = False,
+    gl: str | None = None,
+) -> Path:
     edl_path, edl = _resolve_edl_path(episode)
     cfg = load_project(episode)
     edit = episode / "edit"
     cover = _resolve_cover(episode)
     words = load_cam_words(edit)
     meta = edl.get("_meta") if isinstance(edl.get("_meta"), dict) else {}
+
+    still_index: dict[str, Path] = {}
+    mg_render_mode = "mock"
+    if render_mg and cover:
+        try:
+            from agentic_editor.compose import ensure_mg_review_stills
+
+            still_index = ensure_mg_review_stills(
+                episode, force=force_mg, gl=gl, verbose=True
+            )
+            if still_index:
+                mg_render_mode = "remotion"
+        except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
+            print(f"! MG still render failed — falling back to text previews: {exc}")
+    elif cover and (episode / "edit" / "mg-review" / "stills").is_dir():
+        from agentic_editor.compose import load_mg_review_preview_index
+
+        cached = load_mg_review_preview_index(episode)
+        if cached:
+            from agentic_editor.compose import mg_review_stills_fresh
+
+            if mg_review_stills_fresh(episode):
+                still_index = cached
+                mg_render_mode = "remotion"
 
     dashboard = edit / "storyboard"
     dashboard.mkdir(parents=True, exist_ok=True)
@@ -543,6 +677,8 @@ def generate_storyboard(episode: Path, *, open_browser: bool = True) -> Path:
         dashboard=dashboard,
         words=words,
         cover=cover,
+        still_index=still_index or None,
+        mg_render_mode=mg_render_mode,
     )
 
     assets = dashboard / "assets"
@@ -620,6 +756,16 @@ color:#94a3b8;margin-bottom:4px}}
 background:#080a0d;aspect-ratio:16/9;object-fit:cover}}
 .mg-evidence-missing{{margin-top:6px;padding:16px;text-align:center;font:12px ui-monospace;
 color:#64748b;background:#080a0d;border:1px dashed #334155;border-radius:4px}}
+.mg-render-still{{display:block;width:100%;margin-top:6px;border-radius:4px;border:1px solid #293242;
+aspect-ratio:16/9;object-fit:cover;background:#080a0d}}
+.mg-render-badge{{font-size:10px;font-weight:700;text-transform:uppercase;color:#6ee7b7;
+letter-spacing:.06em}}
+.mg-mode-remotion .mg-panel{{border-left-color:#6ee7b7}}
+.mg-banner{{margin-top:10px;padding:10px 12px;border-radius:8px;background:#101826;
+border:1px solid #293242;font-size:14px}}
+.mg-banner a{{color:#7dd3fc}}
+.mg-banner-ok{{border-color:#065f46;background:#0f1f1a}}
+.mg-banner-warn{{border-color:#92400e;background:#1f1710;color:#fcd34d}}
 .cut-gap{{display:flex;align-items:center;gap:10px;grid-column:1/-1;margin:4px 0;
 padding:10px 16px;border:1px dashed #7c3a2a;border-radius:8px;background:#1c1210;color:#fca5a5}}
 .cut-gap-label{{font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.06em}}
@@ -635,9 +781,16 @@ border:1px solid #293242;font-size:14px}}
 · Plan <code>{html.escape(plan_label)}</code> <code>{digest}</code></div>
 {_meta_stats_html(meta)}
 {_cover_summary_html(cover)}
+{_mg_review_banner_html(
+    render_mg=render_mg,
+    mg_render_mode=mg_render_mode,
+    still_count=len(still_index),
+    episode=episode,
+)}
 <div class="next-steps">After reviewing:
 <code>ae edl-suggest . --apply</code> → <code>ae cut .</code> →
-<code>ae cover-suggest .</code> / <code>ae compose . --studio</code></div>
+<code>ae cover .</code> → <code>ae storyboard . --render-mg</code> /
+<code>ae compose . --studio</code></div>
 </header>
 <main>{cards_html}</main></body></html>"""
 

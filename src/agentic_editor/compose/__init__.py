@@ -1003,8 +1003,7 @@ def render_compose(
     return out
 
 
-#: "glass" house-style kinds (see packages/remotion-kit/src/components/glass/
-#: GlassOverlays.tsx) — kept in sync with cover/remap.py's _GLASS_OVERLAY_KINDS.
+#: All A-roll MG kinds — glass (GlassOverlays.tsx) + legacy rail (OverlayLayer).
 _MG_REVIEW_KINDS = (
     "title",
     "stat",
@@ -1014,6 +1013,11 @@ _MG_REVIEW_KINDS = (
     "quote",
     "code",
     "illustration",
+    "callout",
+    "chapter",
+    "emphasis",
+    "diagram",
+    "chip",
 )
 
 #: Seconds into an overlay's fromSec where its entrance motion has settled —
@@ -1028,25 +1032,189 @@ _MG_REVIEW_SETTLE_DEFAULT = 0.6
 _MG_REVIEW_RETRIES = 3
 
 
-def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = True) -> Path:
-    """Render a real Remotion still per glass MG overlay + a labeled HTML
-    gallery, so the a-roll MG plan (cover.json) can be handed off for visual
-    review without hand-maintaining a second copy of the glass CSS. Each
-    still is the actual production frame (cam + evidence + MG together) —
-    zero drift, since it's the same renderer/components as the final video.
-    """
+def cover_json_sha256(episode: Path) -> str | None:
+    cover_path = episode / "edit" / "cover.json"
+    if not cover_path.is_file():
+        return None
+    return hashlib.sha256(cover_path.read_bytes()).hexdigest()
+
+
+def mg_review_stills_fresh(episode: Path) -> bool:
+    """True when mg-review stills match the current cover.json."""
+    digest = cover_json_sha256(episode)
+    if digest is None:
+        return False
+    stamp_path = episode / "edit" / "mg-review" / ".cover_sha256"
+    stills_dir = episode / "edit" / "mg-review" / "stills"
+    if not stamp_path.is_file() or stamp_path.read_text(encoding="utf-8").strip() != digest:
+        return False
+    return any(stills_dir.glob("*.preview.jpg"))
+
+
+def load_mg_review_preview_index(episode: Path) -> dict[str, Path]:
+    """Map tile id → downscaled preview JPEG (empty when none rendered)."""
+    stills_dir = episode / "edit" / "mg-review" / "stills"
+    if not stills_dir.is_dir():
+        return {}
+    out: dict[str, Path] = {}
+    for preview in stills_dir.glob("*.preview.jpg"):
+        out[preview.name[: -len(".preview.jpg")]] = preview
+    return out
+
+
+def _mg_review_settle_frame(
+    *,
+    kind: str,
+    from_sec: float,
+    exit_start: Any,
+    fps: int,
+) -> int:
+    settle = _MG_REVIEW_SETTLE_SEC.get(kind, _MG_REVIEW_SETTLE_DEFAULT)
+    if isinstance(exit_start, (int, float)):
+        settle = min(settle, max(0.05, float(exit_start) - 0.1))
+    return max(0, round((from_sec + settle) * fps))
+
+
+def _render_remotion_still_tile(
+    *,
+    kit: Path,
+    props_path: Path,
+    env: dict[str, str],
+    gl_args: list[str],
+    tile_id: str,
+    frame: int,
+    still_path: Path,
+    preview_path: Path,
+    verbose: bool,
+) -> tuple[Path | None, Path | None, bool]:
+    cmd = [
+        *_remotion_cli(kit),
+        "still",
+        "src/index.ts",
+        "AgenticTimeline",
+        str(still_path),
+        "--props",
+        str(props_path),
+        f"--frame={frame}",
+        *gl_args,
+    ]
+    if verbose:
+        print(f"$ cd {kit} && {' '.join(cmd)}")
+    last_err: subprocess.CalledProcessError | None = None
+    for attempt in range(1, _MG_REVIEW_RETRIES + 1):
+        try:
+            try:
+                subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+            finally:
+                _clear_remotion_cache()
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(still_path),
+                    "-vf",
+                    "scale=960:-1",
+                    "-q:v",
+                    "5",
+                    str(preview_path),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            return still_path, preview_path, False
+        except subprocess.CalledProcessError as exc:
+            last_err = exc
+            if verbose:
+                print(
+                    f"  ! {tile_id} attempt {attempt}/{_MG_REVIEW_RETRIES} "
+                    f"failed (likely a transient proxy-server timeout), retrying"
+                )
+    if verbose:
+        print(f"  x {tile_id} gave up after {_MG_REVIEW_RETRIES} attempts — {last_err}")
+    return None, None, True
+
+
+def _evidence_review_specs(
+    cover: dict[str, Any] | None,
+    edl: dict[str, Any],
+    *,
+    fps: int,
+) -> list[dict[str, Any]]:
+    from agentic_editor.cover.remap import remap_source_window
+
+    if not cover:
+        return []
+    specs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for ev in cover.get("events") or []:
+        if not isinstance(ev, dict):
+            continue
+        if str(ev.get("type") or "").lower() != "evidence_with_cam":
+            continue
+        src = str(ev.get("src") or "").strip()
+        stem = Path(src).stem or "evidence"
+        eid = f"ev-{stem}"
+        if eid in seen:
+            continue
+        seen.add(eid)
+        try:
+            start = float(ev["start"])
+            end = float(ev["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end <= start:
+            continue
+        mid = (start + end) / 2.0
+        slices = remap_source_window(edl, mid, mid + 0.05)
+        if not slices:
+            continue
+        from_sec = float(slices[0]["fromSec"])
+        frame = max(0, round((from_sec + 0.8) * fps))
+        specs.append(
+            {
+                "id": eid,
+                "kind": "evidence",
+                "fromSec": from_sec,
+                "src": src,
+                "note": str(ev.get("note") or "").strip(),
+                "_frame": frame,
+            }
+        )
+    return specs
+
+
+def render_mg_review_tiles(
+    episode: Path,
+    *,
+    gl: str | None = None,
+    verbose: bool = True,
+) -> list[dict[str, Any]]:
+    """Render production Remotion stills for every MG overlay + evidence hold."""
     prepare_compose(episode, verbose=verbose)
     kit = remotion_kit_dir()
     props_path = episode / "edit" / "remotion-props.json"
     timeline = json.loads(props_path.read_text(encoding="utf-8"))["timeline"]
     fps = int(timeline.get("fps") or 30)
+    cover_path = episode / "edit" / "cover.json"
+    cover: dict[str, Any] | None = None
+    if cover_path.is_file():
+        cover = json.loads(cover_path.read_text(encoding="utf-8"))
+    edl_path = episode / "edit" / "edl.json"
+    edl: dict[str, Any] = {}
+    if edl_path.is_file():
+        edl = json.loads(edl_path.read_text(encoding="utf-8"))
+
     overlays = [
         ov
         for ov in (timeline.get("overlays") or [])
         if isinstance(ov, dict) and ov.get("kind") in _MG_REVIEW_KINDS
     ]
-    if not overlays:
-        raise RuntimeError("No glass MG overlays found in cover.json — nothing to review")
+    evidence_specs = _evidence_review_specs(cover, edl, fps=fps)
+    if not overlays and not evidence_specs:
+        raise RuntimeError(
+            "No MG overlays or evidence holds found in cover.json — nothing to review"
+        )
 
     out_dir = episode / "edit" / "mg-review"
     stills_dir = out_dir / "stills"
@@ -1058,105 +1226,92 @@ def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = Tr
     gl_args = ["--gl", str(gl)] if gl else []
 
     tiles: list[dict[str, Any]] = []
+    render_queue: list[dict[str, Any]] = []
     for ov in overlays:
         kind = str(ov["kind"])
         from_sec = float(ov.get("fromSec") or 0.0)
-        exit_start = ov.get("exitStartSec")
-        settle = _MG_REVIEW_SETTLE_SEC.get(kind, _MG_REVIEW_SETTLE_DEFAULT)
-        if isinstance(exit_start, (int, float)):
-            settle = min(settle, max(0.05, float(exit_start) - 0.1))
-        frame = max(0, round((from_sec + settle) * fps))
-        still_path = stills_dir / f"{ov['id']}.png"
-        cmd = [
-            *_remotion_cli(kit),
-            "still",
-            "src/index.ts",
-            "AgenticTimeline",
-            str(still_path),
-            "--props",
-            str(props_path),
-            f"--frame={frame}",
-            *gl_args,
-        ]
-        if verbose:
-            print(f"$ cd {kit} && {' '.join(cmd)}")
-        # `still` cold-starts its own dev/proxy server per invocation; the
-        # first video-frame fetch occasionally stalls past the delay-render
-        # timeout while that server warms up (seen in production: flaky
-        # "Fetching .../proxy" TimeoutError that succeeds on a bare retry).
-        # Retry a couple of times before giving up on this one tile.
-        last_err: subprocess.CalledProcessError | None = None
-        ok = False
-        for attempt in range(1, _MG_REVIEW_RETRIES + 1):
-            try:
-                try:
-                    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
-                finally:
-                    _clear_remotion_cache()
-                ok = True
-                break
-            except subprocess.CalledProcessError as exc:
-                last_err = exc
-                if verbose:
-                    print(
-                        f"  ! {ov['id']} attempt {attempt}/{_MG_REVIEW_RETRIES} "
-                        f"failed (likely a transient proxy-server timeout), retrying"
-                    )
-        if not ok:
-            if verbose:
-                print(f"  x {ov['id']} gave up after {_MG_REVIEW_RETRIES} attempts — {last_err}")
-            tiles.append({**ov, "_still": None, "_preview": None, "_frame": frame, "_failed": True})
-            continue
-        # Full-res PNG stays on disk for close inspection; the HTML gallery
-        # embeds a downscaled JPEG so the whole page stays well under
-        # Artifact's 16MB budget (25 full-res 1080p PNGs would be ~45MB).
-        preview_path = stills_dir / f"{ov['id']}.preview.jpg"
-        subprocess.run(
-            [
-                "ffmpeg", "-y", "-i", str(still_path),
-                "-vf", "scale=960:-1",
-                "-q:v", "5",
-                str(preview_path),
-            ],
-            check=True,
-            capture_output=True,
+        frame = _mg_review_settle_frame(
+            kind=kind,
+            from_sec=from_sec,
+            exit_start=ov.get("exitStartSec"),
+            fps=fps,
         )
+        render_queue.append({**ov, "_frame": frame, "_tile_kind": kind})
+    for spec in evidence_specs:
+        render_queue.append(spec)
+
+    for item in render_queue:
+        tile_id = str(item["id"])
+        frame = int(item["_frame"])
+        kind = str(item.get("_tile_kind") or item.get("kind") or "mg")
+        still_path = stills_dir / f"{tile_id}.png"
+        preview_path = stills_dir / f"{tile_id}.preview.jpg"
+        still, preview, failed = _render_remotion_still_tile(
+            kit=kit,
+            props_path=props_path,
+            env=env,
+            gl_args=gl_args,
+            tile_id=tile_id,
+            frame=frame,
+            still_path=still_path,
+            preview_path=preview_path,
+            verbose=verbose,
+        )
+        if failed:
+            tiles.append({**item, "_still": None, "_preview": None, "_failed": True})
+            continue
         tiles.append(
-            {**ov, "_still": still_path, "_preview": preview_path, "_frame": frame, "_failed": False}
+            {
+                **item,
+                "_still": still,
+                "_preview": preview,
+                "_failed": False,
+            }
         )
 
-    # Always (re)write the gallery, even on partial failure — an old
-    # review.html left untouched on disk after a crash is indistinguishable
-    # from a fresh one at a glance, and that exact confusion (reviewing a
-    # stale gallery while believing it reflects the current cover.json)
-    # already burned a review cycle once. A stamp of the current cover.json
-    # hash also lets `ae compose` warn if the MG plan changed since the
-    # last reviewed gallery.
     html_path = out_dir / "review.html"
     html_path.write_text(_build_mg_review_html(tiles), encoding="utf-8")
-    cover_path = episode / "edit" / "cover.json"
-    if cover_path.is_file():
-        (out_dir / ".cover_sha256").write_text(
-            hashlib.sha256(cover_path.read_bytes()).hexdigest(), encoding="utf-8"
-        )
+    digest = cover_json_sha256(episode)
+    if digest is not None:
+        (out_dir / ".cover_sha256").write_text(digest, encoding="utf-8")
+
     failed = [t for t in tiles if t.get("_failed")]
     ok_count = len(tiles) - len(failed)
     if verbose:
         print(
             f"• mg-review → {html_path.relative_to(episode)} "
-            f"({ok_count}/{len(tiles)} overlays rendered"
+            f"({ok_count}/{len(tiles)} tiles rendered"
             + (f", {len(failed)} FAILED: {', '.join(t['id'] for t in failed)}" if failed else "")
             + ")"
         )
     if failed:
         raise RuntimeError(
-            f"{len(failed)}/{len(tiles)} overlay(s) failed to render after "
+            f"{len(failed)}/{len(tiles)} tile(s) failed to render after "
             f"{_MG_REVIEW_RETRIES} attempts each: {', '.join(t['id'] for t in failed)}. "
             f"Gallery at {html_path} still has all {len(tiles)} tiles — the {ok_count} that "
             "succeeded plus a visible FAILED placeholder for the rest. Re-run `ae mg-review` "
             "(it re-renders everything, but the retries usually clear a transient failure)."
         )
-    return html_path
+    return tiles
+
+
+def ensure_mg_review_stills(
+    episode: Path,
+    *,
+    force: bool = False,
+    gl: str | None = None,
+    verbose: bool = True,
+) -> dict[str, Path]:
+    """Ensure Remotion MG stills exist; return id → preview path index."""
+    if force or not mg_review_stills_fresh(episode):
+        render_mg_review_tiles(episode, gl=gl, verbose=verbose)
+    return load_mg_review_preview_index(episode)
+
+
+def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = True) -> Path:
+    """Render a real Remotion still per MG overlay + evidence hold + HTML gallery."""
+    render_mg_review_tiles(episode, gl=gl, verbose=verbose)
+    return episode / "edit" / "mg-review" / "review.html"
 
 
 def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
