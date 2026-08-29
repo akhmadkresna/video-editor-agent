@@ -1,9 +1,9 @@
 import React from "react";
+import { Video } from "@remotion/media";
 import {
   AbsoluteFill,
   Easing,
   Img,
-  OffthreadVideo,
   interpolate,
   staticFile,
   useCurrentFrame,
@@ -17,6 +17,42 @@ import type {
 } from "../types";
 import { DEFAULT_SCREEN_EXPLAINER } from "../types";
 import { isLetterboxPresentation, letterboxBand } from "../letterbox";
+
+type ObjectFit = "contain" | "cover" | "fill" | "none" | "scale-down";
+
+/**
+ * Prefer @remotion/media Video over OffthreadVideo.
+ * OffthreadVideo extracts frames via blob: URLs; on long Windows renders of
+ * multi-GB mezzanines Chrome eventually hits net::ERR_UPLOAD_FILE_CHANGED.
+ */
+function TimelineVideo({
+  src,
+  startFrom,
+  volume,
+  style,
+  objectFit = "cover",
+}: {
+  src: string;
+  startFrom: number;
+  volume: number;
+  style?: React.CSSProperties;
+  objectFit?: ObjectFit;
+}) {
+  const { objectFit: _ignored, ...restStyle } = style ?? {};
+  return (
+    <Video
+      src={src}
+      trimBefore={startFrom}
+      volume={volume}
+      muted={volume === 0}
+      objectFit={objectFit}
+      style={restStyle}
+      delayRenderTimeoutInMilliseconds={120_000}
+      delayRenderRetries={3}
+      disallowFallbackToOffthreadVideo
+    />
+  );
+}
 
 type Props = {
   src: string;
@@ -71,6 +107,34 @@ function resolveSrc(src: string): string {
   return staticFile(src);
 }
 
+//: Documentary/interview convention for a push-in is ~100%->115% over
+//: 10+ seconds (~1.5%/sec), eased (Sine/Quad accelerate-then-settle),
+//: not linear — see the research note above useMotionScale for sources.
+//: Scale the target zoom with duration instead of a fixed amount so a
+//: 5s hold and a 30s hold both read at roughly the same *rate*, capped
+//: at the ~15% ceiling documentaries converge on.
+const DRIFT_RATE_PER_SEC = 0.015;
+const DRIFT_MIN_PCT = 0.05;
+const DRIFT_MAX_PCT = 0.15;
+
+function driftTargetPct(durationSec: number): number {
+  return Math.min(
+    DRIFT_MAX_PCT,
+    Math.max(DRIFT_MIN_PCT, durationSec * DRIFT_RATE_PER_SEC),
+  );
+}
+
+/** motion="drift"/"pull_back" easing + rate follow documentary interview
+ * convention, not an arbitrary choice — see:
+ * https://photography.tutsplus.com/tutorials/documentary-in-motion-interview-movement--cms-28295
+ * "a cinematic push typically uses keyframes ten seconds or more apart
+ * with a modest scale change, something like 100% to 115%... A gentle
+ * curve from the Sine or Quad family... accelerates and settles instead
+ * of starting and stopping abruptly." Ken Burns push-ins are near-
+ * universal on interview/talking-head shots (PBS Frontline uses one on
+ * every interview shot); pull-back is the opposite move, used
+ * deliberately as a reveal (start tight, pull back to expose context)
+ * rather than a routine alternate-every-other-shot default. */
 function useMotionScale(
   baseScale: number,
   motion: FramingMotion,
@@ -86,11 +150,20 @@ function useMotionScale(
   }
 
   if (motion === "drift") {
-    const end = baseScale * 1.035;
+    const end = baseScale * (1 + driftTargetPct(durationSec));
     return interpolate(t, [0, Math.max(0.05, durationSec)], [baseScale, end], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
-      easing: Easing.linear,
+      easing: Easing.inOut(Easing.sin),
+    });
+  }
+
+  if (motion === "pull_back") {
+    const start = baseScale * (1 + driftTargetPct(durationSec));
+    return interpolate(t, [0, Math.max(0.05, durationSec)], [start, baseScale], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.inOut(Easing.sin),
     });
   }
 
@@ -144,11 +217,12 @@ function CroppedVideo({
       return <Img src={src} style={mediaStyle} />;
     }
     return (
-      <OffthreadVideo
+      <TimelineVideo
         src={src}
         startFrom={startFrom}
         volume={volume}
         style={mediaStyle}
+        objectFit={(objectFit as ObjectFit) || "cover"}
       />
     );
   }
@@ -165,7 +239,6 @@ function CroppedVideo({
     height: `${heightPct}%`,
     left: `${leftPct}%`,
     top: `${topPct}%`,
-    objectFit: "fill",
     transform: `scale(${liveScale})`,
     transformOrigin,
   };
@@ -173,13 +246,14 @@ function CroppedVideo({
   return (
     <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative" }}>
       {isImageSrc(src) ? (
-        <Img src={src} style={cropStyle} />
+        <Img src={src} style={{ ...cropStyle, objectFit: "fill" }} />
       ) : (
-        <OffthreadVideo
+        <TimelineVideo
           src={src}
           startFrom={startFrom}
           volume={volume}
           style={cropStyle}
+          objectFit="fill"
         />
       )}
     </div>
@@ -277,14 +351,14 @@ export const SourceClip: React.FC<Props> = ({
             background: "#0a0a0a",
           }}
         >
-          <OffthreadVideo
+          <TimelineVideo
             src={resolvedSrc}
             startFrom={startFrom}
             volume={vol}
+            objectFit="cover"
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
               objectPosition: pipCfg.objectPosition ?? "center 28%",
               transform: `scale(${liveScale})`,
               transformOrigin: "center center",
@@ -383,14 +457,14 @@ export const SourceClip: React.FC<Props> = ({
   // full cam / edge-to-edge
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      <OffthreadVideo
+      <TimelineVideo
         src={resolvedSrc}
         startFrom={startFrom}
         volume={vol}
+        objectFit="cover"
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
           transform: `scale(${liveScale})`,
           transformOrigin: "center 42%",
         }}
