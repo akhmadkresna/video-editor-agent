@@ -695,7 +695,9 @@ def cmd_compose(args: argparse.Namespace) -> int:
         return 0
     out = render_compose(
         episode,
-        output=Path(args.output) if args.output else None,
+        output=(episode / args.output).resolve()
+        if args.output and not Path(args.output).is_absolute()
+        else (Path(args.output).resolve() if args.output else None),
         nvenc=bool(args.nvenc),
         gl=args.gl,
         concurrency=(
@@ -1069,8 +1071,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Remotion frame workers (default: 1 on Windows, 4 elsewhere). "
-            "Lower further if OffthreadVideo/Img hits ERR_UPLOAD_FILE_CHANGED."
+            "Remotion frame workers (default 4)."
         ),
     )
     com.set_defaults(func=cmd_compose)

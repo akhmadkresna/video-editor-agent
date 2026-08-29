@@ -1012,18 +1012,15 @@ def render_compose(
     kit = remotion_kit_dir()
     props = episode / "edit" / "remotion-props.json"
     out = output or (episode / "edit" / "final.mp4")
+    if not out.is_absolute():
+        out = (episode / out).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     env = _remotion_env()
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     accel = remotion_render_accel_args(nvenc=nvenc, gl=gl)
-    # Evidence stills + OffthreadVideo cam PIP can hit Chrome
-    # ERR_UPLOAD_FILE_CHANGED under high Windows concurrency when Remotion
-    # fetches frame blobs. Default to 1 on Windows; 4 elsewhere.
-    if concurrency is not None:
-        conc = concurrency
-    else:
-        conc = 1 if os.name == "nt" else 4
+    # Default workers. Prefer modest concurrency; raise via --concurrency.
+    conc = concurrency if concurrency is not None else 4
     cmd = [
         *_remotion_cli(kit),
         "render",
