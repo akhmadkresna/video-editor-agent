@@ -1069,8 +1069,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Remotion frame workers (default 4). Lower if Img/evidence hits "
-            "ERR_UPLOAD_FILE_CHANGED on Windows."
+            "Remotion frame workers (default: 1 on Windows, 4 elsewhere). "
+            "Lower further if OffthreadVideo/Img hits ERR_UPLOAD_FILE_CHANGED."
         ),
     )
     com.set_defaults(func=cmd_compose)

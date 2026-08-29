@@ -1017,9 +1017,13 @@ def render_compose(
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     accel = remotion_render_accel_args(nvenc=nvenc, gl=gl)
-    # Evidence stills (Img + staticFile) can hit Chrome ERR_UPLOAD_FILE_CHANGED
-    # under high Windows concurrency — keep a modest default when unset.
-    conc = concurrency if concurrency is not None else 4
+    # Evidence stills + OffthreadVideo cam PIP can hit Chrome
+    # ERR_UPLOAD_FILE_CHANGED under high Windows concurrency when Remotion
+    # fetches frame blobs. Default to 1 on Windows; 4 elsewhere.
+    if concurrency is not None:
+        conc = concurrency
+    else:
+        conc = 1 if os.name == "nt" else 4
     cmd = [
         *_remotion_cli(kit),
         "render",
