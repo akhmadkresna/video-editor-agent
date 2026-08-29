@@ -62,7 +62,7 @@ MODEL_MAP = {
 
 
 def mapped_model(tier: str, backend: BackendName) -> str:
-    tier = (tier or "small").lower()
+    tier = (tier or "large").lower()
     if tier not in MODEL_MAP:
         # allow raw model names
         return tier

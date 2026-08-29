@@ -95,7 +95,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         bins = list(models.glob("ggml-*.bin"))
         print(f"models/: {len(bins)} ggml file(s) in {models}")
     else:
-        print(f"models/: (create {models} and download ggml-small.bin for whisper.cpp)")
+        print(f"models/: (create {models} and download ggml-large-v3.bin for whisper.cpp)")
 
     kit = home / "packages" / "remotion-kit" / "package.json"
     print(f"remotion-kit: {'OK' if kit.is_file() else 'MISSING'}")
@@ -114,7 +114,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
 
     print("\nInstall tips:")
     print("  Mac:     brew install whisper-cpp ffmpeg")
-    print("           download ggml-small.bin into $AGENTIC_EDITOR_HOME/models/")
+    print("           download ggml-large-v3.bin into $AGENTIC_EDITOR_HOME/models/")
     print("  Windows: uv sync  (faster-whisper); install CUDA ctranslate2 if GPU")
     print("  Both:    export AGENTIC_EDITOR_HOME=" + str(home))
     print("           ln -s \"$AGENTIC_EDITOR_HOME/skills/agentic-editor\" ~/.cursor/skills/agentic-editor")
@@ -159,7 +159,7 @@ sources:
 style: tutorial
 asr:
   backend: auto
-  model: small
+  model: large
   language: id
 fps: 30
 aspect: "16:9"

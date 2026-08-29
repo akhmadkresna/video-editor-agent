@@ -32,8 +32,9 @@ editing rules.
 
 ### First-run network downloads (cached afterward)
 - `ae ingest` uses **faster-whisper**, which downloads model weights from HuggingFace on
-  first use (cached in `~/.cache/huggingface`). For quick smoke tests set `asr.model: tiny`
-  in the episode `project.yaml` (default is `small`, ~460 MB). An unauthenticated HF-rate
+  first use (cached in `~/.cache/huggingface`). Default tier is `asr.model: large`
+  (maps to faster-whisper `large-v3` / whisper.cpp `ggml-large-v3.bin`). For quick smoke
+  tests set `asr.model: tiny` in the episode `project.yaml`. An unauthenticated HF-rate
   warning is normal.
 - `ae compose` / `pnpm -r run build` download **Chrome Headless Shell** for Remotion on
   first render (cached under the Remotion cache). Expect a one-time download.

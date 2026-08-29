@@ -25,15 +25,17 @@ def find_model(model_file: str) -> Path | None:
             cand = p / model_file
             if cand.is_file():
                 return cand
+    cache_env = os.environ.get("WHISPER_CPP_CACHE", "").strip()
     home = framework_home()
     candidates = [
         home / "models" / model_file,
+        Path(cache_env) / model_file if cache_env else None,
         Path.home() / ".cache" / "whisper.cpp" / model_file,
         Path.home() / "models" / "whisper" / model_file,
         Path("/opt/homebrew/share/whisper-cpp") / model_file,
     ]
     for c in candidates:
-        if c.is_file():
+        if c is not None and c.is_file():
             return c
     return None
 
@@ -58,8 +60,8 @@ def transcribe_whisper_cpp(
             f"Download into {framework_home() / 'models'}/ or set WHISPER_CPP_MODEL.\n"
             "Example:\n"
             "  mkdir -p \"$AGENTIC_EDITOR_HOME/models\"\n"
-            "  curl -L -o \"$AGENTIC_EDITOR_HOME/models/ggml-small.bin\" \\\n"
-            "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+            "  curl -L -o \"$AGENTIC_EDITOR_HOME/models/ggml-large-v3.bin\" \\\n"
+            "    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
         )
 
     with tempfile.TemporaryDirectory(prefix="ae-wcpp-") as td:

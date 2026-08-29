@@ -14,7 +14,7 @@ DEFAULTS: dict[str, Any] = {
     "style": "tutorial",
     "asr": {
         "backend": "auto",
-        "model": "small",
+        "model": "large",
         "language": "id",
         "word_timestamps": True,
         "diarize": False,

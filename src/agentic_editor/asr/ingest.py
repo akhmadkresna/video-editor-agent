@@ -55,7 +55,7 @@ def ingest_episode(episode: Path, *, force: bool = False, verbose: bool = True) 
     edit = ensure_edit_dirs(episode)
     asr_cfg = cfg.get("asr") or {}
     backend = resolve_backend(str(asr_cfg.get("backend", "auto")))
-    model_tier = str(asr_cfg.get("model", "small"))
+    model_tier = str(asr_cfg.get("model", "large"))
     model = mapped_model(model_tier, backend)
     language = str(asr_cfg.get("language", "id"))
 

@@ -5,7 +5,7 @@ sources:
 style: tutorial
 asr:
   backend: auto
-  model: small
+  model: large
   language: id
 fps: 30
 aspect: "16:9"

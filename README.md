@@ -27,10 +27,10 @@ Install whatever is missing: uv, Node 20+, pnpm, and ffmpeg. On macOS also
 install whisper-cpp (brew). Then from AGENTIC_EDITOR_HOME run uv sync and
 pnpm install.
 
-On macOS, download ggml-small.bin into $AGENTIC_EDITOR_HOME/models/ from
-https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
-(about 466 MB; do not commit it). On Windows/Linux skip whisper-cpp —
-faster-whisper from uv sync is enough.
+On macOS, download ggml-large-v3.bin into $AGENTIC_EDITOR_HOME/models/ from
+https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
+(do not commit it). On Windows/Linux skip whisper-cpp —
+faster-whisper from uv sync is enough (default asr.model: large → large-v3).
 
 Symlink the Cursor skill once:
 ~/.cursor/skills/agentic-editor → $AGENTIC_EDITOR_HOME/skills/agentic-editor
