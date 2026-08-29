@@ -226,13 +226,27 @@ def _pnpm_cmd() -> str:
 
 
 def _remotion_cli(kit: Path) -> list[str]:
-    """Prefer local remotion bin; fall back to pnpm exec."""
-    if os.name == "nt":
-        local = kit / "node_modules" / ".bin" / "remotion.CMD"
-    else:
-        local = kit / "node_modules" / ".bin" / "remotion"
-    if local.is_file():
-        return [str(local)]
+    """Prefer remotion bin (kit or hoisted workspace root); fall back to pnpm exec.
+
+    With ``node-linker=hoisted`` (see repo ``.npmrc``), binaries live under the
+    framework root ``node_modules/.bin``, not ``packages/remotion-kit/node_modules``.
+    On Windows prefer ``node remotion-cli.js`` so the batch shim cannot drop PATH.
+    """
+    bin_names = ("remotion.CMD", "remotion.cmd") if os.name == "nt" else ("remotion",)
+    roots = (kit, framework_home())
+    for root in roots:
+        for name in bin_names:
+            local = root / "node_modules" / ".bin" / name
+            if local.is_file():
+                if os.name == "nt":
+                    node = shutil.which("node")
+                    for base in roots:
+                        cli_js = (
+                            base / "node_modules" / "@remotion" / "cli" / "remotion-cli.js"
+                        )
+                        if node and cli_js.is_file():
+                            return [node, str(cli_js)]
+                return [str(local)]
     return [_pnpm_cmd(), "exec", "remotion"]
 
 
@@ -991,6 +1005,7 @@ def render_compose(
     output: Path | None = None,
     nvenc: bool = False,
     gl: str | None = None,
+    concurrency: int | None = None,
 ) -> Path:
     _warn_if_mg_review_stale(episode)
     prepare_compose(episode)
@@ -1002,6 +1017,9 @@ def render_compose(
     env["AE_TIMELINE_PROPS"] = str(props)
     env["AE_EPISODE"] = str(episode.resolve())
     accel = remotion_render_accel_args(nvenc=nvenc, gl=gl)
+    # Evidence stills (Img + staticFile) can hit Chrome ERR_UPLOAD_FILE_CHANGED
+    # under high Windows concurrency — keep a modest default when unset.
+    conc = concurrency if concurrency is not None else 4
     cmd = [
         *_remotion_cli(kit),
         "render",
@@ -1010,6 +1028,7 @@ def render_compose(
         str(out),
         "--props",
         str(props),
+        f"--concurrency={conc}",
         *accel,
     ]
     print(f"$ cd {kit} && {' '.join(cmd)}")

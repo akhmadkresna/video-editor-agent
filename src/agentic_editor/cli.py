@@ -698,6 +698,11 @@ def cmd_compose(args: argparse.Namespace) -> int:
         output=Path(args.output) if args.output else None,
         nvenc=bool(args.nvenc),
         gl=args.gl,
+        concurrency=(
+            int(args.concurrency)
+            if getattr(args, "concurrency", None) is not None
+            else None
+        ),
     )
     print(f"Wrote {out}")
     return 0
@@ -1058,6 +1063,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("angle", "egl", "swiftshader", "vulkan", "angle-egl"),
         default=None,
         help="Chrome GL backend for faster frame render (Windows: try angle)",
+    )
+    com.add_argument(
+        "--concurrency",
+        type=int,
+        default=None,
+        help=(
+            "Remotion frame workers (default 4). Lower if Img/evidence hits "
+            "ERR_UPLOAD_FILE_CHANGED on Windows."
+        ),
     )
     com.set_defaults(func=cmd_compose)
 
