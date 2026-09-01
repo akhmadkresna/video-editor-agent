@@ -81,7 +81,7 @@ sfx:
   pack: assets/sfx
   volumes:
     typing: 0.34
-    shutter: 0.38
+    shutter: 0.48
     click: 0.34
     paper: 0.32
     tick: 0.26

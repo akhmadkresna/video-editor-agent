@@ -10,7 +10,7 @@ typing:
   min_hold_sec: 4.0
 shutter:
   file: shutter.wav
-  volume: 0.38
+  volume: 0.48
   max_sec: 0.22
 click:
   files:

@@ -168,7 +168,7 @@ DEFAULT_SFX: dict[str, Any] = {
     "enabled": True,
     "no_whoosh": True,
     "pack": "assets/sfx",
-    "volumes": {"typing": 0.38, "shutter": 0.38, "click": 0.32, "paper": 0.35, "tick": 0.28},
+    "volumes": {"typing": 0.38, "shutter": 0.48, "click": 0.32, "paper": 0.35, "tick": 0.28},
     "density": {
         "sec_per_sfx": 30,
         "min_gap_sec": 1.2,

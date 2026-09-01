@@ -68,7 +68,7 @@ sfx:
   pack: assets/sfx              # shared framework pack (all styles)
   volumes:
     typing: 0.38
-    shutter: 0.38
+    shutter: 0.48
     click: 0.32
     paper: 0.35
     tick: 0.28
