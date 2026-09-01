@@ -102,6 +102,22 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     public = home / "packages" / "remotion-kit" / "public"
     print(f"remotion public/: {'OK  ' + str(public) if public.is_dir() else 'will create on compose'}")
 
+    from agentic_editor.cover.sfx_validate import (
+        format_sfx_pack_errors,
+        validate_sfx_pack,
+    )
+    from agentic_editor.cover.style_load import sfx_pack_dir
+
+    sfx_dir = sfx_pack_dir("tutorial")
+    sfx_reports = validate_sfx_pack(sfx_dir)
+    sfx_bad = [r for r in sfx_reports if not r.ok]
+    if sfx_bad:
+        print(f"sfx pack ({sfx_dir}): FAIL")
+        print(format_sfx_pack_errors(sfx_reports))
+    else:
+        n_ok = sum(1 for r in sfx_reports if r.ok)
+        print(f"sfx pack ({sfx_dir}): OK  {n_ok} wav(s), peak≥−12 dBFS, lead silence≤50ms")
+
     print("\nCompose rules (avoid black Studio / silent bad drafts):")
     print("  Always:  ae compose <episode> --studio   # copy→public/ae-media + passes --props")
     print("  Draft:   ae draft <episode> --seconds 120 --render  # fromSec-safe + quality gates")
@@ -118,7 +134,8 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print("  Windows: uv sync  (faster-whisper); install CUDA ctranslate2 if GPU")
     print("  Both:    export AGENTIC_EDITOR_HOME=" + str(home))
     print("           ln -s \"$AGENTIC_EDITOR_HOME/skills/agentic-editor\" ~/.cursor/skills/agentic-editor")
-    return 0 if ffmpeg and ffprobe else 1
+    sfx_failed = bool(sfx_bad)
+    return 0 if ffmpeg and ffprobe and not sfx_failed else 1
 
 
 def cmd_new(args: argparse.Namespace) -> int:

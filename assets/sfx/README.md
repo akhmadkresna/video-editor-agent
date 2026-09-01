@@ -18,3 +18,15 @@ Config: `pack.yaml` + `DEFAULT_SFX` in `style_load.py` (`pack: assets/sfx`).
 
 All audio here is **real free recordings** (not synthesized tones). Provenance
 and licenses: `LICENSES.md`.
+
+### Loudness / trim guardrails
+
+Silent or mis-trimmed one-shots (e.g. keeping only leading hush before a late
+click) must not land in this pack. CI + `ae doctor` enforce:
+
+- peak ≥ **−12 dBFS**
+- onset within the first **50 ms** (no long quiet head)
+- duration ≥ **30 ms**
+- every `pack.yaml` file exists as 16-bit mono/stereo WAV
+
+See `agentic_editor.cover.sfx_validate` and `tests/test_sfx_pack.py`.
