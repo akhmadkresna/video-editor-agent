@@ -1,7 +1,8 @@
 """Suggest dense A-roll MG overlays (chapter / emphasis / diagram / chip).
 
 Default logic couples overlays to cover mode + camera_play framing so MG
-does not fight close talking-head zooms (safe zones: left_third, faceClear).
+does not fight close talking-head zooms. Safe: face oval clear; surround
+zones rotate (left_third / right_third / lower_raised / top_sparse).
 
 Density / relevance (framework defaults):
   1. Reserve structure budget (chip/chapter/diagram) before emphasis fill
@@ -9,6 +10,7 @@ Density / relevance (framework defaults):
   3. ID payoff lexicon + short-phrase cleaner (not raw EDL notes / filler ASR)
   4. Score emphasis by screen-enter + punch_in proximity + payoff hits
   5. Punch-in beats without nearby MG get a sting (camera energy ↔ type)
+  6. Max one primary + one secondary; rotate zone so type surrounds, not wallpaper
 """
 
 from __future__ import annotations
@@ -27,7 +29,11 @@ CHAPTER_NOTE_RE = re.compile(
     r"(hook|chapter|lesson|fase|phase|section|reset|intro|outro|setup|bab)",
     re.I,
 )
-DIAGRAM_NOTE_RE = re.compile(r"(pipeline|flow|step|langkah|fase|phase|alur)", re.I)
+DIAGRAM_NOTE_RE = re.compile(
+    r"(pipeline|flow|step|langkah|fase|phase|alur|install|config|mount|remote|"
+    r"union|oauth|setup|rclone|gdrive|vbs|script|proper)",
+    re.I,
+)
 
 # Speech-native section cues (do NOT require hand-annotated EDL notes)
 SECTION_CUE_RE = re.compile(
@@ -53,22 +59,64 @@ CHAPTER_HOLD = 5.0
 CHIP_HOLD = 4.0
 DIAGRAM_HOLD = 7.5
 
-# Spacing / density — punchy tutorials want frequent stings
-SEC_PER_OVERLAY = 32.0
-CHAPTER_MIN_GAP = 50.0
-EMPHASIS_MIN_GAP = 10.0
+# Spacing / density — ~15 min keep should land ≥30 overlays
+SEC_PER_OVERLAY = 28.0
+CHAPTER_MIN_GAP = 42.0
+EMPHASIS_MIN_GAP = 8.0
 SECTION_QUOTA_SEC = 80.0
 SCREEN_ENTER_BOOST_SEC = 8.0
 PUNCH_MG_RADIUS_SEC = 10.0
 PUNCH_MG_MIN_GAP = 8.0
-SAME_LABEL_MIN_GAP = 45.0  # avoid "Roadmap" spam every few seconds
-GAP_FILL_KEEP_SEC = 55.0  # quiet keep-timeline stretches get a sting
+SAME_LABEL_MIN_GAP = 35.0  # avoid same-label spam; allow denser variety
+GAP_FILL_KEEP_SEC = 28.0  # quiet keep-timeline stretches get a sting
+# When payoff lexicon is thin (non-Odoo episodes), stride the keep timeline
+# and mint speech-content emphasis so density still hits target_total.
+SPEECH_EMPHASIS_STRIDE_SEC = 24.0
+
+STRUCTURE_KINDS = frozenset({"chip", "chapter", "diagram"})
+STING_KINDS = frozenset(
+    {
+        "emphasis",
+        "title",
+        "quote",
+        "stat",
+        "callout",
+        "lower_third",
+        "tag",
+        "divider",
+        "illustration",
+    }
+)
+QUOTE_MIN_WORDS = 4
+STAT_VALUE_RE = re.compile(
+    r"(\d[\d.,]*)\s*(gb|mb|tb|menit|detik|akun|remote|drive|%)?",
+    re.I,
+)
+COMPARE_RE = re.compile(
+    r"\b(vs|versus|banding|lebih|compare|dua|multi|union|merge|bandingkan)\b",
+    re.I,
+)
+FLOW_STEP_RE = re.compile(
+    r"\b(pertama|kedua|ketiga|keempat|langkah|step)\b",
+    re.I,
+)
 
 # Remap drops tiny slices; suggest must never emit below this
 OVERLAY_MIN_SEC = 1.8
 
 FACE_HEAVY_KINDS = frozenset({"chapter", "diagram"})
 CHIP_PREFERS_MEDIUM = True
+
+# Surround zones around the speaker (face oval stays clear). Rotated so MG
+# is not stuck on the left rail only.
+OVERLAY_ZONES = ("left_third", "right_third", "lower_raised", "top_sparse")
+KIND_ZONE_PREFERS: dict[str, tuple[str, ...]] = {
+    "emphasis": ("lower_raised", "left_third", "right_third"),
+    "callout": ("lower_raised", "left_third", "right_third"),
+    "chapter": ("top_sparse", "left_third", "right_third"),
+    "chip": ("top_sparse", "left_third", "right_third"),
+    "diagram": ("left_third", "right_third"),
+}
 
 # Filler tokens rejected in emphasis phrases
 FILLER = frozenset(
@@ -105,6 +153,17 @@ FILLER = frozenset(
 # Multi-word first, then singles — display label is curated (roadmap early = priority)
 PAYOFF_PHRASES: list[tuple[str, str]] = [
     ("odoo studio", "Odoo Studio"),
+    ("google drive", "Google Drive"),
+    ("gdrive", "Google Drive"),
+    ("rclone", "rclone"),
+    ("client id", "Client ID"),
+    ("client secret", "Client Secret"),
+    ("oauth", "OAuth"),
+    ("access token", "Access Token"),
+    ("refresh token", "Refresh Token"),
+    ("remote", "Remote"),
+    ("mount", "Mount"),
+    ("sync", "Sync"),
     ("roadmap", "Roadmap"),
     ("satu app", "Satu App"),
     ("one app", "Satu App"),
@@ -131,6 +190,10 @@ PAYOFF_PHRASES: list[tuple[str, str]] = [
     ("status", "Status"),
     ("confirm", "Confirm"),
     ("validate", "Validate"),
+    ("token", "Token"),
+    ("akun", "Akun"),
+    ("folder", "Folder"),
+    ("config", "Config"),
 ]
 
 # Map messy EDL notes → short chapter/chip labels
@@ -269,11 +332,15 @@ def caps_for_duration(keep_sec: float) -> dict[str, int]:
     """Scale overlay budgets; structure reserved before emphasis fill."""
     factor = max(1.0, float(keep_sec) / 600.0)  # 1.0 at ~10 min
     target = max(12, int(round(float(keep_sec) / SEC_PER_OVERLAY)))
-    chapter = min(14, max(4, int(round(5 * factor))))
+    # ~15 min keep: user expects ≥30 MG hits even when lexicon is thin
+    if keep_sec >= 800:
+        target = max(target, 30)
+    chapter = min(14, max(4, int(round(6 * factor))))
     diagram = min(5, max(1, int(round(2 * factor))))
     chip = min(4, 1 + (1 if keep_sec >= 900 else 0) + (1 if keep_sec >= 1500 else 0))
     structure = chapter + diagram + chip
-    emphasis = max(8, min(28, target - structure + 6))  # leftover + flex for punch stings
+    # Leave room for speech/gap fill to hit target_total
+    emphasis = max(12, min(40, target - structure + 8))
     return {
         "chapter": chapter,
         "emphasis": emphasis,
@@ -447,7 +514,26 @@ def _annotate(
             ov["framing_note"] = "screen_holds_wide"
         elif ov.get("kind") == "emphasis":
             ov["framing_note"] = "close_ok"
+    # Density: one primary + at most one secondary tag/step label
+    steps = ov.get("steps")
+    if isinstance(steps, list) and len(steps) > 1:
+        ov["steps"] = steps[:1]
     return ov
+
+
+def pick_overlay_zone(
+    kind: str,
+    *,
+    used_zones: list[str],
+    index: int = 0,
+) -> str:
+    """Rotate surround zones; prefer kind-appropriate margins, avoid repeats."""
+    prefs = KIND_ZONE_PREFERS.get(kind, OVERLAY_ZONES)
+    recent = set(used_zones[-2:]) if used_zones else set()
+    for z in prefs:
+        if z not in recent:
+            return z
+    return prefs[index % len(prefs)]
 
 
 def _load_cover(edit: Path) -> dict[str, Any]:
@@ -689,11 +775,249 @@ def _label_near_time(
         if not tok or _norm_token(tok) in FILLER:
             continue
         tokens.append(tok)
-        if len(tokens) >= 3:
+        if len(tokens) >= 6:
             break
     if not tokens:
         return None
     return short_label(" ".join(tokens), fallback=tokens[0].title())
+
+
+def pick_sting_kind(text: str, *, slot: int) -> str:
+    """Rotate glass + legacy stings so packs are not 26× identical emphasis."""
+    words = text.split()
+    low = text.lower()
+    if STAT_VALUE_RE.search(text):
+        return "stat"
+    if len(words) >= QUOTE_MIN_WORDS:
+        return "quote"
+    if COMPARE_RE.search(low) or re.search(
+        r"\b(bebrapa akun|dua akun|multi.?drive|multi drive|2 akun)\b", low
+    ):
+        return "illustration"
+    if slot % 6 == 0:
+        return "title"
+    if slot % 9 == 4:
+        return "callout"
+    if slot % 11 == 7:
+        return "divider"
+    return "emphasis"
+
+
+def materialize_sting(
+    cand: dict[str, Any],
+    *,
+    slot: int,
+    id_prefix: str,
+) -> dict[str, Any]:
+    """Turn a scored candidate into a concrete overlay dict (varied kind)."""
+    text = str(cand.get("text") or "").strip()
+    kind = pick_sting_kind(text, slot=slot)
+    phrase = cand.get("phrase")
+    score = round(float(cand.get("score", 0)), 3)
+    ov: dict[str, Any] = {
+        "id": f"{id_prefix}-{slot:02d}",
+        "kind": kind,
+        "start": cand["start"],
+        "end": cand["end"],
+        "score": score,
+    }
+    if kind == "stat":
+        m = STAT_VALUE_RE.search(text)
+        val = m.group(0).strip() if m else text[:16]
+        label = STAT_VALUE_RE.sub("", text).strip(" ·—-:") or "Total"
+        ov["value"] = val
+        ov["text"] = label[:48]
+        ov["sourceLabel"] = "LIVE"
+        ov["note"] = f"stat:{phrase} score={score}"
+    elif kind == "quote":
+        ov["text"] = text[:120]
+        ov["note"] = f"quote:{phrase} score={score}"
+    elif kind == "title":
+        words = text.split()
+        if len(words) >= 3:
+            ov["kicker"] = words[0]
+            ov["text"] = " ".join(words[1:])[:64]
+            if len(words) >= 5:
+                ov["accent"] = " ".join(words[-2:])[:32]
+        else:
+            ov["text"] = text[:64]
+        ov["note"] = f"hero:{phrase} score={score}"
+    elif kind == "illustration":
+        ov["note"] = "illustration:scale_compare"
+        ov["title"] = text[:40]
+        ov["text"] = ""
+        chunks = [w.strip(",.") for w in text.split() if len(w.strip(",.")) > 2]
+        ov["steps"] = chunks[:4] if len(chunks) >= 2 else ["Before", "After"]
+    elif kind == "callout":
+        ov["text"] = text[:48]
+        parts = text.split()
+        ov["value"] = parts[-1][:24] if parts else text[:24]
+        ov["note"] = f"callout:{phrase} score={score}"
+    elif kind == "divider":
+        ov["text"] = text[:32]
+        ov["note"] = f"divider:{phrase} score={score}"
+    else:
+        ov["text"] = text[:64]
+        ov["note"] = f"payoff:{phrase} score={score}"
+    return ov
+
+
+def find_flow_diagram_candidates(
+    words: list[dict[str, Any]],
+    ranges: list[dict[str, Any]],
+    *,
+    min_gap: float = CHAPTER_MIN_GAP,
+) -> list[dict[str, Any]]:
+    """Diagram heads from install/config/mount speech — not Odoo EDL notes."""
+    if not words:
+        return []
+    out: list[dict[str, Any]] = []
+    for i, w in enumerate(words):
+        try:
+            s = float(w["start"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not _in_edl(ranges, s, s + 0.2):
+            continue
+        window = " ".join(
+            str(words[j].get("text") or "")
+            for j in range(i, min(i + 10, len(words)))
+        )
+        if not (DIAGRAM_NOTE_RE.search(window) or FLOW_STEP_RE.search(window)):
+            continue
+        label = short_label(window[:60], fallback="Alur")
+        steps: list[str] = []
+        for j in range(i, min(i + 24, len(words))):
+            tok = str(words[j].get("text") or "").strip("., ")
+            if FLOW_STEP_RE.search(tok.lower()) or tok.lower() in {
+                "install",
+                "config",
+                "mount",
+                "remote",
+                "oauth",
+                "token",
+                "script",
+                "union",
+            }:
+                nxt = " ".join(
+                    str(words[k].get("text") or "")
+                    for k in range(j + 1, min(j + 4, len(words)))
+                ).strip("., ")
+                if nxt and len(nxt) > 2:
+                    steps.append(short_label(nxt, fallback=nxt)[:36])
+            if len(steps) >= 4:
+                break
+        if len(steps) < 2:
+            steps = ["Install", "Config", "Mount", "Test"]
+        out.append(
+            {
+                "start": s,
+                "title": label[:40],
+                "steps": steps[:4],
+                "score": 2.5,
+                "source": "speech_flow",
+            }
+        )
+    # De-dupe nearby
+    out.sort(key=lambda x: float(x["start"]))
+    deduped: list[dict[str, Any]] = []
+    for item in out:
+        if deduped and float(item["start"]) - float(deduped[-1]["start"]) < min_gap:
+            continue
+        deduped.append(item)
+    return deduped
+
+
+def find_segment_quote_candidates(
+    edit: Path,
+    ranges: list[dict[str, Any]],
+    *,
+    hold_sec: float = EMPHASIS_MIN_HOLD,
+) -> list[dict[str, Any]]:
+    """Longer spoken lines → quote/title candidates (not 3-word crumbs)."""
+    path = edit / "transcripts" / "cam.json"
+    if not path.is_file():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    segments = data.get("segments") or []
+    out: list[dict[str, Any]] = []
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        text = str(seg.get("text") or "").strip()
+        words = text.split()
+        if len(words) < QUOTE_MIN_WORDS:
+            continue
+        try:
+            s, e = float(seg["start"]), float(seg["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not _in_edl(ranges, s, e):
+            continue
+        if overlaps_any(s, e, []):
+            pass
+        clip = " ".join(words[:12]).strip("., ")
+        if len(clip.split()) < QUOTE_MIN_WORDS:
+            continue
+        out.append(
+            {
+                "text": clip[:120],
+                "start": s,
+                "end": min(e, s + hold_sec + 1.0),
+                "score": 5.5 + min(2.0, len(words) / 12.0),
+                "phrase": "segment",
+            }
+        )
+    out.sort(key=lambda x: (-float(x["score"]), float(x["start"])))
+    deduped: list[dict[str, Any]] = []
+    for item in out:
+        if deduped and abs(float(item["start"]) - float(deduped[-1]["start"])) < 18.0:
+            continue
+        deduped.append(item)
+    return deduped[: max(8, int(len(ranges) / 8))]
+
+
+def find_speech_stride_emphasis(
+    words: list[dict[str, Any]],
+    ranges: list[dict[str, Any]],
+    *,
+    keep_sec: float,
+    stride_sec: float = SPEECH_EMPHASIS_STRIDE_SEC,
+    hold_sec: float = EMPHASIS_MIN_HOLD,
+) -> list[dict[str, Any]]:
+    """Mint emphasis candidates along the keep timeline from local speech.
+
+    Used when the curated payoff lexicon is thin (non-Odoo episodes) so density
+    can still approach target_total.
+    """
+    if not words or keep_sec <= 0 or stride_sec <= 0:
+        return []
+    out: list[dict[str, Any]] = []
+    t = stride_sec
+    while t < keep_sec - 1.0:
+        src = keep_elapsed_to_source(ranges, t)
+        t += stride_sec
+        if src is None:
+            continue
+        if not _in_edl(ranges, src, src + 0.3):
+            continue
+        label = _label_near_time(words, src, radius=14.0)
+        if not label:
+            continue
+        s = max(0.0, src - EMPHASIS_PAD)
+        e = src + hold_sec
+        if words:
+            s, e = snap_window_to_words(s, e, words)
+        out.append(
+            {
+                "text": label,
+                "start": s,
+                "end": max(s + hold_sec, e),
+                "score": 4.2,
+                "phrase": f"speech:{label.lower()}",
+            }
+        )
+    return out
 
 
 def suggest_overlays(episode: Path) -> dict[str, Any]:
@@ -720,7 +1044,9 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     ranges = list(edl.get("ranges") or [])
     cover = _load_cover(edit)
     cover_events = list(cover.get("events") or [])
-    camera_play = dict(cover.get("camera_play") or {})
+    from agentic_editor.cover.composite import effective_camera_play
+
+    camera_play = effective_camera_play(cover, cfg)
     screen_wins = screen_windows(cover_events)
     punch_wins = [
         (a, b)
@@ -762,15 +1088,23 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             "emphasis_min_gap_sec": EMPHASIS_MIN_GAP,
             "sec_per_overlay": SEC_PER_OVERLAY,
             "gap_fill_keep_sec": GAP_FILL_KEEP_SEC,
+            "speech_emphasis_stride_sec": SPEECH_EMPHASIS_STRIDE_SEC,
             "section_quota_sec": SECTION_QUOTA_SEC,
-            "safe_zones": ["left_third", "lower_third"],
+            "safe_zones": list(OVERLAY_ZONES),
             "faceClear": True,
+            "surround_ok": True,
+            "density": {"maxPrimary": 1, "maxSecondary": 1},
             "dwell_readable": True,
         },
     }
 
+    used_zones: list[str] = []
+
     def kind_count(kind: str) -> int:
         return sum(1 for o in overlays if o["kind"] == kind)
+
+    def sting_count() -> int:
+        return sum(1 for o in overlays if o["kind"] in STING_KINDS)
 
     def try_add(
         ov: dict[str, Any],
@@ -778,7 +1112,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         structural: bool,
         force_punch: bool = False,
     ) -> bool:
-        nonlocal overlays, framing_events, used_spans, chapter_spans, emphasis_spans
+        nonlocal overlays, framing_events, used_spans, chapter_spans, emphasis_spans, used_zones
         kind = str(ov["kind"])
         s, e = ensure_overlay_dwell(
             float(ov["start"]),
@@ -807,7 +1141,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             struct_n = sum(
                 1 for o in overlays if o["kind"] in {"chip", "chapter", "diagram"}
             )
-            emph_n = kind_count("emphasis")
+            emph_n = sting_count()
             if not force_punch:
                 if emph_n >= caps["emphasis"]:
                     return False
@@ -835,13 +1169,17 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             ov_id=str(ov.get("id") or kind),
         )
         ov = _annotate(ov, on_screen=on_screen, framing_ev=framing_ev)
+        if not ov.get("zone"):
+            z = pick_overlay_zone(kind, used_zones=used_zones, index=len(overlays))
+            ov["zone"] = z
+        used_zones.append(str(ov["zone"]))
         overlays.append(ov)
         used_spans.append((s, e))
         if framing_ev:
             framing_events.append(framing_ev)
-        if kind == "chapter":
+        if kind == "chapter" or kind == "title":
             chapter_spans.append((s, e))
-        if kind == "emphasis":
+        if kind in STING_KINDS:
             emphasis_spans.append((s, e))
         return True
 
@@ -879,25 +1217,30 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     for sec in find_section_candidates(
         words, ranges, screen_wins, min_gap=CHAPTER_MIN_GAP
     ):
-        if kind_count("chapter") >= caps["chapter"]:
+        if chapter_i >= caps["chapter"]:
             break
         rs = float(sec["start"])
         end = rs + chapter_hold
         if words:
             rs, end = snap_window_to_words(rs, end, words)
         chapter_i += 1
-        if not try_add(
-            {
-                "id": f"chapter-{chapter_i:02d}",
-                "kind": "chapter",
-                "start": rs,
-                "end": max(rs + 1.2, end),
-                "kicker": f"Bab {chapter_i:02d}",
-                "text": str(sec.get("label") or "Section"),
-                "note": f"section:{sec.get('source')}",
-            },
-            structural=True,
-        ):
+        use_title = chapter_i % 2 == 0
+        kind = "title" if use_title else "chapter"
+        ov_id = f"{'title' if use_title else 'chapter'}-{chapter_i:02d}"
+        ov_body: dict[str, Any] = {
+            "id": ov_id,
+            "kind": kind,
+            "start": rs,
+            "end": max(rs + 1.2, end),
+            "note": f"section:{sec.get('source')}",
+        }
+        if use_title:
+            ov_body["kicker"] = f"Bab {chapter_i:02d}"
+            ov_body["text"] = str(sec.get("label") or "Section")[:64]
+        else:
+            ov_body["kicker"] = f"Bab {chapter_i:02d}"
+            ov_body["text"] = str(sec.get("label") or "Section")
+        if not try_add(ov_body, structural=True):
             chapter_i -= 1
 
     # 2b) Optional boost from EDL notes when present (legacy / agent tags)
@@ -993,10 +1336,12 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             end = min(r_end, rs + diagram_hold)
             if words:
                 rs, end = snap_window_to_words(rs, end, words)
-        # Curated default steps for tutorial material apps
+        # Curated default steps — Odoo vs Drive/rclone episodes
         steps = ["Master data", "Produk + gambar", "Kartu stok", "Pembelian"]
         if re.search(r"partner|kategori|seed", note, re.I):
             steps = ["res.partner", "Seed kategori", "Gambar produk", "Kartu stok"]
+        elif re.search(r"rclone|gdrive|mount|remote|oauth|union|vbs", note, re.I):
+            steps = ["Install rclone", "OAuth remote", "Mount drive", "Union merge"]
         diagram_i += 1
         if not try_add(
             {
@@ -1004,11 +1349,36 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
                 "kind": "diagram",
                 "start": rs,
                 "end": max(rs + 2.0, end),
-                "title": short_label(note, fallback="Toko Material")[:40],
+                "title": short_label(note, fallback="Alur")[:40],
                 "kicker": "Alur",
                 "steps": steps,
                 "text": "",
                 "note": note,
+            },
+            structural=True,
+        ):
+            diagram_i -= 1
+
+    # 4b) Diagrams from install/config/mount speech (no Odoo EDL tags required)
+    for flow in find_flow_diagram_candidates(words, ranges, min_gap=CHAPTER_MIN_GAP):
+        if kind_count("diagram") >= caps["diagram"]:
+            break
+        rs = float(flow["start"])
+        end = rs + diagram_hold
+        if words:
+            rs, end = snap_window_to_words(rs, end, words)
+        diagram_i += 1
+        if not try_add(
+            {
+                "id": f"diagram-{diagram_i:02d}",
+                "kind": "diagram",
+                "start": rs,
+                "end": max(rs + 2.0, end),
+                "title": str(flow["title"])[:40],
+                "kicker": "Alur",
+                "steps": list(flow["steps"]),
+                "text": "",
+                "note": f"speech_flow:{flow.get('source')}",
             },
             structural=True,
         ):
@@ -1068,27 +1438,46 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             }
         )
 
+    # Speech-stride fill when lexicon is thin (Drive/rclone/etc. episodes)
+    speech_stride = find_speech_stride_emphasis(
+        words,
+        ranges,
+        keep_sec=keep_sec,
+        stride_sec=SPEECH_EMPHASIS_STRIDE_SEC,
+        hold_sec=emphasis_hold,
+    )
+    for cand in speech_stride:
+        if overlaps_any(float(cand["start"]), float(cand["end"]), used_spans):
+            continue
+        if any(
+            abs(float(cand["start"]) - float(c["start"])) < EMPHASIS_MIN_GAP
+            for c in candidates
+        ):
+            continue
+        candidates.append(cand)
+
+    for cand in find_segment_quote_candidates(edit, ranges, hold_sec=emphasis_hold):
+        if overlaps_any(float(cand["start"]), float(cand["end"]), used_spans):
+            continue
+        if any(
+            abs(float(cand["start"]) - float(c["start"])) < EMPHASIS_MIN_GAP * 2
+            for c in candidates
+        ):
+            continue
+        candidates.append(cand)
+
     candidates.sort(key=lambda c: (-float(c["score"]), float(c["start"])))
 
     emph_n = 0
     for cand in candidates:
-        if emph_n >= caps["emphasis"]:
+        if sting_count() >= caps["emphasis"]:
             break
-        if structure_n + emph_n >= caps["target_total"]:
+        if structure_n + sting_count() >= caps["target_total"]:
             break
         emph_n += 1
-        if try_add(
-            {
-                "id": f"emphasis-{emph_n:02d}",
-                "kind": "emphasis",
-                "start": cand["start"],
-                "end": cand["end"],
-                "text": cand["text"],
-                "note": f"payoff:{cand.get('phrase')} score={cand['score']:.2f}",
-                "score": round(float(cand["score"]), 3),
-            },
-            structural=False,
-        ):
+        ov = materialize_sting(cand, slot=emph_n, id_prefix="sting")
+        ov["id"] = f"{ov['kind']}-{emph_n:02d}"
+        if try_add(ov, structural=False):
             pass
         else:
             emph_n -= 1
@@ -1109,71 +1498,105 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         e = mid + emphasis_hold
         if words:
             s, e = snap_window_to_words(s, e, words)
-        emph_n = kind_count("emphasis") + 1
-        if try_add(
-            {
-                "id": f"emphasis-punch-{emph_n:02d}",
-                "kind": "emphasis",
-                "start": s,
-                "end": max(s + emphasis_hold, e),
-                "text": label,
-                "note": f"punch-guarantee:{label.lower()}",
-                "score": 9.5,
-            },
-            structural=False,
-            force_punch=True,
-        ):
+        slot = sting_count() + 1
+        cand = {
+            "text": label,
+            "start": s,
+            "end": max(s + emphasis_hold, e),
+            "score": 9.5,
+            "phrase": f"punch:{label.lower()}",
+        }
+        ov = materialize_sting(cand, slot=slot, id_prefix="punch")
+        ov["id"] = f"{ov['kind']}-punch-{slot:02d}"
+        ov["note"] = f"punch-guarantee:{label.lower()}"
+        if try_add(ov, structural=False, force_punch=True):
             punch_seeded += 1
 
     # Creative density on the *keep* timeline (source gaps from radio-edit
     # are not "quiet A-roll" — only long stretches the viewer actually sees).
+    # Iterate largest quiet gaps until target_total / emphasis cap.
     gap_filled = 0
     quiet_limit = GAP_FILL_KEEP_SEC
-    keep_starts: list[tuple[float, float]] = []  # (keep_t, source_t)
-    for o in overlays:
-        kt = source_to_keep_elapsed(ranges, float(o["start"]))
-        if kt is not None:
-            keep_starts.append((kt, float(o["start"])))
-    keep_starts.sort(key=lambda x: x[0])
-    anchors = [0.0] + [kt for kt, _ in keep_starts] + [keep_sec]
-    for a, b in zip(anchors, anchors[1:]):
-        if b - a < quiet_limit:
-            continue
-        mid_keep = 0.5 * (a + b)
-        src = keep_elapsed_to_source(ranges, mid_keep)
-        if src is None:
-            continue
-        if overlaps_any(src, src + emphasis_hold, used_spans):
-            continue
-        if not _in_edl(ranges, src, src + 0.3):
-            continue
+    while True:
+        if sting_count() >= caps["emphasis"]:
+            break
+        if len(overlays) >= caps["target_total"]:
+            break
+        keep_starts: list[tuple[float, float]] = []  # (keep_t, source_t)
+        for o in overlays:
+            kt = source_to_keep_elapsed(ranges, float(o["start"]))
+            if kt is not None:
+                keep_starts.append((kt, float(o["start"])))
+        keep_starts.sort(key=lambda x: x[0])
+        anchors = [0.0] + [kt for kt, _ in keep_starts] + [keep_sec]
+        best: tuple[float, float, float] | None = None  # (gap, mid_keep, src)
+        for a, b in zip(anchors, anchors[1:]):
+            gap = b - a
+            if gap < quiet_limit:
+                continue
+            mid_keep = 0.5 * (a + b)
+            src = keep_elapsed_to_source(ranges, mid_keep)
+            if src is None:
+                continue
+            if overlaps_any(src, src + emphasis_hold, used_spans):
+                continue
+            if not _in_edl(ranges, src, src + 0.3):
+                continue
+            if best is None or gap > best[0]:
+                best = (gap, mid_keep, src)
+        if best is None:
+            break
+        _, _, src = best
         label = _label_near_time(words, src, radius=18.0)
         if not label:
+            # Skip this midpoint by marking a tiny used span so we don't loop forever
+            used_spans.append((src, src + 0.05))
             continue
         s = max(0.0, src - EMPHASIS_PAD)
         e = src + emphasis_hold
         if words:
             s, e = snap_window_to_words(s, e, words)
-        emph_n = kind_count("emphasis") + 1
-        if try_add(
-            {
-                "id": f"emphasis-gap-{emph_n:02d}",
-                "kind": "emphasis",
-                "start": s,
-                "end": max(s + emphasis_hold, e),
-                "text": label,
-                "note": f"gap-fill:{label.lower()}",
-                "score": 3.5,
-            },
-            structural=False,
-        ):
+        slot = sting_count() + 1
+        cand = {
+            "text": label,
+            "start": s,
+            "end": max(s + emphasis_hold, e),
+            "score": 3.5,
+            "phrase": f"gap:{label.lower()}",
+        }
+        ov = materialize_sting(cand, slot=slot, id_prefix="gap")
+        ov["id"] = f"{ov['kind']}-gap-{slot:02d}"
+        ov["note"] = f"gap-fill:{label.lower()}"
+        if try_add(ov, structural=False):
             gap_filled += 1
+        else:
+            # Rejected (gap/label/overlap) — burn this midpoint and keep filling
+            used_spans.append((src, src + 0.05))
+            if gap_filled == 0 and len(overlays) >= caps["target_total"]:
+                break
+            # Safety: stop if we keep failing near the same density
+            if gap_filled > 0 and len(overlays) >= caps["target_total"]:
+                break
+            if gap_filled >= caps["emphasis"]:
+                break
+            # Avoid infinite loop when every midpoint fails
+            if gap_filled == 0:
+                # still count attempts via used_spans growth; hard stop below
+                pass
+            if len(used_spans) > caps["target_total"] * 4:
+                break
 
     overlays.sort(key=lambda o: float(o["start"]))
     framing_events.sort(key=lambda o: float(o["start"]))
     meta["counts"] = {
         "chapter": sum(1 for o in overlays if o["kind"] == "chapter"),
+        "title": sum(1 for o in overlays if o["kind"] == "title"),
         "emphasis": sum(1 for o in overlays if o["kind"] == "emphasis"),
+        "quote": sum(1 for o in overlays if o["kind"] == "quote"),
+        "stat": sum(1 for o in overlays if o["kind"] == "stat"),
+        "illustration": sum(1 for o in overlays if o["kind"] == "illustration"),
+        "callout": sum(1 for o in overlays if o["kind"] == "callout"),
+        "divider": sum(1 for o in overlays if o["kind"] == "divider"),
         "diagram": sum(1 for o in overlays if o["kind"] == "diagram"),
         "chip": sum(1 for o in overlays if o["kind"] == "chip"),
         "total": len(overlays),

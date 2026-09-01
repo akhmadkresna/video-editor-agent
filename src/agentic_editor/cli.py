@@ -285,8 +285,13 @@ def cmd_cover_suggest(args: argparse.Namespace) -> int:
     episode = resolve_episode(args.episode)
     cfg = load_project(episode)
     sources = cfg.get("sources") or {}
-    if "screen" not in sources:
-        print("No screen source in project.yaml — nothing to suggest (full-cam only)", file=sys.stderr)
+    from agentic_editor.cover.composite import has_screen_cover
+
+    if not has_screen_cover(cfg):
+        print(
+            "No screen source (and composite.enabled is false) — nothing to suggest (full-cam only)",
+            file=sys.stderr,
+        )
         return 1
     suggestion = suggest_cover(
         episode,

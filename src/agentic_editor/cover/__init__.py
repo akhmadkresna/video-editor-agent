@@ -220,7 +220,26 @@ def build_timeline_from_edl_and_cover(
     )
 
     cover = cover or {}
-    camera_play = cover.get("camera_play") or {}
+    composite_cfg: dict[str, Any] = {"enabled": False, "baked_pip": True}
+    project_cfg: dict[str, Any] | None = None
+    baked_pip = False
+    if episode is not None:
+        try:
+            from agentic_editor.cover.composite import (
+                effective_camera_play,
+                is_baked_pip,
+                load_composite,
+            )
+            from agentic_editor.project import load_project
+
+            project_cfg = load_project(Path(episode))
+            composite_cfg = load_composite(project_cfg)
+            camera_play = effective_camera_play(cover, project_cfg)
+            baked_pip = is_baked_pip(composite_cfg)
+        except Exception:
+            camera_play = cover.get("camera_play") or {}
+    else:
+        camera_play = cover.get("camera_play") or {}
     scales = _scales(camera_play)
     cover_events = list(cover.get("events") or [])
     clips: list[dict[str, Any]] = []
@@ -228,6 +247,14 @@ def build_timeline_from_edl_and_cover(
     captions: list[dict[str, Any]] = list(cover.get("captions") or [])
     snap = bool(camera_play.get("snap_on_cuts", True))
     max_hold = float(camera_play.get("max_hold_sec", 16.0))
+    # Default (9s) is tuned for max_hold_sec ~7 — high enough that drift
+    # only catches the handful of shots that genuinely run longer than the
+    # usual snap-cut rhythm, not most/all of them. If max_hold_sec is much
+    # bigger than 7 (long uninterrupted holds are the norm), lower this in
+    # cover.json's camera_play; if it's much smaller, this may need raising
+    # to stay selective — check the actual clip-duration distribution
+    # rather than guessing (94% of clips can pass a 5s bar under max_hold=7).
+    drift_min_hold = float(camera_play.get("drift_min_hold_sec", 9.0))
     se = screen_explainer or DEFAULT_SCREEN_EXPLAINER
     ov_style = overlays or DEFAULT_OVERLAYS
     float_presentation = str(
@@ -244,6 +271,7 @@ def build_timeline_from_edl_and_cover(
     from agentic_editor.cover.remap import (
         build_timeline_cutaways,
         build_timeline_overlays,
+        build_timeline_privacy,
         build_timeline_sfx,
     )
     from agentic_editor.cover.suggest import load_cam_words
@@ -270,6 +298,7 @@ def build_timeline_from_edl_and_cover(
         except Exception:
             style_name = "tutorial"
     timeline_sfx = build_timeline_sfx(edl, cover, style_name=style_name, sfx_cfg=load_sfx(style_name))
+    timeline_privacy = build_timeline_privacy(edl, cover)
 
     out_t = 0.0
     global_clip_i = 0
@@ -309,12 +338,18 @@ def build_timeline_from_edl_and_cover(
                 ev_layout = str(part.get("layout") or "float")
                 layout = float_layout if ev_layout == "float" else "full"
             elif screen_visual:
-                visual_src = "screen"
-                layout = float_layout
+                if baked_pip:
+                    visual_src = str(r.get("source") or "cam")
+                    layout = "full"
+                else:
+                    visual_src = "screen"
+                    layout = float_layout
             else:
                 visual_src = str(r["source"])
                 layout = "full"
-            wants_pip = mode in ("screen_with_cam", "evidence_with_cam")
+            wants_pip = (
+                mode in ("screen_with_cam", "evidence_with_cam") or mode == "screen"
+            ) and not (baked_pip and screen_visual)
 
             if broll_visual:
                 segments = [(seg_start, seg_end)]
@@ -343,9 +378,15 @@ def build_timeline_from_edl_and_cover(
                         framing = str(ev.get("framing") or framing)
                         motion = str(ev.get("motion") or motion)
                         scale = _framing_scale(framing, scales, ev.get("scale"))
-                    if motion == "hold" and seg_dur >= 12:
-                        motion = "drift"
-                    if motion == "snap" and seg_dur >= 14 and framing != "wide":
+                    # Push-in on any static shot that outlasts drift_min_hold_sec
+                    # — documentary/interview convention (PBS Frontline pushes
+                    # in on every interview shot). "snap" is just as static as
+                    # "hold" once the cut lands (SourceClip returns a fixed
+                    # scale for both), so both branches share one threshold.
+                    # Rate scales with duration in SourceClip (useMotionScale).
+                    # "wide" stays excluded — establishing/reset shots are
+                    # meant to sit still.
+                    if motion in ("hold", "snap") and seg_dur >= drift_min_hold and framing != "wide":
                         motion = "drift"
 
                 clips.append(
@@ -388,7 +429,7 @@ def build_timeline_from_edl_and_cover(
                 )
 
     sources = dict(edl.get("sources") or {})
-    return {
+    timeline: dict[str, Any] = {
         "fps": fps,
         "width": width,
         "height": height,
@@ -401,6 +442,7 @@ def build_timeline_from_edl_and_cover(
         "overlays": timeline_overlays,
         "cutaways": timeline_cutaways,
         "sfx": timeline_sfx,
+        "privacy": timeline_privacy,
         "camera_play": {
             "snap_on_cuts": snap,
             "home": camera_play.get("home", "medium"),
@@ -410,6 +452,12 @@ def build_timeline_from_edl_and_cover(
         },
         "presentation": {"screenExplainer": se, "overlays": ov_style},
     }
+    if composite_cfg.get("enabled"):
+        timeline["composite"] = {
+            "enabled": True,
+            "baked_pip": baked_pip,
+        }
+    return timeline
 
 
 def write_timeline(path: Path, timeline: dict[str, Any]) -> None:

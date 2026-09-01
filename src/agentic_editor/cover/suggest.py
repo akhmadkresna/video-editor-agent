@@ -568,7 +568,15 @@ def suggest_cover(
         cover_cfg["merge_gap_sec"] = float(merge_gap_sec)
 
     cover_cfg = apply_screen_bias(cover_cfg)
+    from agentic_editor.cover.composite import (
+        effective_camera_play,
+        has_composite_screen,
+        has_screen_cover,
+        activity_probe_path,
+    )
+
     camera_play = load_style_camera_play(style)
+    camera_play = effective_camera_play({"camera_play": camera_play}, cfg)
     edit = episode / "edit"
 
     words = load_cam_words(edit)
@@ -580,12 +588,12 @@ def suggest_cover(
     )
 
     sources = cfg.get("sources") or {}
-    has_screen = "screen" in sources
+    has_screen = has_screen_cover(cfg)
     bins: list[dict[str, Any]] = list(activity_bins or [])
     if has_screen and activity_bins is None and not skip_activity_probe:
-        screen_path = resolve_source(episode, sources["screen"])
+        probe_path = activity_probe_path(episode, cfg)
         bins = probe_screen_activity(
-            screen_path,
+            probe_path,
             fps=float(cover_cfg.get("activity_fps", 2)),
             threshold=float(cover_cfg.get("activity_threshold", 0.035)),
         )
@@ -636,6 +644,7 @@ def suggest_cover(
         "captions": [],
         "_meta": {
             "has_screen": has_screen,
+            "composite": has_composite_screen(cfg),
             "deixis_hits": len(deixis),
             "activity_bins": len(bins),
             "suggested_events": len(events),
