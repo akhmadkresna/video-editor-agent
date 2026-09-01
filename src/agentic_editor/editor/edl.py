@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+CONTINUATION_START_RE = re.compile(
+    r"(?i)^(oke|ok|nah|lanjut|setelah|kemudian|selanjutnya|now|so)\b"
+)
 
 
 def load_edl(path: Path) -> dict[str, Any]:
@@ -72,6 +77,103 @@ def snap_range_to_words(
         if snapped_end <= snapped_start:
             snapped_end = snapped_start + 0.05
     return snapped_start, snapped_end
+
+
+def _words_in_gap(
+    words: list[dict[str, Any]], gap_start: float, gap_end: float
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if we > gap_start + 0.02 and ws < gap_end - 0.02:
+            tok = str(w.get("text") or w.get("word") or "").strip()
+            if tok:
+                out.append(w)
+    return out
+
+
+def _first_clause_text(
+    words: list[dict[str, Any]], t: float, *, radius: float = 4.0
+) -> str:
+    parts: list[str] = []
+    for w in words:
+        try:
+            ws = float(w["start"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if ws < t - 0.05 or ws > t + radius:
+            continue
+        tok = str(w.get("text") or w.get("word") or "").strip()
+        if tok:
+            parts.append(tok)
+        if len(parts) >= 6:
+            break
+    return " ".join(parts)
+
+
+def _note_bridgeable(a: str | None, b: str | None) -> bool:
+    na, nb = (a or "").strip().lower(), (b or "").strip().lower()
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    stem_a = re.split(r"\s*[+|,]", na)[0].strip()
+    stem_b = re.split(r"\s*[+|,]", nb)[0].strip()
+    return stem_a == stem_b and len(stem_a) >= 4
+
+
+def merge_bridge_gaps(
+    ranges: list[dict[str, Any]],
+    words: list[dict[str, Any]] | None = None,
+    *,
+    max_gap_sec: float = 8.0,
+) -> tuple[list[dict[str, Any]], int]:
+    """Merge adjacent keeps across short silent gaps (same topic / continuation).
+
+    Fixes hard jumps when radio-edit cuts a mid pause (THINK/AI_WAIT) between
+    clauses that belong to one beat — e.g. WinFSP explanation → brief silence →
+    "Oke setelah kita install…".
+    """
+    if len(ranges) < 2 or max_gap_sec <= 0:
+        return ranges, 0
+    word_rows = words or []
+    merged: list[dict[str, Any]] = []
+    bridges = 0
+    ordered = sorted(ranges, key=lambda r: float(r["start"]))
+    i = 0
+    while i < len(ordered):
+        cur = {k: v for k, v in ordered[i].items() if not str(k).startswith("_")}
+        j = i + 1
+        while j < len(ordered):
+            nxt = ordered[j]
+            if str(cur.get("source") or "cam") != str(nxt.get("source") or "cam"):
+                break
+            gap = float(nxt["start"]) - float(cur["end"])
+            if gap < -0.05 or gap > max_gap_sec:
+                break
+            if word_rows and _words_in_gap(
+                word_rows, float(cur["end"]), float(nxt["start"])
+            ):
+                break
+            nxt_open = _first_clause_text(word_rows, float(nxt["start"]))
+            if (
+                gap <= 0.05
+                or _note_bridgeable(cur.get("note"), nxt.get("note"))
+                or (nxt_open and CONTINUATION_START_RE.search(nxt_open))
+            ):
+                cur["end"] = round(float(nxt["end"]), 3)
+                if cur.get("note") != nxt.get("note") and nxt.get("note"):
+                    cur["note"] = str(cur.get("note") or nxt.get("note"))
+                bridges += 1
+                j += 1
+            else:
+                break
+        merged.append(cur)
+        i = j
+    return merged, bridges
 
 
 def example_edl(episode_rel_cam: str = "../raw/cam.mp4") -> dict[str, Any]:

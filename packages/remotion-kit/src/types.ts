@@ -90,6 +90,33 @@ export type OverlayKind =
 
 export type SfxKind = "typing" | "shutter" | "click";
 
+/** Normalized rect as percent of frame (0–100). */
+export type PrivacyRect = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+/** Solid privacy bars over secrets (client ID / secret / tokens). */
+export type TimelinePrivacy = {
+  id: string;
+  fromSec: number;
+  durationSec: number;
+  rects: PrivacyRect[];
+  /** v1: solid bar or full-window frosted blur. */
+  mode?: "bar" | "screen_blur";
+  label?: string;
+  note?: string;
+};
+
+/** Face-clear surround zones for A-roll MG (middle-ground Open Overlay). */
+export type OverlayZone =
+  | "left_third"
+  | "right_third"
+  | "lower_raised"
+  | "top_sparse";
+
 export type TimelineOverlay = {
   id: string;
   kind: OverlayKind;
@@ -116,6 +143,8 @@ export type TimelineOverlay = {
   /** `title` kind only — second-color headline continuation, e.g.
    * text="Kalau ngoding udah gampang," accent="kita dibayar buat apa?" */
   accent?: string;
+  /** Surround placement around the speaker; face oval stays clear. */
+  zone?: OverlayZone;
 };
 
 /** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
@@ -387,8 +416,20 @@ export type OverlayStyle = {
   ink?: string;
   dim?: string;
   fonts?: { display?: string; ui?: string };
+  /** Size bands (cqh): hero / body / meta — moderate hierarchy. */
+  sizeBands?: {
+    heroCqh?: number;
+    bodyCqh?: number;
+    metaCqh?: number;
+  };
+  /** Max primary + secondary lines on screen (density cap). */
+  density?: {
+    maxPrimary?: number;
+    maxSecondary?: number;
+  };
   chapter?: {
     leftCqw?: number;
+    rightCqw?: number;
     topCqh?: number;
     maxWidthCqw?: number;
     kickerSizeCqh?: number;
@@ -396,6 +437,7 @@ export type OverlayStyle = {
   };
   emphasis?: {
     leftCqw?: number;
+    rightCqw?: number;
     bottomCqh?: number;
     /** When set, pin to top (letterbox top bar) instead of bottom. */
     topCqh?: number;
@@ -405,12 +447,14 @@ export type OverlayStyle = {
   };
   diagram?: {
     leftCqw?: number;
+    rightCqw?: number;
     topCqh?: number;
     maxWidthCqw?: number;
     stepSizeCqh?: number;
   };
   callout?: {
     leftCqw?: number;
+    rightCqw?: number;
     bottomCqh?: number;
     /** When set, pin to top (letterbox top bar) instead of bottom. */
     topCqh?: number;
@@ -420,8 +464,13 @@ export type OverlayStyle = {
   };
   chip?: {
     leftCqw?: number;
+    rightCqw?: number;
     topCqh?: number;
     sizeCqh?: number;
+  };
+  safe?: {
+    faceClear?: boolean;
+    zones?: OverlayZone[];
   };
 };
 
@@ -434,17 +483,23 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
     display: "Syne",
     ui: "Instrument Sans",
   },
-  chapter: { leftCqw: 4.5, topCqh: 12, maxWidthCqw: 42 },
-  emphasis: { leftCqw: 4.5, bottomCqh: 28, sizeCqh: 16, underline: true },
+  sizeBands: { heroCqh: 22, bodyCqh: 9, metaCqh: 3.4 },
+  density: { maxPrimary: 1, maxSecondary: 1 },
+  chapter: { leftCqw: 4.5, topCqh: 12, maxWidthCqw: 42, titleSizeCqh: 12, kickerSizeCqh: 2.4 },
+  emphasis: { leftCqw: 4.5, bottomCqh: 28, sizeCqh: 22, underline: true, maxWidthCqw: 48 },
   diagram: { leftCqw: 4.5, topCqh: 10, maxWidthCqw: 40 },
   callout: {
     leftCqw: 4.5,
     bottomCqh: 22,
-    valueSizeCqh: 14,
+    valueSizeCqh: 18,
     sourceSizeCqh: 2.8,
     maxWidthCqw: 48,
   },
   chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4 },
+  safe: {
+    faceClear: true,
+    zones: ["left_third", "right_third", "lower_raised", "top_sparse"],
+  },
 };
 
 /** Persistent call-to-action badge (social profile). */
@@ -474,6 +529,8 @@ export type Timeline = {
   overlays?: TimelineOverlay[];
   cutaways?: TimelineCutaway[];
   sfx?: TimelineSfx[];
+  /** Solid bars masking on-screen credentials (EDL-remapped). */
+  privacy?: TimelinePrivacy[];
   presentation?: {
     screenExplainer?: ScreenExplainerStyle;
     overlays?: OverlayStyle;
@@ -504,6 +561,7 @@ export const emptyTimeline: Timeline = {
   overlays: [],
   cutaways: [],
   sfx: [],
+  privacy: [],
 };
 
 /** Locked cozy + cool mist defaults (mirror styles/tutorial). */

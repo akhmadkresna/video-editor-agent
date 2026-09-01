@@ -113,6 +113,14 @@ export const OverlayKindSchema = z.enum([
   "callout",
 ]);
 
+/** Face-clear surround placement (never on the face oval). */
+export const OverlayZoneSchema = z.enum([
+  "left_third",
+  "right_third",
+  "lower_raised",
+  "top_sparse",
+]);
+
 export const CoverOverlaySchema = z.object({
   id: z.string().optional(),
   kind: OverlayKindSchema,
@@ -128,6 +136,8 @@ export const CoverOverlaySchema = z.object({
   /** Callout: estimator source label (e.g. SocialCounts). */
   sourceLabel: z.string().optional(),
   note: z.string().optional(),
+  /** Surround zone around the speaker (face oval stays clear). */
+  zone: OverlayZoneSchema.optional(),
 });
 
 /** Generated MG cutaway scenes (picture takeover under cam VO), source-time. */
@@ -351,6 +361,26 @@ export const CoverSfxSchema = z.object({
   note: z.string().optional(),
 });
 
+/** Percent-of-frame rect (0–100) for solid privacy bars over secrets. */
+export const PrivacyRectSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+});
+
+/** Source-time privacy masks on cover — remapped through EDL, no dwell floor. */
+export const CoverPrivacySchema = z.object({
+  id: z.string().optional(),
+  start: z.number(),
+  end: z.number(),
+  rects: z.array(PrivacyRectSchema).optional(),
+  mode: z.enum(["bar", "screen_blur"]).optional(),
+  label: z.string().optional(),
+  note: z.string().optional(),
+  source: z.string().optional(),
+});
+
 export const CameraPlaySchema = z.object({
   /** Alternate home/alt framing at each EDL join when no framing event wins. */
   snap_on_cuts: z.boolean().default(true),
@@ -376,6 +406,8 @@ export const CoverSchema = z.object({
   cutaways: z.array(CoverCutawaySchema).default([]),
   /** Additive SFX under cam VO (source-time). */
   sfx: z.array(CoverSfxSchema).default([]),
+  /** Solid privacy bars over on-screen credentials (source-time). */
+  privacy: z.array(CoverPrivacySchema).default([]),
   captions: z
     .array(
       z.object({
@@ -454,6 +486,25 @@ export const OverlayStyleSchema = z.object({
       ui: z.string().optional(),
     })
     .optional(),
+  sizeBands: z
+    .object({
+      heroCqh: z.number().optional(),
+      bodyCqh: z.number().optional(),
+      metaCqh: z.number().optional(),
+    })
+    .optional(),
+  density: z
+    .object({
+      maxPrimary: z.number().optional(),
+      maxSecondary: z.number().optional(),
+    })
+    .optional(),
+  safe: z
+    .object({
+      faceClear: z.boolean().optional(),
+      zones: z.array(OverlayZoneSchema).optional(),
+    })
+    .optional(),
 });
 
 /** Output-timeline MG instance (after EDL remap). */
@@ -467,6 +518,7 @@ export const TimelineOverlaySchema = z.object({
   title: z.string().optional(),
   steps: z.array(z.string()).optional(),
   note: z.string().optional(),
+  zone: OverlayZoneSchema.optional(),
 });
 
 /** Output-timeline SFX (after EDL remap). src is staged under ae-media/sfx/. */
@@ -478,6 +530,17 @@ export const TimelineSfxSchema = z.object({
   src: z.string(),
   volume: z.number().default(0.4),
   tile: z.boolean().optional(),
+  note: z.string().optional(),
+});
+
+/** Output-timeline privacy bars (after EDL remap). */
+export const TimelinePrivacySchema = z.object({
+  id: z.string(),
+  fromSec: z.number(),
+  durationSec: z.number(),
+  rects: z.array(PrivacyRectSchema).min(1),
+  mode: z.enum(["bar", "screen_blur"]).optional(),
+  label: z.string().optional(),
   note: z.string().optional(),
 });
 
@@ -589,6 +652,7 @@ export const TimelineSchema = z.object({
     )
     .default([]),
   sfx: z.array(TimelineSfxSchema).default([]),
+  privacy: z.array(TimelinePrivacySchema).default([]),
   presentation: z
     .object({
       screenExplainer: ScreenExplainerSchema.optional(),
@@ -627,4 +691,7 @@ export type CoverOverlay = z.infer<typeof CoverOverlaySchema>;
 export type TimelineOverlay = z.infer<typeof TimelineOverlaySchema>;
 export type CoverSfx = z.infer<typeof CoverSfxSchema>;
 export type TimelineSfx = z.infer<typeof TimelineSfxSchema>;
+export type CoverPrivacy = z.infer<typeof CoverPrivacySchema>;
+export type TimelinePrivacy = z.infer<typeof TimelinePrivacySchema>;
+export type PrivacyRect = z.infer<typeof PrivacyRectSchema>;
 export type SfxKind = z.infer<typeof SfxKindSchema>;

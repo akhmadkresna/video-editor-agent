@@ -9,6 +9,7 @@ from agentic_editor.cover.overlay_suggest import (
     caps_for_duration,
     companion_framing_event,
     ensure_overlay_dwell,
+    find_payoff_clusters,
     find_payoff_hits,
     get_dwell_holds,
     is_mostly_screen,
@@ -157,6 +158,27 @@ def test_payoff_hits_and_screen_enter_score():
     near = next(h for h in hits if h["text"] == "Stok")
     far = next(h for h in hits if h["text"] == "Otomatis")
     assert score_emphasis(near, screen_wins=wins) > score_emphasis(far, screen_wins=wins)
+
+
+def test_payoff_cluster_lists_stack_tools():
+    words = [
+        {"text": "menggunakan", "start": 92.0, "end": 92.5},
+        {"text": "AirClone,", "start": 92.5, "end": 92.9},
+        {"text": "Google", "start": 93.0, "end": 93.4},
+        {"text": "Drive,", "start": 93.4, "end": 93.9},
+        {"text": "Union,", "start": 94.1, "end": 94.3},
+        {"text": "WinFSP,", "start": 94.7, "end": 95.4},
+        {"text": "Task", "start": 96.4, "end": 96.5},
+        {"text": "Scheduler.", "start": 96.5, "end": 97.1},
+    ]
+    clusters = find_payoff_clusters(words)
+    assert len(clusters) == 1
+    steps = clusters[0]["steps"]
+    assert "AirClone" in steps
+    assert "Google Drive" in steps
+    assert "Union" in steps
+    assert "WinFSP" in steps
+    assert "Task Scheduler" in steps
 
 
 def test_merge_framing_replaces_overlay_notes_only():

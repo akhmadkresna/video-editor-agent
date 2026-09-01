@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentic_editor.editor.edl import snap_range_to_words
+from agentic_editor.editor.edl import merge_bridge_gaps, snap_range_to_words
 from agentic_editor.editor.edl_suggest import suggest_edl_from_words
 from agentic_editor.editor.gap_class import GapClass, GapPolicy, classify_gap
 
@@ -116,3 +116,33 @@ def test_retake_dropped():
         cut_wait_speech=False,
     )
     assert edl["_meta"]["dropped_repeat"] >= 1
+
+
+def test_bridge_merges_silent_continuation_gap():
+    """Short silent gap + 'Oke setelah…' → one keep (no hard jump)."""
+    words = [
+        {"text": "Explorer.", "start": 323.5, "end": 323.95, "type": "word"},
+        {"text": "Oke", "start": 329.9, "end": 330.3, "type": "word"},
+        {"text": "setelah", "start": 330.3, "end": 330.6, "type": "word"},
+        {"text": "kita", "start": 330.6, "end": 330.8, "type": "word"},
+        {"text": "install,", "start": 330.8, "end": 331.1, "type": "word"},
+    ]
+    ranges = [
+        {
+            "source": "cam",
+            "start": 313.71,
+            "end": 324.05,
+            "note": "WinFSP install + why",
+        },
+        {
+            "source": "cam",
+            "start": 329.84,
+            "end": 335.65,
+            "note": "folder scripts + config path",
+        },
+    ]
+    merged, n = merge_bridge_gaps(ranges, words, max_gap_sec=8.0)
+    assert n == 1
+    assert len(merged) == 1
+    assert merged[0]["start"] == 313.71
+    assert merged[0]["end"] == 335.65

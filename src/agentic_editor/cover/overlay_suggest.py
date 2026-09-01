@@ -150,15 +150,41 @@ FILLER = frozenset(
     }
 )
 
+PAYOFF_CLUSTER_WINDOW_SEC = 18.0
+PAYOFF_CLUSTER_MAX_SPAN_SEC = 14.0
+PAYOFF_CLUSTER_MIN = 3
+STACK_TOOL_LABELS = frozenset(
+    {
+        "airclone",
+        "google drive",
+        "gdrive",
+        "winfsp",
+        "rclone",
+        "union",
+        "task scheduler",
+        "file explorer",
+        "oauth",
+        "client id",
+        "client secret",
+        "remote",
+        "mount",
+    }
+)
+
 # Multi-word first, then singles — display label is curated (roadmap early = priority)
 PAYOFF_PHRASES: list[tuple[str, str]] = [
     ("odoo studio", "Odoo Studio"),
     ("google drive", "Google Drive"),
     ("gdrive", "Google Drive"),
+    ("task scheduler", "Task Scheduler"),
+    ("file explorer", "File Explorer"),
+    ("airclone", "AirClone"),
+    ("winfsp", "WinFSP"),
     ("rclone", "rclone"),
     ("client id", "Client ID"),
     ("client secret", "Client Secret"),
     ("oauth", "OAuth"),
+    ("union", "Union"),
     ("access token", "Access Token"),
     ("refresh token", "Refresh Token"),
     ("remote", "Remote"),
@@ -522,9 +548,13 @@ def _annotate(
             ov["framing_note"] = "screen_holds_wide"
         elif ov.get("kind") == "emphasis":
             ov["framing_note"] = "close_ok"
-    # Density: one primary + at most one secondary tag/step label
+    # Density: one primary tag for stings — diagrams keep full step lists
     steps = ov.get("steps")
-    if isinstance(steps, list) and len(steps) > 1:
+    if (
+        isinstance(steps, list)
+        and len(steps) > 1
+        and ov.get("kind") != "diagram"
+    ):
         ov["steps"] = steps[:1]
     return ov
 
@@ -716,6 +746,68 @@ def find_payoff_hits(
             )
             used_i.update(range(i, i + n))
     return hits
+
+
+def find_payoff_clusters(
+    words: list[dict[str, Any]],
+    *,
+    window_sec: float = PAYOFF_CLUSTER_WINDOW_SEC,
+    max_span_sec: float = PAYOFF_CLUSTER_MAX_SPAN_SEC,
+    min_hits: int = PAYOFF_CLUSTER_MIN,
+) -> list[dict[str, Any]]:
+    """Dense tool-list windows → multi-step diagram (e.g. rclone + Drive + WinFSP)."""
+    hits = [
+        h
+        for h in find_payoff_hits(words)
+        if str(h.get("text") or "").lower() in STACK_TOOL_LABELS
+    ]
+    if len(hits) < min_hits:
+        return []
+    hits.sort(key=lambda h: float(h["start"]))
+    raw: list[dict[str, Any]] = []
+    for i in range(len(hits)):
+        group = [hits[i]]
+        for j in range(i + 1, len(hits)):
+            if float(hits[j]["start"]) - float(hits[i]["start"]) > window_sec:
+                break
+            group.append(hits[j])
+        if len(group) < min_hits:
+            continue
+        span = float(group[-1]["end"]) - float(group[0]["start"])
+        if span > max_span_sec:
+            continue
+        labels: list[str] = []
+        seen: set[str] = set()
+        for h in group:
+            lab = str(h.get("text") or "").strip()
+            key = lab.lower()
+            if not lab or key in seen:
+                continue
+            seen.add(key)
+            labels.append(lab)
+        if len(labels) < min_hits:
+            continue
+        raw.append(
+            {
+                "start": float(group[0]["start"]),
+                "end": float(group[-1]["end"]),
+                "title": "Stack" if len(labels) >= 3 else " · ".join(labels[:2]),
+                "steps": labels[:5],
+                "score": 4.0 + len(labels) + span * 0.05,
+                "source": "payoff_cluster",
+            }
+        )
+    raw.sort(key=lambda c: (-float(c["score"]), float(c["start"])))
+    picked: list[dict[str, Any]] = []
+    for cand in raw:
+        cs, ce = float(cand["start"]), float(cand["end"]) + 1.0
+        if any(
+            not (ce <= float(p["start"]) or cs >= float(p["end"]) + 1.0) for p in picked
+        ):
+            continue
+        picked.append(cand)
+    picked.sort(key=lambda c: float(c["start"]))
+    return picked
 
 
 def score_emphasis(
@@ -1325,8 +1417,40 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
                 structural=True,
             )
 
-    # 4) Diagrams (prefer screen; slide past chapter head)
+    # 3b) Tool-list stacks from payoff clusters (before generic EDL diagrams)
+    cluster_spans: list[tuple[float, float]] = []
     diagram_i = 0
+    for cluster in find_payoff_clusters(words):
+        if kind_count("diagram") >= caps["diagram"]:
+            break
+        rs = float(cluster["start"])
+        end = float(cluster["end"]) + diagram_hold * 0.35
+        if not _in_edl(ranges, rs, end):
+            continue
+        if words:
+            rs, end = snap_window_to_words(rs, end, words)
+        if overlaps_any(rs, end, used_spans):
+            continue
+        diagram_i += 1
+        if try_add(
+            {
+                "id": f"diagram-{diagram_i:02d}",
+                "kind": "diagram",
+                "start": rs,
+                "end": max(rs + 2.0, end),
+                "title": str(cluster["title"])[:40],
+                "kicker": "Stack",
+                "steps": list(cluster["steps"]),
+                "text": "",
+                "note": f"payoff_cluster:{cluster.get('source')}",
+            },
+            structural=True,
+        ):
+            cluster_spans.append((float(cluster["start"]), float(cluster["end"]) + 2.0))
+        else:
+            diagram_i -= 1
+
+    # 4) Diagrams (prefer screen; slide past chapter head)
     for r in ranges:
         if kind_count("diagram") >= caps["diagram"]:
             break
@@ -1334,6 +1458,10 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         if not note or not DIAGRAM_NOTE_RE.search(note):
             continue
         rs, r_end = float(r["start"]), float(r["end"])
+        if any(
+            not (r_end <= cs or rs >= ce) for cs, ce in cluster_spans
+        ):
+            continue
         end = min(r_end, rs + diagram_hold)
         if words:
             rs, end = snap_window_to_words(rs, end, words)
@@ -1404,7 +1532,10 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     # ---------- EMPHASIS PHASE (best-fit + punch coupling) ----------
     candidates: list[dict[str, Any]] = []
     for hit in find_payoff_hits(words):
-        s = max(0.0, float(hit["start"]) - EMPHASIS_PAD)
+        hs, he = float(hit["start"]), float(hit["end"])
+        if any(cs <= hs <= ce or cs <= he <= ce for cs, ce in cluster_spans):
+            continue
+        s = max(0.0, hs - EMPHASIS_PAD)
         e = float(hit["end"]) + EMPHASIS_PAD
         if words:
             s, e = snap_window_to_words(s, e, words)

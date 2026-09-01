@@ -21,7 +21,7 @@ from typing import Any
 import yaml
 
 from agentic_editor.cover.suggest import load_cam_words
-from agentic_editor.editor.edl import snap_range_to_words
+from agentic_editor.editor.edl import merge_bridge_gaps, snap_range_to_words
 from agentic_editor.editor.gap_class import (
     DEFAULT_GAP_POLICY,
     GapClass,
@@ -52,6 +52,8 @@ DEFAULT_RADIO_CFG: dict[str, Any] = {
     "silence_gap_sec": 0.60,  # fallback pack only
     "gap_cut_sec": 5.0,  # treated as wait_min if wait_min unset
     "hold_if_gap_sec": 5.0,
+    # Post-pass: merge short silent gaps between continuation clauses
+    "bridge_silent_gap_sec": 8.0,
 }
 
 WAIT_SPEECH_RE = re.compile(
@@ -445,6 +447,7 @@ def suggest_edl_from_words(
     hold_if_gap_sec: float | None = None,
     bridge_gap_sec: float | None = None,
     bridge_similarity: float | None = None,
+    bridge_silent_gap_sec: float = 8.0,
 ) -> dict[str, Any]:
     """
     Build keep ranges with gap-class logic.
@@ -628,6 +631,13 @@ def suggest_edl_from_words(
             }
         )
 
+    bridge_max = float(bridge_silent_gap_sec)
+    if bridge_gap_sec is not None:
+        bridge_max = float(bridge_gap_sec)
+    cleaned, bridges_merged = merge_bridge_gaps(
+        cleaned, word_dicts, max_gap_sec=bridge_max
+    )
+
     keep = sum(float(r["end"]) - float(r["start"]) for r in cleaned)
     return {
         "sources": sources or {source: f"../raw/{source}.mp4"},
@@ -650,6 +660,8 @@ def suggest_edl_from_words(
             "cut_repeats": cut_repeats,
             "cut_wait_speech": cut_wait_speech,
             "gap_classes": class_counts,
+            "bridges_merged": bridges_merged,
+            "bridge_silent_gap_sec": bridge_max,
             **filter_stats,
         },
     }
@@ -722,6 +734,7 @@ def suggest_edl(
         repeat_window_sec=float(radio.get("repeat_window_sec", 90.0)),
         cut_wait_speech=bool(radio.get("cut_wait_speech", True)),
         wait_speech_max_sec=float(radio.get("wait_speech_max_sec", radio["hold_sec"])),
+        bridge_silent_gap_sec=float(radio.get("bridge_silent_gap_sec", 8.0)),
     )
     meta = suggestion.setdefault("_meta", {})
     meta["style"] = style

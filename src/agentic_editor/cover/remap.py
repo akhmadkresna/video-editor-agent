@@ -124,6 +124,14 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
         accent = str(item.get("accent") or "").strip()
         if accent:
             entry["accent"] = accent
+        zone = str(item.get("zone") or "").strip().lower()
+        if zone in (
+            "left_third",
+            "right_third",
+            "lower_raised",
+            "top_sparse",
+        ):
+            entry["zone"] = zone
         # Optional manual source-time cues for diagram steps (cam seconds).
         raw_starts = item.get("stepStarts") or item.get("step_starts")
         if isinstance(raw_starts, list):
@@ -725,6 +733,8 @@ def build_timeline_overlays(
             inst["tone"] = ov["tone"]
         if ov.get("accent"):
             inst["accent"] = ov["accent"]
+        if ov.get("zone"):
+            inst["zone"] = ov["zone"]
         if kind == "diagram" and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell
@@ -811,5 +821,92 @@ def build_timeline_sfx(
         if item.get("note"):
             entry["note"] = str(item["note"])
         out.append(entry)
+    out.sort(key=lambda x: float(x["fromSec"]))
+    return out
+
+
+def _normalize_privacy_rects(raw: Any) -> list[dict[str, float]]:
+    """Clamp percent-of-frame rects; drop empty / invalid ones."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, float]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            x = float(item["x"])
+            y = float(item["y"])
+            w = float(item["w"])
+            h = float(item["h"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if w <= 0 or h <= 0:
+            continue
+        out.append(
+            {
+                "x": max(0.0, min(100.0, x)),
+                "y": max(0.0, min(100.0, y)),
+                "w": max(0.5, min(100.0, w)),
+                "h": max(0.5, min(100.0, h)),
+            }
+        )
+    return out
+
+
+DEFAULT_SCREEN_BLUR_RECT = {"x": 0.0, "y": 0.0, "w": 100.0, "h": 100.0}
+
+
+def build_timeline_privacy(
+    edl: dict[str, Any],
+    cover: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Remap cover.privacy[] (source-time) → timeline.privacy[] (output fromSec).
+
+    Exact duration through EDL — no dwell floor / collision trim (unlike MG overlays).
+    Emits **one timeline entry per keep slice** so radio-edit gaps never leave
+    a secret fragment unmasked.
+    """
+    if not cover:
+        return []
+    out: list[dict[str, Any]] = []
+    for i, item in enumerate(cover.get("privacy") or []):
+        if not isinstance(item, dict):
+            continue
+        mode = str(item.get("mode") or "bar").lower().strip()
+        if mode not in {"bar", "screen_blur"}:
+            mode = "bar"
+        rects = _normalize_privacy_rects(item.get("rects"))
+        if mode == "screen_blur" and not rects:
+            rects = [dict(DEFAULT_SCREEN_BLUR_RECT)]
+        if not rects:
+            continue
+        try:
+            start = float(item["start"])
+            end = float(item["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end <= start:
+            continue
+        slices = remap_source_window(
+            edl, start, end, source=str(item.get("source") or "cam")
+        )
+        if not slices:
+            continue
+        base_id = str(item.get("id") or f"privacy-{i}")
+        label = str(item["label"]) if item.get("label") else None
+        note = str(item["note"]) if item.get("note") else None
+        for j, sl in enumerate(slices):
+            entry: dict[str, Any] = {
+                "id": base_id if len(slices) == 1 else f"{base_id}-{j}",
+                "fromSec": round(float(sl["fromSec"]), 3),
+                "durationSec": round(max(0.05, float(sl["durationSec"])), 3),
+                "rects": rects,
+                "mode": mode,
+            }
+            if label:
+                entry["label"] = label
+            if note:
+                entry["note"] = note
+            out.append(entry)
     out.sort(key=lambda x: float(x["fromSec"]))
     return out
