@@ -81,6 +81,39 @@ def is_baked_pip(composite: dict[str, Any]) -> bool:
     return bool(composite.get("enabled")) and bool(composite.get("baked_pip", True))
 
 
+def is_composite_episode(project: dict[str, Any]) -> bool:
+    """True when ``composite.enabled`` — single-file OBS bake, not dual-source Remotion PIP."""
+    return bool(load_composite(project).get("enabled"))
+
+
+def overlay_explain_fill_enabled(project: dict[str, Any]) -> bool:
+    """Extra MG in long explain / stale-UI blocks.
+
+    Default **off** for normal cam+screen episodes. On when ``composite.enabled``
+    or ``overlays.density.explain_fill: true`` in project.yaml.
+    """
+    ov = project.get("overlays")
+    if isinstance(ov, dict):
+        density = ov.get("density")
+        if isinstance(density, dict) and density.get("explain_fill") is not None:
+            return bool(density["explain_fill"])
+    return is_composite_episode(project)
+
+
+def overlay_stale_screen_fill_enabled(project: dict[str, Any]) -> bool:
+    """MG on low-activity UI runs (uses ``screen_activity.json``).
+
+    Default **off** for dual-source — activity is probed on ``sources.screen``.
+    On for composite (cam.mkv probe) or ``overlays.density.stale_screen_fill: true``.
+    """
+    ov = project.get("overlays")
+    if isinstance(ov, dict):
+        density = ov.get("density")
+        if isinstance(density, dict) and density.get("stale_screen_fill") is not None:
+            return bool(density["stale_screen_fill"])
+    return is_composite_episode(project)
+
+
 def activity_probe_path(episode: Path, project: dict[str, Any]) -> Path:
     """File used for ffmpeg activity bins (screen file, else composite cam)."""
     sources = project.get("sources") or {}

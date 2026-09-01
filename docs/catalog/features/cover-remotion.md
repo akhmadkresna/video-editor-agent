@@ -136,6 +136,24 @@ This shrinks Remotion I/O without lowering published quality.
 
 UI fallback: `MissingTimelineBanner` if Studio somehow loads empty props.
 
+## Composite mode (OBS baked PIP — opt-in only)
+
+Use when **one** file already contains UI + face (`sources.cam` only). **Do not**
+set `composite.enabled` on normal dual-source episodes.
+
+| | Normal (`cam` + `screen`) | Composite (`composite.enabled: true`) |
+|--|--|--|
+| Screen beat visual | `sources.screen` on cool-mist float | Same `cam` clip, layout `full` |
+| Face during demo | Remotion `pip_corner` overlay | Already in frame — **no** extra PIP |
+| Activity probe | `sources.screen` | `sources.cam` (full composite) |
+| camera_play | Style / `cover.json` defaults | Softer composite defaults; optional `camera_play.enabled: false` |
+| Extra MG density (future) | **Off** unless `overlays.density.explain_fill: true` | On by default (`overlay_explain_fill_enabled`) |
+
+Gate helpers live in [`composite.py`](../../src/agentic_editor/cover/composite.py):
+`is_composite_episode`, `overlay_explain_fill_enabled`, `overlay_stale_screen_fill_enabled`.
+
+Regression: `tests/test_composite_cover.py::test_dual_source_without_composite_uses_screen_and_pip`.
+
 ## Test
 
 ```bash

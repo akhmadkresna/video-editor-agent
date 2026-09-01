@@ -6,7 +6,11 @@ from agentic_editor.cover import build_timeline_from_edl_and_cover
 from agentic_editor.cover.composite import (
     effective_camera_play,
     has_screen_cover,
+    is_camera_play_enabled,
+    is_composite_episode,
     load_composite,
+    overlay_explain_fill_enabled,
+    overlay_stale_screen_fill_enabled,
 )
 
 
@@ -93,3 +97,58 @@ def test_effective_camera_play_merges_composite_defaults():
     assert cp["enabled"] is False
     assert cp["scales"]["close"] == 1.0
     assert cp["snap_on_cuts"] is False
+
+
+def test_dual_source_without_composite_uses_screen_and_pip():
+    """Normal cam+screen episodes must not inherit composite baked-PIP behavior."""
+    edl = _edl(
+        [{"source": "cam", "start": 0.0, "end": 30.0}],
+        sources={"cam": "/tmp/cam.mp4", "screen": "/tmp/screen.mp4"},
+    )
+    cover = {
+        "camera_play": {
+            "snap_on_cuts": True,
+            "scales": {"wide": 1.0, "medium": 1.22, "close": 1.42},
+        },
+        "events": [{"type": "screen_with_cam", "start": 5.0, "end": 20.0}],
+    }
+    project = {"sources": {"cam": "raw/cam.mp4", "screen": "raw/screen.mp4"}}
+    assert is_composite_episode(project) is False
+    assert overlay_explain_fill_enabled(project) is False
+    assert overlay_stale_screen_fill_enabled(project) is False
+
+    tl = build_timeline_from_edl_and_cover(edl, cover)
+    pip = [c for c in tl["clips"] if c["layout"] == "pip_corner"]
+    screen_clips = [c for c in tl["clips"] if c["source"] == "screen"]
+    assert pip
+    assert screen_clips
+    assert tl.get("composite") is None
+    assert tl["camera_play"]["scales"]["close"] == 1.42
+    assert tl["camera_play"]["snap_on_cuts"] is True
+
+
+def test_effective_camera_play_no_composite_passthrough():
+    project = {"sources": {"cam": "raw/cam.mp4", "screen": "raw/screen.mp4"}}
+    cp = effective_camera_play(
+        {"camera_play": {"home": "medium", "scales": {"close": 1.42}}},
+        project,
+    )
+    assert cp["home"] == "medium"
+    assert cp["scales"]["close"] == 1.42
+    assert is_camera_play_enabled(cp) is True
+
+
+def test_overlay_density_extras_opt_in_on_dual_source():
+    project = {
+        "sources": {"cam": "raw/cam.mp4", "screen": "raw/screen.mp4"},
+        "overlays": {"density": {"explain_fill": True, "stale_screen_fill": False}},
+    }
+    assert is_composite_episode(project) is False
+    assert overlay_explain_fill_enabled(project) is True
+    assert overlay_stale_screen_fill_enabled(project) is False
+
+
+def test_overlay_density_extras_default_on_composite_only():
+    project = {"sources": {"cam": "raw/cam.mkv"}, "composite": {"enabled": True}}
+    assert overlay_explain_fill_enabled(project) is True
+    assert overlay_stale_screen_fill_enabled(project) is True
