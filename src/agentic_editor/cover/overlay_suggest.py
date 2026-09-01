@@ -196,10 +196,18 @@ PAYOFF_PHRASES: list[tuple[str, str]] = [
     ("config", "Config"),
 ]
 
-# Map messy EDL notes → short chapter/chip labels
+# Map messy EDL notes → short chapter/chip labels (series-specific; never match bare "hook")
 NOTE_LABEL_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\broadmap\b", re.I), "Roadmap"),
-    (re.compile(r"hook|lanjut|continue|plan", re.I), "Lanjut Toko Material"),
+    (
+        re.compile(
+            r"continue\s+toko\s*material|lanjut\s+toko\s*material|"
+            r"toko\s*material.*(?:lanjut|continue|plan|hook)|"
+            r"(?:hook|plan).*(?:continue|lanjut).*toko\s*material",
+            re.I,
+        ),
+        "Lanjut Toko Material",
+    ),
     (re.compile(r"one.?app|free app|from scratch|dari scratch", re.I), "Satu App"),
     (re.compile(r"not only|usaha|toko listrik", re.I), "Bukan Cuma Toko Material"),
     (re.compile(r"phase\s*3|kartu\s*stok|kartu\s*stock|stock card", re.I), "Kartu Stok"),

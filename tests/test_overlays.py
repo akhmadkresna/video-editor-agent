@@ -125,9 +125,31 @@ def test_overlay_sole_short_slice_not_dropped():
     assert ov[0]["durationSec"] >= 0.05
 
 
+def test_overlay_zone_passthrough_on_remap():
+    edl = {
+        "sources": {"cam": "/tmp/cam.mp4"},
+        "ranges": [{"source": "cam", "start": 0.0, "end": 20.0}],
+    }
+    cover = {
+        "overlays": [
+            {
+                "kind": "emphasis",
+                "start": 2.0,
+                "end": 5.0,
+                "text": "Satu App",
+                "zone": "right_third",
+            },
+        ],
+    }
+    ov = build_timeline_overlays(edl, cover)
+    assert len(ov) == 1
+    assert ov[0]["zone"] == "right_third"
+
+
 def test_chapter_note_and_title_helpers():
     assert CHAPTER_NOTE_RE.search("fase 2 setup")
     # curated short labels (not raw note dumps)
-    assert _clean_title("hook: Extend kontak") == "Lanjut Toko Material"
+    assert _clean_title("hook: Extend kontak") == "Extend kontak"
+    assert _clean_title("hook multi-drive") == "multi drive"
     assert _clean_title("hook + plan: continue toko material, roadmap") == "Roadmap"
     assert _clean_title("phase 1 done menus") == "Master Data"

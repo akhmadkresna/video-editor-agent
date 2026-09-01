@@ -12,8 +12,11 @@ from agentic_editor.cover.overlay_suggest import (
     find_payoff_hits,
     get_dwell_holds,
     is_mostly_screen,
+    materialize_sting,
     merge_framing_into_events,
     min_gap_ok,
+    pick_overlay_zone,
+    pick_sting_kind,
     score_emphasis,
     screen_windows,
     short_label,
@@ -27,10 +30,14 @@ def test_caps_scale_and_reserve_structure():
     assert long["target_total"] > short["target_total"]
     assert long["structure_reserve"] >= short["structure_reserve"]
     assert long["target_total"] >= long["structure_reserve"]
-    # Denser defaults (~1 / 40s): ~21m keep should ask for many stings
+    # Denser defaults (~1 / 28s): ~21m keep should ask for many stings
     mid = caps_for_duration(1275)
     assert mid["target_total"] >= 30
     assert mid["emphasis"] >= 8
+    # ~15 min keep must request ≥30 overlays
+    fifteen = caps_for_duration(880)
+    assert fifteen["target_total"] >= 30
+    assert fifteen["emphasis"] >= 12
 
 
 def test_short_label_rejects_generic_speech_notes():
@@ -85,6 +92,9 @@ def test_dwell_moves_to_keep_that_fits():
 
 def test_short_label_curates_notes():
     assert short_label("hook + plan: continue toko material, roadmap") == "Roadmap"
+    assert short_label("hook multi-drive") == "multi drive"
+    assert short_label("hook: Extend kontak") == "Extend kontak"
+    assert short_label("hook plan: continue toko material") == "Lanjut Toko Material"
     assert "Master Data" == short_label("phase 1 done: menus, res.partner, UDU check")
     assert short_label("purchase demo + status buttons + stock bug → diterima") == "Pembelian"
     assert short_label("not only toko material + phase 2 summary") == "Bukan Cuma Toko Material"
@@ -416,3 +426,24 @@ def test_punch_guarantee_places_mg_on_bare_punch(tmp_path: Path):
     ]
     assert near, "bare punch_in must get MG"
     assert any(o["kind"] == "emphasis" for o in near)
+
+
+def test_pick_sting_kind_rotates_glass_and_legacy():
+    assert pick_sting_kind("dua akun merge", slot=1) == "illustration"
+    assert pick_sting_kind("sudah mengenali komen di folder", slot=2) == "quote"
+    assert pick_sting_kind("3 remote", slot=3) == "stat"
+    assert pick_sting_kind("Otomatis", slot=4) == "callout"
+    assert pick_sting_kind("OAuth", slot=6) == "title"
+    ov = materialize_sting(
+        {"text": "sudah mengenali komen di folder", "start": 1.0, "end": 3.0, "score": 4.0, "phrase": "x"},
+        slot=2,
+        id_prefix="sting",
+    )
+    assert ov["kind"] == "quote"
+    assert "text" in ov
+    z0 = pick_overlay_zone("emphasis", used_zones=[], index=0)
+    assert z0 in {"lower_raised", "left_third", "right_third"}
+    z1 = pick_overlay_zone("emphasis", used_zones=[z0], index=1)
+    assert z1 != z0 or z1 in {"lower_raised", "left_third", "right_third"}
+    chip = pick_overlay_zone("chip", used_zones=[], index=0)
+    assert chip in {"top_sparse", "left_third", "right_third"}
