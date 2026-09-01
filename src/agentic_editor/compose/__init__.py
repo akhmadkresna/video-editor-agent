@@ -1006,6 +1006,7 @@ def render_compose(
     nvenc: bool = False,
     gl: str | None = None,
     concurrency: int | None = None,
+    jpeg_quality: int = 80,
 ) -> Path:
     _warn_if_mg_review_stale(episode)
     prepare_compose(episode)
@@ -1030,6 +1031,7 @@ def render_compose(
         "--props",
         str(props),
         f"--concurrency={conc}",
+        f"--jpeg-quality={int(jpeg_quality)}",
         *accel,
     ]
     print(f"$ cd {kit} && {' '.join(cmd)}")
@@ -1060,9 +1062,22 @@ _MG_REVIEW_KINDS = (
 
 #: Seconds into an overlay's fromSec where its entrance motion has settled —
 #: see styles/tutorial/style.md's "Motion (exact...)" section. stat needs
-#: longer (300ms count-up + 80ms delay + 260ms label fade ≈ 640ms); everything
-#: else settles within ~220-280ms, so 0.6s is a safe generic hold point.
-_MG_REVIEW_SETTLE_SEC = {"stat": 0.85}
+#: longer (300ms count-up + 80ms delay + 260ms label fade ≈ 640ms). Punch
+#: kinds capture mid-entrance so mg-review stills show motion, not only rest.
+_MG_REVIEW_SETTLE_SEC = {
+    "stat": 0.85,
+    "emphasis": 0.28,
+    "title": 0.32,
+    "quote": 0.32,
+    "chapter": 0.45,
+    "diagram": 0.55,
+    "chip": 0.35,
+    "callout": 0.40,
+    "illustration": 0.50,
+    "divider": 0.30,
+    "lower_third": 0.40,
+    "tag": 0.35,
+}
 _MG_REVIEW_SETTLE_DEFAULT = 0.6
 #: Per-still retry count — see the comment at the retry loop in
 #: render_mg_review for why this class of failure is expected to be
@@ -1359,6 +1374,24 @@ def render_mg_review(episode: Path, *, gl: str | None = None, verbose: bool = Tr
     return episode / "edit" / "mg-review" / "review.html"
 
 
+def _mg_motion_hint(kind: str) -> str:
+    hints = {
+        "emphasis": "punch scale + last-word pop + underline draw",
+        "title": "punch + stagger-rise (hero 64px)",
+        "quote": "punch + word stagger",
+        "stat": "count-up 300ms + punch",
+        "chapter": "slide Y + kicker pop + line draw",
+        "diagram": "rail grow + step pop",
+        "chip": "slide X + accent dot",
+        "callout": "slide + value count",
+        "illustration": "fade + contrast scale pair",
+        "divider": "punch + rule",
+        "lower_third": "calm slide",
+        "tag": "slide X",
+    }
+    return hints.get(kind, "enter + hold")
+
+
 def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
     import base64
     import html as _html
@@ -1393,13 +1426,14 @@ def _build_mg_review_html(tiles: list[dict[str, Any]]) -> str:
                 f'<span class="badge" style="border-style:{border_style}">'
                 f"{_html.escape(str(tone))}</span>"
             )
+        motion = _html.escape(_mg_motion_hint(str(t.get("kind") or "")))
         rows.append(
             f"""
       <figure>
         <img src="data:image/jpeg;base64,{img_b64}" alt="{oid}" />
         <figcaption>
           <div class="meta">{badges}<span class="id">{oid}</span></div>
-          <div class="t">t={from_sec:.2f}s · frame {t['_frame']}</div>
+          <div class="t">t={from_sec:.2f}s · frame {t['_frame']} · motion: {motion}</div>
         </figcaption>
       </figure>"""
         )

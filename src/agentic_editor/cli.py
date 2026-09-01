@@ -727,6 +727,7 @@ def cmd_compose(args: argparse.Namespace) -> int:
             if getattr(args, "concurrency", None) is not None
             else None
         ),
+        jpeg_quality=int(getattr(args, "jpeg_quality", 80)),
     )
     print(f"Wrote {out}")
     return 0
@@ -1095,6 +1096,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Remotion frame workers (default 4)."
         ),
+    )
+    com.add_argument(
+        "--jpeg-quality",
+        type=int,
+        default=80,
+        help="JPEG frame cache quality for final render (default 80; lowers disk vs PNG)",
     )
     com.set_defaults(func=cmd_compose)
 
