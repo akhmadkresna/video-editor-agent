@@ -2,15 +2,14 @@
 
 Defaults for tech talking-head + screen recordings.
 
-**Locked A-roll MG (2026-08+, "Open Overlay" v7):** one look for every overlay
-kind — white ink straight on the a-roll, **no panel, no accent color**.
-Readability comes from a darker scrim (`OverlayLayer`'s veil gradient) behind
-the text, not a card surface or a hue. The only color beyond white is a
-translucent-white text-selection highlight on `title`/`quote` accent
-phrases — never a general "accent" elsewhere. Superseded the opaque
-paper-card "Design Canvas" (v6) look: same layout, type, and motion per
-kind, just un-paneled and recolored. Do not invent episode-local forks;
-promote changes here.
+**Locked A-roll MG (2026-08+, "Open Overlay" v7+ middle-ground):** one look for
+every overlay kind — white ink straight on the a-roll, **no panel, no accent
+color**. Readability comes from a darker scrim (`OverlayLayer`'s zone-aware
+veil) behind the text. **Surround OK** (left / right / above / below the
+speaker); **face oval stays clear**. Moderate size hierarchy (hero ~22cqh,
+body ~9, meta ~3.4) and density cap (**one primary + optional one secondary**).
+Motion recipes: punch, stagger-rise, slide-in, count — snappy support, not
+poster collage. Do not invent episode-local forks; promote changes here.
 
 Kinds: `title` · `stat` · `lower_third` · `tag` · `divider` · `quote` · `code` ·
 `illustration` · `chapter` · `emphasis` · `diagram` · `callout` · `chip` — all
@@ -20,11 +19,12 @@ Kinds: `title` · `stat` · `lower_third` · `tag` · `divider` · `quote` · `c
 structure, same palette). Tokens in `glass/tokens.ts`. `code` stays a real
 terminal window — a screen convention, not part of the panel-removal, so it
 was never affected. Author cover.json `overlays[]` the same way as before
-(`start`/`end` cam-source seconds, word-snapped); the Python remap (`ae
-cover`) passes `text` / `title` / `kicker` / `steps` / `value` /
-`sourceLabel` / `note` / `tone` / `accent` through unchanged (`tone` and the
-per-overlay `accent` are data fields, not style colors — see field mapping
-below). Field mapping:
+(`start`/`end` cam-source seconds, word-snapped); optional `zone` =
+`left_third` | `right_third` | `lower_raised` | `top_sparse` (suggest rotates
+these). The Python remap (`ae cover`) passes `text` / `title` / `kicker` /
+`steps` / `value` / `sourceLabel` / `note` / `tone` / `accent` / `zone`
+through unchanged (`tone` and the per-overlay `accent` are data fields, not
+style colors — see field mapping below). Field mapping:
 
 | Kind | Fields used |
 |------|-------------|
@@ -42,16 +42,12 @@ badge with a dashed border (caution/estimate), teal/neutral render solid
 (sourced/plain). It's a border style, not a color — color is reserved for
 the white text-selection highlight only.
 
-**Motion (exact, from the design's "Motion & diagram guide"):** title/divider
-punch in (scale 0.94→1, fade) over 220ms, ease-punch, then **hard cut** on
-exit (no fade — the Sequence unmount is the cut). Stat numbers count up from
-0 over 300ms with the same punch ease; the label fades in 80ms after the
-count finishes. Quote cards fade/rise in over 280ms and are the one kind
-with a graceful **exit**: plain 200ms ease-out fade, no punch. Chips/lower
-third slide in 12px + fade over 180ms, staggered ~60ms apart, and mirror
-that on exit. Hold time: cut once the entrance motion settles and the beat
-is read (~1.5–2.5s single stat/quote, ~3s two-up) — don't hold a static MG
-once nothing is moving and the line has passed.
+**Motion (middle-ground recipes):** title/divider/emphasis **punch** in (scale
+0.94→1, fade) over ~220ms, then hard/near-hard cut on exit. Titles/quotes may
+**stagger-rise** words (60–90ms). Stat numbers **count** up ~300ms with punch
+ease; label fades in after. Chips/lower third **slide in** ~12px + fade over
+~180ms. Hold until the beat is read (~1.5–2.5s single sting, ~3s denser) —
+don't hold static MG once nothing is moving.
 
 The `chapter` / `emphasis` / `diagram` / `chip` / `callout` kinds (config
 below) render through `OverlayLayer`'s own `OneOverlay`, not
@@ -71,8 +67,8 @@ voice_enhance:
   compensate_delay: true
   sample_rate: 48000
   sources: [cam]
-# Locked A-roll overlay presentation (Remotion), "Open Overlay" v7 — one
-# look for every kind: no panel, no accent color, white ink + veil scrim.
+# Locked A-roll overlay presentation (Remotion), Open Overlay v7+ middle-ground —
+# white ink, no panel, surround zones, moderate hierarchy, density capped.
 overlays:
   preset: open_overlay
   treatment: bold              # type-only — no panel on any kind
@@ -91,16 +87,24 @@ overlays:
   fonts:
     display: Syne
     ui: Instrument Sans
+  sizeBands:
+    heroCqh: 22
+    bodyCqh: 9
+    metaCqh: 3.4
+  density:
+    maxPrimary: 1
+    maxSecondary: 1
   chapter:
     kickerSizeCqh: 2.4
-    titleSizeCqh: 9
+    titleSizeCqh: 12
     leftCqw: 4.5
     topCqh: 12
     maxWidthCqw: 42
   emphasis:
-    sizeCqh: 16
+    sizeCqh: 22
     leftCqw: 4.5
     bottomCqh: 28             # raised — was too low vs face/PIP
+    maxWidthCqw: 48
     underline: true
   diagram:
     leftCqw: 4.5
@@ -112,14 +116,16 @@ overlays:
     topCqh: 10
     sizeCqh: 3.4
   safe:
-    faceClear: true            # keep middle/face free
-    zones: [left_third, lower_third]
+    faceClear: true            # face oval clear; surround margins OK
+    zones: [left_third, right_third, lower_raised, top_sparse]
   # Framework default (ae overlay-suggest): denser MG + punch coupling
-  # - ~1 sting / 32s keep; chapter gap ~50s; emphasis gap ~10s
-  # - quiet keep stretches >55s get gap-fill emphasis
+  # - ~1 sting / 28s keep (≥30 overlays on ~15 min); chapter gap ~42s; emphasis gap ~8s
+  # - quiet keep stretches >28s get gap-fill emphasis (iterates to target_total)
+  # - thin payoff lexicon → speech-stride emphasis (~24s keep) from local words
   # - punch_in (in EDL) without nearby MG gets a forced emphasis sting
   # - chapter/diagram: prefer screen_with_cam; else framing medium/wide
-  # - emphasis: close OK; ID payoff + screen-enter + punch score; bottomCqh 28
+  # - emphasis: close OK; ID payoff + screen-enter + punch score
+  # - zone rotates around speaker (not left-rail only)
 punch_in:
   scale: 1.28
   defaultDurationSec: 1.35
@@ -128,11 +134,13 @@ punch_in:
 sfx:
   enabled: true
   no_whoosh: true
-  pack: styles/tutorial/sfx
+  pack: assets/sfx
   volumes:
     typing: 0.38
     shutter: 0.38
     click: 0.32
+    paper: 0.35
+    tick: 0.28
   density:
     sec_per_sfx: 30
     min_gap_sec: 1.2
@@ -256,7 +264,7 @@ Agents must load these defaults when `project.yaml` has `style: tutorial` (frame
 
 | Layer | Locked look |
 |-------|-------------|
-| A-roll MG — all 13 kinds (title / stat / lower_third / tag / divider / quote / code / illustration / chapter / emphasis / diagram / callout / chip) | `open_overlay` preset — white ink, no panel, no accent color, darker veil scrim behind the text (see above). `code` alone stays a real terminal window. |
+| A-roll MG — all 13 kinds (title / stat / lower_third / tag / divider / quote / code / illustration / chapter / emphasis / diagram / callout / chip) | `open_overlay` middle-ground — white ink, no panel, surround zones (face oval clear), moderate size hierarchy, density 1+1, zone-aware veil. `code` alone stays a real terminal window. |
 | Screen + PIP stage | Cool-mist canvas `#d9e2ec` + cozy float (soft round, no smart crop) |
 
 Run `ae cover-suggest .` after the EDL is confirmed when a `screen` source exists.

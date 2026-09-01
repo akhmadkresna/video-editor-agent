@@ -31,14 +31,15 @@ overlays:
     ui: Instrument Sans
   chapter:
     kickerSizeCqh: 2.4
-    titleSizeCqh: 9
+    titleSizeCqh: 12
     leftCqw: 4.5
     topCqh: 12
     maxWidthCqw: 42
   emphasis:
-    sizeCqh: 16
+    sizeCqh: 22
     leftCqw: 4.5
     bottomCqh: 28
+    maxWidthCqw: 48
     underline: true
   diagram:
     leftCqw: 4.5
@@ -48,7 +49,7 @@ overlays:
   callout:
     leftCqw: 4.5
     bottomCqh: 22
-    valueSizeCqh: 14
+    valueSizeCqh: 18
     sourceSizeCqh: 2.8
     maxWidthCqw: 48
   chip:
@@ -57,14 +58,14 @@ overlays:
     sizeCqh: 3.4
   safe:
     faceClear: true
-    zones: [left_third, lower_third]
+    zones: [left_third, right_third, lower_raised, top_sparse]
 punch_in:
   scale: 1.28
   defaultDurationSec: 1.35
 sfx:
   enabled: true
   no_whoosh: true
-  pack: styles/evidence/sfx      # own pack — camera_shutter/paper_page/soft_tick.mp3
+  pack: assets/sfx              # shared framework pack (all styles)
   volumes:
     typing: 0.38
     shutter: 0.38

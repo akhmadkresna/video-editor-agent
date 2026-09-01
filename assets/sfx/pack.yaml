@@ -1,20 +1,18 @@
-# Modern tech SFX pack — dry one-shots only. No whoosh / riser / swoosh.
-# Suggest default: shutter/click (+ MG appear). Typing asset kept for opt-in / hand-author.
+# Framework-default SFX pack (all styles). Dry one-shots only — no whoosh / riser / swoosh.
+# Real free recordings (see README.md + LICENSES.md). Prefer .wav.
 theme: modern_tech
 no_whoosh: true
 typing:
   enabled: false
-  file: typing-thock.mp3
+  file: typing-thock.wav
   volume: 0.38
   tile_sec: 1.2
   min_hold_sec: 4.0
 shutter:
-  # Deterministic dry two-stage shutter one-shot, stored with this pack.
   file: shutter.wav
   volume: 0.38
   max_sec: 0.22
 click:
-  # Deterministic dry UI clicks, stored with this pack.
   files:
     - click_01.wav
     - click_02.wav
@@ -22,12 +20,28 @@ click:
     - click_04.wav
   volume: 0.32
   max_sec: 0.22
+paper:
+  file: paper_page.wav
+  volume: 0.35
+  max_sec: 0.45
+tick:
+  file: soft_tick.wav
+  volume: 0.28
+  max_sec: 0.15
 mg:
   enabled: true
   chapter: shutter
   diagram: shutter
   emphasis: click
   chip: click
+  title: paper
+  stat: paper
+  lower_third: paper
+  divider: paper
+  quote: paper
+  illustration: paper
+  code: paper
+  tag: tick
 density:
   sec_per_sfx: 30
   min_gap_sec: 1.2

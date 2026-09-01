@@ -37,17 +37,28 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "display": "Syne",
         "ui": "Instrument Sans",
     },
+    # Middle-ground size hierarchy (~1.3–1.4× prior hero)
+    "sizeBands": {
+        "heroCqh": 22,
+        "bodyCqh": 9,
+        "metaCqh": 3.4,
+    },
+    "density": {
+        "maxPrimary": 1,
+        "maxSecondary": 1,
+    },
     "chapter": {
         "kickerSizeCqh": 2.4,
-        "titleSizeCqh": 9,
+        "titleSizeCqh": 12,
         "leftCqw": 4.5,
         "topCqh": 12,
         "maxWidthCqw": 42,
     },
     "emphasis": {
-        "sizeCqh": 16,
+        "sizeCqh": 22,
         "leftCqw": 4.5,
         "bottomCqh": 28,
+        "maxWidthCqw": 48,
         "underline": True,
     },
     "diagram": {
@@ -59,7 +70,7 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
     "callout": {
         "leftCqw": 4.5,
         "bottomCqh": 22,
-        "valueSizeCqh": 14,
+        "valueSizeCqh": 18,
         "sourceSizeCqh": 2.8,
         "maxWidthCqw": 48,
     },
@@ -70,7 +81,8 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
     },
     "safe": {
         "faceClear": True,
-        "zones": ["left_third", "lower_third"],
+        # Surround OK (left/right/above/below); never cover face oval
+        "zones": ["left_third", "right_third", "lower_raised", "top_sparse"],
     },
 }
 
@@ -155,7 +167,7 @@ def load_screen_explainer(style_name: str = "tutorial") -> dict[str, Any]:
 DEFAULT_SFX: dict[str, Any] = {
     "enabled": True,
     "no_whoosh": True,
-    "pack": "styles/tutorial/sfx",
+    "pack": "assets/sfx",
     "volumes": {"typing": 0.38, "shutter": 0.38, "click": 0.32, "paper": 0.35, "tick": 0.28},
     "density": {
         "sec_per_sfx": 30,
@@ -248,9 +260,9 @@ def load_voice_enhance(
 
 
 def sfx_pack_dir(style_name: str = "tutorial") -> Path:
-    """Absolute path to styles/<style>/sfx (or pack override)."""
+    """Absolute path to the shared SFX pack (default ``assets/sfx``)."""
     cfg = load_sfx(style_name)
-    pack = str(cfg.get("pack") or f"styles/{style_name}/sfx")
+    pack = str(cfg.get("pack") or "assets/sfx")
     p = Path(pack)
     if p.is_absolute():
         return p

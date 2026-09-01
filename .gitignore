@@ -2,8 +2,10 @@ node_modules/
 dist/
 out/
 .turbo/
+.cache/
 *.mp4
 *.wav
+!assets/sfx/*.wav
 !styles/**/sfx/*.wav
 *.mov
 !templates/**/.gitkeep

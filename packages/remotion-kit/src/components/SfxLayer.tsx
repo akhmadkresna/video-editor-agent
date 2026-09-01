@@ -9,7 +9,7 @@ type Props = {
 /**
  * Additive modern-tech SFX under cam VO. Shutter/click are one-shots.
  * Typing tiles only when present (opt-in / hand-authored — off in default suggest).
- * No whoosh assets — pack is curated in styles/tutorial/sfx.
+ * No whoosh assets — pack is curated in assets/sfx.
  */
 export const SfxLayer: React.FC<Props> = ({ sfx }) => {
   const { fps } = useVideoConfig();

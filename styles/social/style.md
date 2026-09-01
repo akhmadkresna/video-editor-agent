@@ -78,11 +78,13 @@ overlays:
 sfx:
   enabled: true
   no_whoosh: true
-  pack: styles/tutorial/sfx
+  pack: assets/sfx
   volumes:
     typing: 0.34
     shutter: 0.38
     click: 0.34
+    paper: 0.32
+    tick: 0.26
   typing:
     enabled: false
   shutter:

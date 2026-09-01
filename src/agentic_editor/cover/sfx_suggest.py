@@ -89,7 +89,7 @@ def resolve_sfx_file(
     bank_index: int = 0,
     explicit: str | None = None,
 ) -> str:
-    """Return filename (basename) inside the style sfx pack."""
+    """Return filename (basename) inside the framework SFX pack (``assets/sfx``)."""
     if explicit:
         name = Path(explicit).name
         if any(bad in name.lower() for bad in FORBIDDEN):
@@ -105,14 +105,14 @@ def resolve_sfx_file(
         files = section.get("files") if isinstance(section, dict) else None
         if isinstance(files, list) and files:
             return str(files[bank_index % len(files)])
-        return f"click_{(bank_index % 4) + 1:02d}.mp3"
+        return f"click_{(bank_index % 4) + 1:02d}.wav"
     if kind_l == "shutter":
-        return str((section or {}).get("file") or "shutter.mp3")
+        return str((section or {}).get("file") or "shutter.wav")
     if kind_l == "paper":
-        return str((section or {}).get("file") or "paper_page.mp3")
+        return str((section or {}).get("file") or "paper_page.wav")
     if kind_l == "tick":
-        return str((section or {}).get("file") or "soft_tick.mp3")
-    return str((section or {}).get("file") or "typing-thock.mp3")
+        return str((section or {}).get("file") or "soft_tick.wav")
+    return str((section or {}).get("file") or "typing-thock.wav")
 
 
 def _keep_ranges(edl: dict[str, Any]) -> list[tuple[float, float]]:

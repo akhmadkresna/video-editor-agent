@@ -41,7 +41,8 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Cache: `edit/audio/cam.voice.wav`. Raw is never rewritten. Opt out: `voice_enhance.enabled: false`.
     Do **not** substitute ffmpeg denoise / gate / `dialoguenhance` chains.
     SFX (typing / shutter / click) is additive under cam VO via `cover.sfx[]` — modern tech only,
-    **no whoosh**. Run `ae sfx-suggest .` after cover; confirm then `--apply`.
+    **no whoosh**. Shared pack: `assets/sfx/` (all styles). Run `ae sfx-suggest .` after cover;
+    confirm then `--apply`.
 10. **Locked look (`style: tutorial`):** house default for Odoo/tech screen demos.
     A-roll MG = **"Open Overlay" v7** — white ink straight on the a-roll, no panel,
     no accent color; readability from a darker veil scrim behind the text, not a card
