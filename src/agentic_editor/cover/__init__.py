@@ -242,11 +242,22 @@ def build_timeline_from_edl_and_cover(
         camera_play = cover.get("camera_play") or {}
     scales = _scales(camera_play)
     cover_events = list(cover.get("events") or [])
+    play_enabled = bool(camera_play.get("enabled", True))
+    if not play_enabled:
+        # Drop overlay framing companions — they only exist to fight zoom.
+        cover_events = [
+            ev
+            for ev in cover_events
+            if str(ev.get("type") or "").lower() != "framing"
+            or not str(ev.get("note") or "").startswith("overlay:")
+        ]
     clips: list[dict[str, Any]] = []
     effects: list[dict[str, Any]] = []
     captions: list[dict[str, Any]] = list(cover.get("captions") or [])
-    snap = bool(camera_play.get("snap_on_cuts", True))
+    snap = bool(camera_play.get("snap_on_cuts", True)) and play_enabled
     max_hold = float(camera_play.get("max_hold_sec", 16.0))
+    if not play_enabled:
+        max_hold = 86400.0
     # Default (9s) is tuned for max_hold_sec ~7 — high enough that drift
     # only catches the handful of shots that genuinely run longer than the
     # usual snap-cut rhythm, not most/all of them. If max_hold_sec is much
@@ -364,7 +375,7 @@ def build_timeline_from_edl_and_cover(
             part_out_start = out_t
             for seg_s, seg_e in segments:
                 seg_dur = seg_e - seg_s
-                if broll_visual:
+                if broll_visual or not play_enabled:
                     framing, motion, scale = "wide", "hold", 1.0
                 else:
                     framing, motion = _pick_base_framing(
@@ -379,14 +390,12 @@ def build_timeline_from_edl_and_cover(
                         motion = str(ev.get("motion") or motion)
                         scale = _framing_scale(framing, scales, ev.get("scale"))
                     # Push-in on any static shot that outlasts drift_min_hold_sec
-                    # — documentary/interview convention (PBS Frontline pushes
-                    # in on every interview shot). "snap" is just as static as
-                    # "hold" once the cut lands (SourceClip returns a fixed
-                    # scale for both), so both branches share one threshold.
-                    # Rate scales with duration in SourceClip (useMotionScale).
-                    # "wide" stays excluded — establishing/reset shots are
-                    # meant to sit still.
-                    if motion in ("hold", "snap") and seg_dur >= drift_min_hold and framing != "wide":
+                    if (
+                        play_enabled
+                        and motion in ("hold", "snap")
+                        and seg_dur >= drift_min_hold
+                        and framing != "wide"
+                    ):
                         motion = "drift"
 
                 clips.append(
@@ -444,6 +453,7 @@ def build_timeline_from_edl_and_cover(
         "sfx": timeline_sfx,
         "privacy": timeline_privacy,
         "camera_play": {
+            "enabled": play_enabled,
             "snap_on_cuts": snap,
             "home": camera_play.get("home", "medium"),
             "alt": camera_play.get("alt", "close"),

@@ -1044,9 +1044,10 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     ranges = list(edl.get("ranges") or [])
     cover = _load_cover(edit)
     cover_events = list(cover.get("events") or [])
-    from agentic_editor.cover.composite import effective_camera_play
+    from agentic_editor.cover.composite import effective_camera_play, is_camera_play_enabled
 
     camera_play = effective_camera_play(cover, cfg)
+    play_enabled = is_camera_play_enabled(camera_play)
     screen_wins = screen_windows(cover_events)
     punch_wins = [
         (a, b)
@@ -1161,12 +1162,16 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             return False
 
         on_screen = is_mostly_screen(s, e, screen_wins)
-        framing_ev = companion_framing_event(
-            kind=kind,
-            start=s,
-            end=e,
-            on_screen=on_screen,
-            ov_id=str(ov.get("id") or kind),
+        framing_ev = (
+            companion_framing_event(
+                kind=kind,
+                start=s,
+                end=e,
+                on_screen=on_screen,
+                ov_id=str(ov.get("id") or kind),
+            )
+            if play_enabled
+            else None
         )
         ov = _annotate(ov, on_screen=on_screen, framing_ev=framing_ev)
         if not ov.get("zone"):

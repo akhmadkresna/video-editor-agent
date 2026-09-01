@@ -57,8 +57,39 @@ def test_composite_baked_pip_with_episode(tmp_path, monkeypatch):
     assert tl["camera_play"]["scales"]["close"] <= 1.2
 
 
+def test_camera_play_disabled_flat_clips(tmp_path, monkeypatch):
+    ep = tmp_path / "ep"
+    (ep / "edit").mkdir(parents=True)
+    (ep / "raw").mkdir()
+    (ep / "project.yaml").write_text(
+        "id: flat\nsources:\n  cam: raw/cam.mkv\nstyle: tutorial\n"
+        "composite:\n  enabled: true\n  camera_play:\n    enabled: false\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENTIC_EDITOR_HOME", str(tmp_path.parent))
+    from agentic_editor import paths
+
+    monkeypatch.setattr(paths, "framework_home", lambda: tmp_path.parent)
+
+    edl = _edl([{"source": "cam", "start": 0.0, "end": 20.0}])
+    cover = {
+        "camera_play": {"snap_on_cuts": True, "scales": {"close": 1.42}},
+        "events": [
+            {"type": "framing", "start": 1.0, "end": 4.0, "framing": "close", "motion": "snap"},
+        ],
+    }
+    tl = build_timeline_from_edl_and_cover(edl, cover, episode=ep)
+    assert len(tl["clips"]) == 1
+    c = tl["clips"][0]
+    assert c["scale"] == 1.0
+    assert c["framing"] == "wide"
+    assert c["motion"] == "hold"
+    assert tl["camera_play"]["enabled"] is False or tl["camera_play"]["scales"]["close"] == 1.0
+
+
 def test_effective_camera_play_merges_composite_defaults():
-    project = {"composite": {"enabled": True}}
+    project = {"composite": {"enabled": True, "camera_play": {"enabled": False}}}
     cp = effective_camera_play({"camera_play": {"home": "medium"}}, project)
-    assert cp["home"] == "wide"
+    assert cp["enabled"] is False
+    assert cp["scales"]["close"] == 1.0
     assert cp["snap_on_cuts"] is False

@@ -16,13 +16,29 @@ from agentic_editor.project import resolve_source
 # Softer fake-multicam on a full-frame OBS composite — zooming the whole frame
 # crops UI; cut-snap shutter without a visible punch reads as "missing MG".
 DEFAULT_COMPOSITE_CAMERA_PLAY: dict[str, Any] = {
+    "enabled": True,
     "snap_on_cuts": False,
     "home": "wide",
     "alt": "medium",
-    "wide_on_resets": True,
+    "wide_on_resets": False,
     "max_hold_sec": 12,
     "scales": {"wide": 1.0, "medium": 1.08, "close": 1.15},
 }
+
+# Flat / off — no fake multicam zoom, snap cuts, or drift on composite tutorials.
+FLAT_CAMERA_PLAY: dict[str, Any] = {
+    "enabled": False,
+    "snap_on_cuts": False,
+    "home": "wide",
+    "alt": "wide",
+    "wide_on_resets": False,
+    "max_hold_sec": 86400,
+    "scales": {"wide": 1.0, "medium": 1.0, "close": 1.0},
+}
+
+
+def is_camera_play_enabled(camera_play: dict[str, Any]) -> bool:
+    return bool(camera_play.get("enabled", True))
 
 
 def load_composite(project: dict[str, Any]) -> dict[str, Any]:
@@ -86,4 +102,6 @@ def effective_camera_play(
     comp = load_composite(project)
     if comp.get("enabled") and isinstance(comp.get("camera_play"), dict):
         cp = _deep_merge(cp, comp["camera_play"])
+    if not is_camera_play_enabled(cp):
+        cp = _deep_merge(cp, FLAT_CAMERA_PLAY)
     return cp

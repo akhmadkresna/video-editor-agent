@@ -242,6 +242,10 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
     cover: dict[str, Any] = {}
     if cover_path.is_file():
         cover = json.loads(cover_path.read_text(encoding="utf-8"))
+    from agentic_editor.cover.composite import effective_camera_play, is_camera_play_enabled
+
+    camera_play = effective_camera_play(cover, cfg)
+    play_enabled = is_camera_play_enabled(camera_play)
     events = list(cover.get("events") or [])
     overlays = list(cover.get("overlays") or [])
     screens = _screen_intervals(events)
@@ -259,7 +263,7 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
         start = _snap_to_keep(start_raw, keeps)
         if start is None:
             continue
-        if kind in ("punch_in", "punch"):
+        if kind in ("punch_in", "punch") and play_enabled:
             candidates.append(
                 {
                     "kind": "shutter",
@@ -269,7 +273,11 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
                     "priority": 3,
                 }
             )
-        elif kind == "framing" and str(ev.get("motion") or "").lower() == "snap":
+        elif (
+            play_enabled
+            and kind == "framing"
+            and str(ev.get("motion") or "").lower() == "snap"
+        ):
             candidates.append(
                 {
                     "kind": "shutter",
@@ -290,7 +298,7 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
         for r in edl.get("ranges") or []
         if str(r.get("source") or "cam") == "cam" and float(r["end"]) > float(r["start"])
     ]
-    if bool(camera_play.get("snap_on_cuts", True)) and len(cam_ranges) > 1:
+    if play_enabled and bool(camera_play.get("snap_on_cuts", True)) and len(cam_ranges) > 1:
         for idx, (ks, _ke, note) in enumerate(cam_ranges):
             if idx == 0 or not _in_keep(ks, keeps):
                 continue
