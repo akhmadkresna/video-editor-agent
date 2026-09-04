@@ -7,18 +7,27 @@ from agentic_editor.cover.style_load import (
 )
 
 
-def test_overlays_locked_open_overlay_no_accent():
+def test_overlays_locked_aroll_text_motion_no_accent():
     ov = load_overlays("tutorial")
-    # open_overlay (2026-08+, v7) is the one house look for every kind —
-    # white ink, no panel, no accent color.
-    assert ov["preset"] == "open_overlay"
+    # A-Roll Text Motion System — the one house look for every kind:
+    # white ink, no panel, no accent hue; surround zones + size bands.
+    assert ov["preset"] == "aroll_text_motion"
     assert ov["treatment"] == "bold"
     assert ov["ink"] == "#ffffff"
     assert "accent" not in ov
     assert "accentName" not in ov
-    assert ov["fonts"]["display"] == "Syne"
+    assert ov["fonts"]["sans"] == "Plus Jakarta Sans"
+    assert ov["fonts"]["mono"] == "IBM Plex Mono"
     assert ov["dwell"]["chip_sec"] >= 3.5
     assert ov["dwell"]["emphasis_sec"] >= 2.0
+    assert ov["emphasis"]["sizeCqh"] >= 20
+    assert "right_third" in ov["safe"]["zones"]
+    assert ov["density"]["maxSecondary"] == 1
+    assert ov["sizeBands"]["heroCqh"] >= 20
+    # new keys inherited from DEFAULT_OVERLAYS
+    assert ov["motion"]["wordStaggerMs"] == 90
+    assert ov["type"]["weightHero"] == 800
+    assert ov["shape"]["fillWhite12"].startswith("rgba(255,255,255")
 
 
 def test_overlays_defaults_match_constant():

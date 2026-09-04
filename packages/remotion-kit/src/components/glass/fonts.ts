@@ -1,22 +1,19 @@
 /**
- * Real font loading for the "poster study" house style (2026-08, v5).
+ * Real font loading for the A-Roll Text Motion System overlay layer.
  *
- * Previously NO font was ever loaded anywhere in remotion-kit — every
- * "Instrument Sans/Serif" or "IBM Plex Mono" reference silently fell back
- * to system fonts, in both Remotion Studio and the final render. Fixed
- * here via @remotion/google-fonts, which gates rendering (delayRender/
- * continueRender) until the font actually loads — required for
- * deterministic frame-by-frame rendering, unlike a plain <link> tag.
+ * Via @remotion/google-fonts, which gates rendering (delayRender/
+ * continueRender) until the face loads — required for deterministic
+ * frame-by-frame renders, unlike a plain <link>.
+ *
+ * Plus Jakarta Sans = the rounded-geometric bold of the design system
+ * (800 punch words, 600 captions/labels). IBM Plex Mono for the `code`
+ * kind's terminal window only.
  */
-import { loadFont as loadArchivo } from "@remotion/google-fonts/Archivo";
+import { loadFont as loadJakarta } from "@remotion/google-fonts/PlusJakartaSans";
 import { loadFont as loadIBMPlexMono } from "@remotion/google-fonts/IBMPlexMono";
 
-const archivo = loadArchivo("normal", {
-  weights: ["400", "500", "700", "800", "900"],
-  subsets: ["latin"],
-});
-const archivoItalic = loadArchivo("italic", {
-  weights: ["400", "500"],
+const jakarta = loadJakarta("normal", {
+  weights: ["500", "600", "700", "800"],
   subsets: ["latin"],
 });
 const plexMono = loadIBMPlexMono("normal", {
@@ -24,7 +21,5 @@ const plexMono = loadIBMPlexMono("normal", {
   subsets: ["latin"],
 });
 
-export const sansFamily = archivo.fontFamily;
+export const sansFamily = jakarta.fontFamily;
 export const monoFamily = plexMono.fontFamily;
-// Referenced so the italic weights are actually requested/loaded.
-void archivoItalic;

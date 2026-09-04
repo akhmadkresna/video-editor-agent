@@ -70,10 +70,13 @@ voice_enhance:
 # Locked A-roll overlay presentation (Remotion), Open Overlay v7+ middle-ground —
 # white ink, no panel, surround zones, moderate hierarchy, density capped.
 overlays:
-  preset: open_overlay
-  treatment: bold              # type-only — no panel on any kind
+  # A-Roll Text Motion System. Common tokens (fonts / sizeBands / type /
+  # motion / shape / grid) come from DEFAULT_OVERLAYS — see
+  # styles/aroll-text-motion/overlays.style.yaml. This pack only overrides
+  # timing (dwell) + per-kind placement.
+  preset: aroll_text_motion
+  treatment: bold
   ink: "#ffffff"
-  dim: "rgba(255,255,255,0.55)"
   dwell:
     chip_sec: 4.0
     chapter_sec: 5.5
@@ -84,13 +87,6 @@ overlays:
     diagram_sec_per_step: 1.45
     diagram_search_pad_sec: 8.0        # speech search may look past short cover windows
     exit_sec: 0.9
-  fonts:
-    display: Syne
-    ui: Instrument Sans
-  sizeBands:
-    heroCqh: 22
-    bodyCqh: 9
-    metaCqh: 3.4
   density:
     maxPrimary: 1
     maxSecondary: 1

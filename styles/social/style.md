@@ -30,10 +30,12 @@ captions:
   # Centered in the bottom black letterbox bar.
   safeBottomRatio: 0.17
 overlays:
-  preset: open_overlay
+  # A-Roll Text Motion System — common tokens from DEFAULT_OVERLAYS
+  # (styles/aroll-text-motion/overlays.style.yaml). Social keeps its small
+  # top-bar per-kind sizes + zones below.
+  preset: aroll_text_motion
   treatment: bold
   ink: "#ffffff"
-  dim: "rgba(255,255,255,0.58)"
   dwell:
     chip_sec: 3.2
     chapter_sec: 4.0
@@ -41,9 +43,6 @@ overlays:
     emphasis_sec: 2.2
     min_sec: 1.6
     exit_sec: 0.6
-  fonts:
-    display: Syne
-    ui: Instrument Sans
   # All MG lives in the top black bar.
   chapter:
     kickerSizeCqh: 1.4

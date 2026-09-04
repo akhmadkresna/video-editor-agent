@@ -13,6 +13,7 @@ import {
   type TimelineOverlay,
 } from "../types";
 import { GlassOverlay, isGlassKind } from "./glass/GlassOverlays";
+import { resolveZone, zoneBoxStyle, zoneVeilBackground } from "./overlayZones";
 
 const DISPLAY =
   'Syne, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
@@ -23,20 +24,23 @@ function useStyle(style?: OverlayStyle) {
     ...DEFAULT_OVERLAY_STYLE,
     ...style,
     fonts: { ...DEFAULT_OVERLAY_STYLE.fonts, ...style?.fonts },
+    sizeBands: { ...DEFAULT_OVERLAY_STYLE.sizeBands, ...style?.sizeBands },
+    density: { ...DEFAULT_OVERLAY_STYLE.density, ...style?.density },
     chapter: { ...DEFAULT_OVERLAY_STYLE.chapter, ...style?.chapter },
     emphasis: { ...DEFAULT_OVERLAY_STYLE.emphasis, ...style?.emphasis },
     diagram: { ...DEFAULT_OVERLAY_STYLE.diagram, ...style?.diagram },
     callout: { ...DEFAULT_OVERLAY_STYLE.callout, ...style?.callout },
     chip: { ...DEFAULT_OVERLAY_STYLE.chip, ...style?.chip },
+    safe: { ...DEFAULT_OVERLAY_STYLE.safe, ...style?.safe },
   };
 }
 
-/** Softer than the old 140-stiffness snap. */
+/** Snappy punch spring (middle-ground recipe). */
 function softSpring(frame: number, fps: number, delay = 0) {
   return spring({
     frame: Math.max(0, frame - delay),
     fps,
-    config: { damping: 20, stiffness: 80 },
+    config: { damping: 16, stiffness: 160 },
   });
 }
 
@@ -156,23 +160,30 @@ function EnterExit({
   durationSec,
   exitStartSec,
   style,
+  recipe = "slide",
 }: {
   children: React.ReactNode;
   durationSec: number;
   /** Prefer holding content until this local second, then fade. */
   exitStartSec?: number;
   style?: React.CSSProperties;
+  recipe?: "slide" | "punch";
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const s = softSpring(frame, fps);
-  const y = interpolate(s, [0, 1], [18, 0]);
-  const fadeIn = interpolate(frame, [0, 8], [0, 1], {
+  const y =
+    recipe === "punch"
+      ? 0
+      : interpolate(s, [0, 1], [14, 0]);
+  const scale =
+    recipe === "punch" ? interpolate(s, [0, 1], [0.94, 1]) : 1;
+  const fadeIn = interpolate(frame, [0, Math.round(0.22 * fps)], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
   const total = Math.max(1, Math.round(durationSec * fps));
-  const defaultExitFrames = Math.min(28, Math.max(12, Math.round(fps * 0.9)));
+  const defaultExitFrames = Math.min(18, Math.max(8, Math.round(fps * 0.35)));
   const exitFrom =
     exitStartSec != null
       ? Math.min(total - 4, Math.max(8, Math.round(exitStartSec * fps)))
@@ -183,7 +194,14 @@ function EnterExit({
   });
   const opacity = Math.min(fadeIn, fadeOut);
   return (
-    <div style={{ opacity, transform: `translateY(${y}px)`, ...style }}>
+    <div
+      style={{
+        opacity,
+        transform: `translateY(${y}px) scale(${scale})`,
+        transformOrigin: "left center",
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
@@ -196,27 +214,28 @@ const Chapter: React.FC<{
   w: number;
 }> = ({ ov, style, h, w }) => {
   const frame = useCurrentFrame();
-  const left = style.chapter?.leftCqw ?? 4.5;
-  const top = style.chapter?.topCqh ?? 12;
+  const zone = resolveZone(ov.zone, "chapter");
   const maxW = style.chapter?.maxWidthCqw ?? 42;
   const kickerSize = style.chapter?.kickerSizeCqh ?? 2.4;
-  const titleSize = style.chapter?.titleSizeCqh ?? 9;
+  const titleSize = style.chapter?.titleSizeCqh ?? 12;
   const line = interpolate(frame, [10, 28], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const box = zoneBoxStyle(zone, {
+    maxWidthCqw: maxW,
+    insetCqw: style.chapter?.leftCqw ?? 4.5,
+    topCqh: style.chapter?.topCqh ?? 12,
+  });
   return (
     <div
       style={{
-        position: "absolute",
-        left: `${left}%`,
-        top: `${top}%`,
-        maxWidth: `${maxW}%`,
+        ...box,
         color: style.ink,
         textShadow: "0 8px 28px rgba(0,0,0,0.55)",
       }}
     >
-      <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
+      <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec} recipe="slide">
         {ov.kicker ? (
           <div
             style={{
@@ -225,7 +244,7 @@ const Chapter: React.FC<{
               fontWeight: 600,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: style.ink,
+              color: style.dim,
               marginBottom: Math.round(h * 0.012),
             }}
           >
@@ -264,6 +283,7 @@ const Emphasis: React.FC<{
   w: number;
 }> = ({ ov, style, h, w }) => {
   const frame = useCurrentFrame();
+  const zone = resolveZone(ov.zone, "emphasis");
   const line = interpolate(frame, [8, 24], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -275,33 +295,39 @@ const Emphasis: React.FC<{
   const parts = (ov.text || "").split(/\s+/).filter(Boolean);
   const head = parts.slice(0, -1).join(" ");
   const tail = parts.slice(-1)[0] || ov.text || "";
-  const left = style.emphasis?.leftCqw ?? 4.5;
-  const bottom = style.emphasis?.bottomCqh ?? 28;
-  const top = style.emphasis?.topCqh;
-  const sizeCqh = style.emphasis?.sizeCqh ?? 16;
-  const maxW = style.emphasis?.maxWidthCqw ?? 55;
+  const sizeCqh = style.emphasis?.sizeCqh ?? style.sizeBands?.heroCqh ?? 22;
+  const maxW = style.emphasis?.maxWidthCqw ?? 48;
   const strike = /^(tidak|no|off|deny)$/i.test(tail);
   const strikeP = interpolate(frame, [14, 26], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const box = zoneBoxStyle(zone, {
+    maxWidthCqw: maxW,
+    insetCqw: style.emphasis?.leftCqw ?? 4.5,
+    bottomCqh: style.emphasis?.bottomCqh ?? 28,
+    topCqh: style.emphasis?.topCqh,
+  });
+  const softHero = parts.length <= 4;
+  const fontSize = Math.round(h * ((softHero ? sizeCqh * 1.12 : sizeCqh) / 100));
   return (
     <div
       style={{
-        position: "absolute",
-        left: `${left}%`,
-        ...(top != null ? { top: `${top}%` } : { bottom: `${bottom}%` }),
-        maxWidth: `${maxW}%`,
+        ...box,
         color: style.ink,
         textShadow: "0 8px 28px rgba(0,0,0,0.55)",
       }}
     >
-      <EnterExit durationSec={ov.durationSec} exitStartSec={ov.exitStartSec}>
+      <EnterExit
+        durationSec={ov.durationSec}
+        exitStartSec={ov.exitStartSec}
+        recipe="punch"
+      >
         <div
           style={{
             fontFamily: DISPLAY,
             fontWeight: 800,
-            fontSize: Math.round(h * (sizeCqh / 100)),
+            fontSize,
             lineHeight: 0.92,
             letterSpacing: "-0.04em",
           }}
@@ -329,13 +355,15 @@ const Emphasis: React.FC<{
             ) : null}
           </span>
         </div>
-        <div style={{ marginTop: Math.round(h * 0.02) }}>
-          <DrawnLine
-            progress={line}
-            widthPx={Math.round(w * 0.22)}
-            color={style.ink}
-          />
-        </div>
+        {style.emphasis?.underline !== false ? (
+          <div style={{ marginTop: Math.round(h * 0.02) }}>
+            <DrawnLine
+              progress={line}
+              widthPx={Math.round(w * 0.22)}
+              color={style.ink}
+            />
+          </div>
+        ) : null}
       </EnterExit>
     </div>
   );
@@ -481,10 +509,14 @@ const Diagram: React.FC<{
   const { fps } = useVideoConfig();
   const steps = ov.steps || [];
   const stepAt = resolveStepAtSec(steps, ov);
-  const left = style.diagram?.leftCqw ?? 4.5;
-  const top = style.diagram?.topCqh ?? 10;
+  const zone = resolveZone(ov.zone, "diagram");
   const maxW = style.diagram?.maxWidthCqw ?? 40;
   const stepSizeCqh = style.diagram?.stepSizeCqh ?? 3.6;
+  const box = zoneBoxStyle(zone, {
+    maxWidthCqw: maxW,
+    insetCqw: style.diagram?.leftCqw ?? 4.5,
+    topCqh: style.diagram?.topCqh ?? 10,
+  });
   const n = steps.length;
   const metrics = diagramListMetrics(h, n, stepSizeCqh);
   const firstF = Math.round((stepAt[0] ?? 0.2) * fps);
@@ -497,10 +529,7 @@ const Diagram: React.FC<{
   return (
     <div
       style={{
-        position: "absolute",
-        left: `${left}%`,
-        top: `${top}%`,
-        maxWidth: `${maxW}%`,
+        ...box,
         color: style.ink,
         textShadow: "0 8px 24px rgba(0,0,0,0.5)",
       }}
@@ -601,17 +630,19 @@ const Chip: React.FC<{
 }> = ({ ov, style, h }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const left = style.chip?.leftCqw ?? 4.5;
-  const top = style.chip?.topCqh ?? 10;
-  const sizeCqh = style.chip?.sizeCqh ?? 3.4;
+  const zone = resolveZone(ov.zone, "chip");
+  const sizeCqh = style.chip?.sizeCqh ?? style.sizeBands?.metaCqh ?? 3.4;
   const pop = popSpring(frame, fps, 2);
   const scale = interpolate(pop, [0, 1], [0.15, 1]);
+  const box = zoneBoxStyle(zone, {
+    maxWidthCqw: 38,
+    insetCqw: style.chip?.leftCqw ?? 4.5,
+    topCqh: style.chip?.topCqh ?? 10,
+  });
   return (
     <div
       style={{
-        position: "absolute",
-        left: `${left}%`,
-        top: `${top}%`,
+        ...box,
         color: style.ink,
         fontFamily: UI,
         fontWeight: 600,
@@ -647,10 +678,8 @@ const Callout: React.FC<{
   w: number;
 }> = ({ ov, style, h, w }) => {
   const frame = useCurrentFrame();
-  const left = style.callout?.leftCqw ?? 4.5;
-  const bottom = style.callout?.bottomCqh ?? 22;
-  const top = style.callout?.topCqh;
-  const valueSize = style.callout?.valueSizeCqh ?? 14;
+  const zone = resolveZone(ov.zone, "callout");
+  const valueSize = style.callout?.valueSizeCqh ?? 18;
   const sourceSize = style.callout?.sourceSizeCqh ?? 2.8;
   const maxW = style.callout?.maxWidthCqw ?? 48;
   const value = ov.value || ov.text || "";
@@ -663,13 +692,16 @@ const Callout: React.FC<{
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const box = zoneBoxStyle(zone, {
+    maxWidthCqw: maxW,
+    insetCqw: style.callout?.leftCqw ?? 4.5,
+    bottomCqh: style.callout?.bottomCqh ?? 22,
+    topCqh: style.callout?.topCqh,
+  });
   return (
     <div
       style={{
-        position: "absolute",
-        left: `${left}%`,
-        ...(top != null ? { top: `${top}%` } : { bottom: `${bottom}%` }),
-        maxWidth: `${maxW}%`,
+        ...box,
         color: style.ink,
         textShadow: "0 8px 28px rgba(0,0,0,0.55)",
       }}
@@ -756,14 +788,14 @@ export const OverlayLayer: React.FC<{
         const duration = Math.max(1, Math.round(ov.durationSec * fps));
         // Emphasis sits in lower-third — skip left-rail veil (reduces flicker in dense packs).
         // Code stays a real terminal window — already opaque, doesn't need a veil behind it.
-        const showVeil = ov.kind !== "emphasis" && ov.kind !== "code";
+        const zone = resolveZone(ov.zone, ov.kind);
+        const showVeil = ov.kind !== "code";
         return (
           <Sequence key={ov.id} from={from} durationInFrames={duration} name={ov.id}>
             {showVeil ? (
               <AbsoluteFill
                 style={{
-                  background:
-                    "linear-gradient(90deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.1) 32%, transparent 50%)",
+                  background: zoneVeilBackground(zone),
                 }}
               />
             ) : null}

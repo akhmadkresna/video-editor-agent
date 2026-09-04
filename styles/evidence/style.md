@@ -11,10 +11,11 @@ Odoo/screen demos.
 captions:
   style: off
 overlays:
-  preset: open_overlay
+  # A-Roll Text Motion System — common tokens from DEFAULT_OVERLAYS
+  # (styles/aroll-text-motion/overlays.style.yaml). Overrides below only.
+  preset: aroll_text_motion
   treatment: bold
   ink: "#ffffff"
-  dim: "rgba(255,255,255,0.55)"
   dwell:
     chip_sec: 4.0
     chapter_sec: 5.5
@@ -26,9 +27,6 @@ overlays:
     diagram_sec_per_step: 1.55
     diagram_search_pad_sec: 8.0
     exit_sec: 0.9
-  fonts:
-    display: Syne
-    ui: Instrument Sans
   chapter:
     kickerSizeCqh: 2.4
     titleSizeCqh: 12

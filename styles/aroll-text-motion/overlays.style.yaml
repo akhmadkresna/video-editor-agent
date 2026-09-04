@@ -1,0 +1,122 @@
+# Overlay — A-Roll Text Motion System — style pack block.
+#
+# Replaces the `overlays:` YAML fence in every style pack that has one
+# (styles/tutorial, styles/evidence, styles/social, styles/mockup). This
+# file is the tutorial/default baseline; evidence & social keep only their
+# per-kind SIZE/PLACEMENT overrides (e.g. social's small top-bar sizes) and
+# inherit everything else here.
+#
+# Derived from overlay-aroll-design.md §2 (tokens) + §4 (new OverlayStyle
+# keys). Mirrors packages/remotion-kit/src/types.ts DEFAULT_OVERLAY_STYLE
+# and src/agentic_editor/cover/style_load.py DEFAULT_OVERLAYS.
+#
+# Guardrails (design system, non-negotiable): white text only, no hue; no
+# panels/cards/plates/backdrop-filter; max surface = fillWhite12 flat tint
+# (FlowSteps unreached chip only); face oval clear; 1 primary + 1 secondary.
+
+overlays:
+  preset: aroll_text_motion        # legacy string field, no code branches on it
+  treatment: bold
+  ink: "#ffffff"
+  inkMuted: "rgba(255,255,255,0.68)"
+  inkFaint: "rgba(255,255,255,0.4)"
+
+  fonts:
+    sans: "Plus Jakarta Sans"
+    mono: "IBM Plex Mono"
+
+  # cqh = % of frame height
+  sizeBands:
+    heroCqh: 22
+    bodyCqh: 12
+    subCqh: 7.0
+    metaCqh: 3.2
+    labelCqh: 2.4
+    eyebrowCqh: 2.0
+
+  density:
+    maxPrimary: 1
+    maxSecondary: 1
+
+  type:
+    weightHero: 800
+    weightBody: 600
+    lsTight: "-0.02em"
+    lsCaps: "0.14em"
+    lhTight: 0.98
+    textShadow: "0 2px 18px rgba(0,0,0,.55)"
+
+  motion:
+    easePop: [0.2, 1.4, 0.4, 1]
+    easeOut: [0.16, 1.0, 0.3, 1]
+    durFast: 220
+    durBase: 420
+    durSlow: 680
+    wordStaggerMs: 90
+    countMs: 900
+    exitMs: 340
+
+  shape:
+    radiusPill: 999
+    radiusSm: 6
+    radiusMd: 10
+    strokeW: 2
+    fillWhite12: "rgba(255,255,255,0.12)"
+    lineHair: "rgba(255,255,255,0.28)"
+
+  # Full-bleed dashed rule-of-thirds backdrop. Off by default; opt in per
+  # beat with note:"grid:3".
+  grid:
+    enabled: false
+    density: 3
+    opacity: 0.14
+
+  # On-screen time per kind (timing only — unchanged from the prior pack).
+  dwell:
+    chip_sec: 4.0
+    chapter_sec: 5.5
+    diagram_sec: 10.0
+    emphasis_sec: 2.4
+    callout_sec: 3.6
+    min_sec: 1.8
+    diagram_hold_after_last_sec: 2.6
+    diagram_sec_per_step: 1.45
+    diagram_search_pad_sec: 8.0
+    exit_sec: 0.9
+
+  # Placement per kind — cqw/cqh, unchanged from the prior pack (§3: this is
+  # a renderer swap, not a placement rewrite). New sub-keys added.
+  chapter:
+    kickerSizeCqh: 2.4
+    titleSizeCqh: 12
+    leftCqw: 4.5
+    topCqh: 12
+    maxWidthCqw: 42
+  emphasis:
+    sizeCqh: 22
+    leftCqw: 4.5
+    bottomCqh: 28
+    maxWidthCqw: 48
+    underline: true
+  diagram:
+    leftCqw: 4.5
+    topCqh: 10
+    maxWidthCqw: 40
+    stepSizeCqh: 3.6
+    connector: traveling_dot
+  callout:
+    leftCqw: 4.5
+    bottomCqh: 22
+    valueSizeCqh: 18
+    sourceSizeCqh: 2.8
+    maxWidthCqw: 48
+  chip:
+    leftCqw: 4.5
+    topCqh: 10
+    sizeCqh: 3.4
+    iconEm: 1.15
+    float: true
+
+  safe:
+    faceClear: true
+    zones: [left_third, right_third, lower_raised, top_sparse]

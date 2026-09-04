@@ -1,0 +1,10 @@
+:root{
+--ink-950:#0a0a0a;--ink-900:#111111;--ink-800:#1c1c1c;--ink-700:#2b2b2b;
+--paper-0:#ffffff;--paper-100:#f5f5f2;--paper-300:#d9d9d4;
+--scrim-strong:rgba(0,0,0,.72);--scrim-soft:rgba(0,0,0,.42);--scrim-hair:rgba(0,0,0,.18);
+--glass-white-12:rgba(255,255,255,.12);--glass-white-20:rgba(255,255,255,.2);
+--text-on-video:var(--paper-0);
+--text-caption:var(--paper-300);
+--stroke-on-video:var(--ink-950);
+--line-hair:rgba(255,255,255,.28);
+}

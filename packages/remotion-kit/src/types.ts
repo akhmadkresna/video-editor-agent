@@ -86,7 +86,10 @@ export type OverlayKind =
   | "divider"
   | "quote"
   | "code"
-  | "illustration";
+  | "illustration"
+  // A-Roll Text Motion System — optional "we do: [rotating]" pattern
+  // (text -> prefix, steps[] -> items). Renders as ListCycle.
+  | "list_cycle";
 
 export type SfxKind = "typing" | "shutter" | "click";
 
@@ -137,14 +140,18 @@ export type TimelineOverlay = {
   /** Local second when fade-out begins (after list hold). */
   exitStartSec?: number;
   note?: string;
-  /** "glass" kinds only — teal (info/positive) | amber (caution/estimate) |
-   * neutral. Drives StatCallout's mono-badge border style (dashed = amber). */
+  /** @deprecated tone axis removed by the A-Roll Text Motion System —
+   * kept so old cover.json still parses; renders as a no-op. */
   tone?: "teal" | "amber" | "neutral";
-  /** `title` kind only — second-color headline continuation, e.g.
-   * text="Kalau ngoding udah gampang," accent="kita dibayar buat apa?" */
+  /** `title` kind only — second headline line (2nd `PunchWord`, same size),
+   * e.g. text="Kalau ngoding udah gampang," accent="kita dibayar buat apa?" */
   accent?: string;
   /** Surround placement around the speaker; face oval stays clear. */
   zone?: OverlayZone;
+  /** `callout` only — annotation target, 0–1 of the frame. Absent → the
+   * CalloutArrow anchors to the zone edge and points at the centre third.
+   * Suppressed on full-cam (nothing to annotate). */
+  at?: [number, number];
 };
 
 /** Generated MG cutaway scenes (picture takeover; cam VO keeps playing). */
@@ -553,19 +560,55 @@ export type OverlayStyle = {
   preset?: string;
   treatment?: "bold";
   ink?: string;
+  /** @deprecated legacy veil colour — unused by the A-Roll Text Motion System. */
   dim?: string;
-  fonts?: { display?: string; ui?: string };
-  /** Size bands (cqh): hero / body / meta — moderate hierarchy. */
+  inkMuted?: string;
+  inkFaint?: string;
+  fonts?: { sans?: string; mono?: string };
+  /** Size bands (cqh ≈ % of frame height). */
   sizeBands?: {
     heroCqh?: number;
     bodyCqh?: number;
+    subCqh?: number;
     metaCqh?: number;
+    labelCqh?: number;
+    eyebrowCqh?: number;
   };
   /** Max primary + secondary lines on screen (density cap). */
   density?: {
     maxPrimary?: number;
     maxSecondary?: number;
   };
+  /** Motion timing/easing (ms; easings are cubic-bezier control points). */
+  motion?: {
+    easePop?: number[];
+    easeOut?: number[];
+    durFast?: number;
+    durBase?: number;
+    durSlow?: number;
+    wordStaggerMs?: number;
+    countMs?: number;
+    exitMs?: number;
+  };
+  type?: {
+    weightHero?: number;
+    weightBody?: number;
+    lsTight?: string;
+    lsCaps?: string;
+    lhTight?: number;
+    textShadow?: string;
+  };
+  shape?: {
+    radiusPill?: number;
+    radiusSm?: number;
+    radiusMd?: number;
+    strokeW?: number;
+    fillWhite12?: string;
+    lineHair?: string;
+  };
+  /** Full-bleed dashed rule-of-thirds backdrop. Off by default; per beat
+   * opt in with note:"grid:3". */
+  grid?: { enabled?: boolean; density?: number; opacity?: number };
   chapter?: {
     leftCqw?: number;
     rightCqw?: number;
@@ -590,6 +633,8 @@ export type OverlayStyle = {
     topCqh?: number;
     maxWidthCqw?: number;
     stepSizeCqh?: number;
+    /** FlowSteps connector: a glowing dot travels each link. */
+    connector?: "traveling_dot";
   };
   callout?: {
     leftCqw?: number;
@@ -606,6 +651,10 @@ export type OverlayStyle = {
     rightCqw?: number;
     topCqh?: number;
     sizeCqh?: number;
+    /** Lucide glyph size relative to the label (em). */
+    iconEm?: number;
+    /** ±7px sine drift after entrance when dwell > 3s. */
+    float?: boolean;
   };
   safe?: {
     faceClear?: boolean;
@@ -614,19 +663,51 @@ export type OverlayStyle = {
 };
 
 export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
-  preset: "open_overlay",
+  preset: "aroll_text_motion",
   treatment: "bold",
   ink: "#ffffff",
-  dim: "rgba(255,255,255,0.55)",
-  fonts: {
-    display: "Syne",
-    ui: "Instrument Sans",
+  inkMuted: "rgba(255,255,255,0.68)",
+  inkFaint: "rgba(255,255,255,0.4)",
+  fonts: { sans: "Plus Jakarta Sans", mono: "IBM Plex Mono" },
+  sizeBands: {
+    heroCqh: 22,
+    bodyCqh: 12,
+    subCqh: 7.0,
+    metaCqh: 3.2,
+    labelCqh: 2.4,
+    eyebrowCqh: 2.0,
   },
-  sizeBands: { heroCqh: 22, bodyCqh: 9, metaCqh: 3.4 },
   density: { maxPrimary: 1, maxSecondary: 1 },
+  motion: {
+    easePop: [0.2, 1.4, 0.4, 1],
+    easeOut: [0.16, 1.0, 0.3, 1],
+    durFast: 220,
+    durBase: 420,
+    durSlow: 680,
+    wordStaggerMs: 90,
+    countMs: 900,
+    exitMs: 340,
+  },
+  type: {
+    weightHero: 800,
+    weightBody: 600,
+    lsTight: "-0.02em",
+    lsCaps: "0.14em",
+    lhTight: 0.98,
+    textShadow: "0 2px 18px rgba(0,0,0,.55)",
+  },
+  shape: {
+    radiusPill: 999,
+    radiusSm: 6,
+    radiusMd: 10,
+    strokeW: 2,
+    fillWhite12: "rgba(255,255,255,0.12)",
+    lineHair: "rgba(255,255,255,0.28)",
+  },
+  grid: { enabled: false, density: 3, opacity: 0.14 },
   chapter: { leftCqw: 4.5, topCqh: 12, maxWidthCqw: 42, titleSizeCqh: 12, kickerSizeCqh: 2.4 },
   emphasis: { leftCqw: 4.5, bottomCqh: 28, sizeCqh: 22, underline: true, maxWidthCqw: 48 },
-  diagram: { leftCqw: 4.5, topCqh: 10, maxWidthCqw: 40 },
+  diagram: { leftCqw: 4.5, topCqh: 10, maxWidthCqw: 40, connector: "traveling_dot" },
   callout: {
     leftCqw: 4.5,
     bottomCqh: 22,
@@ -634,7 +715,7 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
     sourceSizeCqh: 2.8,
     maxWidthCqw: 48,
   },
-  chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4 },
+  chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4, iconEm: 1.15, float: true },
   safe: {
     faceClear: true,
     zones: ["left_third", "right_third", "lower_raised", "top_sparse"],

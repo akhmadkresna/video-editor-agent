@@ -15,17 +15,22 @@ from agentic_editor.paths import framework_home
 # the text. One look, shared by every kind (title/stat/lower_third/tag/
 # divider/quote/code/illustration/chapter/emphasis/diagram/callout/chip) and
 # every style pack. See packages/remotion-kit/src/components/glass/tokens.ts.
+# Mirrors packages/remotion-kit/src/types.ts DEFAULT_OVERLAY_STYLE and
+# packages/remotion-kit/src/components/glass/tokens.ts. Source of record:
+# styles/aroll-text-motion/overlays.style.yaml.
 DEFAULT_OVERLAYS: dict[str, Any] = {
-    "preset": "open_overlay",
+    "preset": "aroll_text_motion",
     "treatment": "bold",
     "ink": "#ffffff",
-    "dim": "rgba(255,255,255,0.55)",
+    "inkMuted": "rgba(255,255,255,0.68)",
+    "inkFaint": "rgba(255,255,255,0.4)",
     # Readable on-screen time (OverlayLayer fades out; do not hard-cut early)
     "dwell": {
         "chip_sec": 4.0,
         "chapter_sec": 5.5,
         "diagram_sec": 10.0,
         "emphasis_sec": 2.4,
+        "callout_sec": 3.6,
         "min_sec": 1.8,
         # List must remain after the last step appears (was ~0.35s — unreadable)
         "diagram_hold_after_last_sec": 2.6,
@@ -34,19 +39,48 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "exit_sec": 0.9,
     },
     "fonts": {
-        "display": "Syne",
-        "ui": "Instrument Sans",
+        "sans": "Plus Jakarta Sans",
+        "mono": "IBM Plex Mono",
     },
-    # Middle-ground size hierarchy (~1.3–1.4× prior hero)
     "sizeBands": {
         "heroCqh": 22,
-        "bodyCqh": 9,
-        "metaCqh": 3.4,
+        "bodyCqh": 12,
+        "subCqh": 7.0,
+        "metaCqh": 3.2,
+        "labelCqh": 2.4,
+        "eyebrowCqh": 2.0,
     },
     "density": {
         "maxPrimary": 1,
         "maxSecondary": 1,
     },
+    "motion": {
+        "easePop": [0.2, 1.4, 0.4, 1],
+        "easeOut": [0.16, 1.0, 0.3, 1],
+        "durFast": 220,
+        "durBase": 420,
+        "durSlow": 680,
+        "wordStaggerMs": 90,
+        "countMs": 900,
+        "exitMs": 340,
+    },
+    "type": {
+        "weightHero": 800,
+        "weightBody": 600,
+        "lsTight": "-0.02em",
+        "lsCaps": "0.14em",
+        "lhTight": 0.98,
+        "textShadow": "0 2px 18px rgba(0,0,0,.55)",
+    },
+    "shape": {
+        "radiusPill": 999,
+        "radiusSm": 6,
+        "radiusMd": 10,
+        "strokeW": 2,
+        "fillWhite12": "rgba(255,255,255,0.12)",
+        "lineHair": "rgba(255,255,255,0.28)",
+    },
+    "grid": {"enabled": False, "density": 3, "opacity": 0.14},
     "chapter": {
         "kickerSizeCqh": 2.4,
         "titleSizeCqh": 12,
@@ -66,6 +100,7 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "topCqh": 10,
         "maxWidthCqw": 40,
         "stepSizeCqh": 3.6,
+        "connector": "traveling_dot",
     },
     "callout": {
         "leftCqw": 4.5,
@@ -78,6 +113,8 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "leftCqw": 4.5,
         "topCqh": 10,
         "sizeCqh": 3.4,
+        "iconEm": 1.15,
+        "float": True,
     },
     "safe": {
         "faceClear": True,

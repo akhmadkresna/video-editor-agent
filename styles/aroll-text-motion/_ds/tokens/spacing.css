@@ -1,0 +1,6 @@
+:root{
+--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;--sp-7:48px;--sp-8:64px;--sp-9:96px;
+--radius-sm:6px;--radius-md:10px;--radius-lg:16px;--radius-pill:999px;
+--stroke-w:2px;--stroke-w-thick:4px; /* @kind spacing */
+--safe-x:6%;--safe-top:8%;--safe-bottom:10%; /* @kind spacing */
+}

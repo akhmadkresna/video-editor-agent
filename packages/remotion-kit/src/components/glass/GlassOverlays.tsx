@@ -6,47 +6,32 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { TimelineOverlay } from "../../types";
+import type { OverlayZone, TimelineOverlay } from "../../types";
 import {
   color,
   font,
   letterSpacing,
   radius,
   duration,
-  toneBorderStyle,
   jitterDeg,
 } from "./tokens";
+import { resolveZone, zoneRailAlign } from "../overlayZones";
 
 /* ------------------------------------------------------------------ */
-/* "Open Overlay" house style (v7) — no panel: white ink sits straight  */
-/* on the a-roll, legibility held by OverlayLayer's darker scrim behind */
-/* the text instead of a paper surface. Every kind here used to carry   */
-/* an opaque PaperCard (v6) — that's gone, along with its accent color; */
-/* text-shadow now does what the paper surface used to. The one         */
-/* exception is `code`, which stays a real terminal window (a screen    */
-/* convention, not a paper one) — it was never part of the card family. */
-/* Illustrations that show a comparison (dual_timeline, scale_compare)  */
-/* express it through TYPE SIZE, not bar charts — a bar/tick-mark       */
-/* widget isn't in any reference; a big numeral next to a small one is  */
-/* (see WOVE, TP-7).                                                    */
-/*                                                                      */
-/* Face-safe placement unchanged: left-third + vertically centered      */
-/* (title/divider/quote/code/illustration) or bottom-left corner        */
-/* (stat/lower_third/tag) — camera_play keeps the host roughly          */
-/* centered, so nothing anchors dead-center.                            */
+/* "Open Overlay" house style (v7+) — middle-ground kinetic: white ink  */
+/* on a-roll, no panel; surround zones around the speaker (face oval    */
+/* clear). Size hierarchy + snappy punch/stagger; density capped to one */
+/* primary + one secondary. Veil from OverlayLayer follows zone.        */
 /*                                                                      */
 /* IMPORTANT: Remotion's <AbsoluteFill> defaults to flexDirection:      */
 /* "column" — alignItems is the HORIZONTAL axis here, justifyContent    */
 /* is VERTICAL (opposite of normal row-flex intuition).                 */
 /*                                                                      */
-/* Motion timings — exact, from the Kresna "Motion & diagram guide":    */
-/*   Title/divider cards: punch in (scale 0.94->1, fade), 220ms,        */
-/*     ease-punch. Hold, hard cut out.                                  */
-/*   Stat callouts: number counts up from 0 over 300ms, punch ease;     */
-/*     label fades in 80ms after.                                       */
-/*   Quote cards: fade/rise in 280ms; exit plain fade 200ms ease-out,   */
-/*     no punch on exit.                                                */
-/*   Chips/lower third: slide in 12px + fade, 180ms, staggered ~60ms.   */
+/* Motion (middle-ground recipes):                                      */
+/*   Punch: scale 0.94→1 + fade ~220ms, hard cut exit (title/emphasis)  */
+/*   Stagger rise: Y + opacity, 60–90ms word stagger (title/quote)      */
+/*   Slide in: 12px + fade ~180ms (chips/lower third/tags)              */
+/*   Count: numeral count-up ~300ms + punch (stat)                      */
 /* ------------------------------------------------------------------ */
 
 function punchSpring(frame: number, fps: number, delay = 0, ms = duration.base) {
@@ -87,14 +72,25 @@ function useExit(
   });
 }
 
-function slideIn(frame: number, fps: number, staggerIndex = 0) {
+function slideIn(
+  frame: number,
+  fps: number,
+  staggerIndex = 0,
+  axis: "x" | "y" = "y",
+  fromPx = 12,
+) {
   const delay = Math.round(staggerIndex * 0.06 * fps);
   const dur = Math.round(0.18 * fps);
   const p = interpolate(frame, [delay, delay + dur], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  return { opacity: p, y: interpolate(p, [0, 1], [12, 0]) };
+  const offset = interpolate(p, [0, 1], [fromPx, 0]);
+  return {
+    opacity: p,
+    y: axis === "y" ? offset : 0,
+    x: axis === "x" ? offset : 0,
+  };
 }
 
 function countUpText(raw: string, progress: number): string {
@@ -108,20 +104,79 @@ function countUpText(raw: string, progress: number): string {
   });
 }
 
+/** Word-by-word rise (60–90ms stagger) for titles/quotes. */
+const StaggerRise: React.FC<{
+  text: string;
+  style?: React.CSSProperties;
+  staggerMs?: number;
+}> = ({ text, style, staggerMs = 75 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    return <span style={style}>{text}</span>;
+  }
+  const step = Math.max(2, Math.round((staggerMs / 1000) * fps));
+  const riseFrames = Math.round(0.22 * fps);
+  return (
+    <span style={{ ...style, display: "inline" }}>
+      {words.map((w, i) => {
+        const start = i * step;
+        const opacity = interpolate(frame, [start, start + riseFrames], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+        const y = interpolate(frame, [start, start + riseFrames], [14, 0], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+        return (
+          <span
+            key={`${i}-${w}`}
+            style={{
+              display: "inline-block",
+              opacity,
+              transform: `translateY(${y}px)`,
+              marginRight: i < words.length - 1 ? "0.28em" : 0,
+            }}
+          >
+            {w}
+          </span>
+        );
+      })}
+    </span>
+  );
+};
+
 /* ------------------------------------------------------------------ */
-/* Rails — face-safe placement (see flex-axis note above)               */
+/* Rails — face-clear surround zones                                    */
 /* ------------------------------------------------------------------ */
 
+const ZoneRail: React.FC<{
+  zone: OverlayZone;
+  children: React.ReactNode;
+}> = ({ zone, children }) => {
+  const align = zoneRailAlign(zone);
+  return (
+    <AbsoluteFill
+      style={{
+        alignItems: align.alignItems,
+        justifyContent: align.justifyContent,
+        padding: align.padding,
+        textAlign: align.textAlign,
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
+
 const LeftRail: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <AbsoluteFill style={{ alignItems: "flex-start", justifyContent: "center", padding: "0 8%" }}>
-    {children}
-  </AbsoluteFill>
+  <ZoneRail zone="left_third">{children}</ZoneRail>
 );
 
 const BottomLeftRail: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <AbsoluteFill style={{ alignItems: "flex-start", justifyContent: "flex-end", padding: "0 8% 9%" }}>
-    {children}
-  </AbsoluteFill>
+  <ZoneRail zone="lower_raised">{children}</ZoneRail>
 );
 
 /* ------------------------------------------------------------------ */
@@ -246,7 +301,7 @@ const MonoBadge: React.FC<{ children: React.ReactNode; tone?: "teal" | "amber" |
       letterSpacing: letterSpacing.caps,
       color: color.ink,
       border: `1px solid ${color.ink}`,
-      borderStyle: toneBorderStyle(tone),
+      borderStyle: "solid", // tone axis removed — no-op kept for callers
       padding: "3px 10px",
       marginBottom: 14,
     }}
@@ -293,18 +348,20 @@ const TagChip: React.FC<{ label: string; index: number; frame: number; fps: numb
 const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const zone = resolveZone(ov.zone, "title");
   const s = punchSpring(frame, fps);
   const scale = interpolate(s, [0, 1], [0.94, 1]);
   const opacity = interpolate(frame, [0, 6], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const tags = ov.steps || [];
+  const tags = (ov.steps || []).slice(0, 1);
   const isOutro = !ov.kicker && !ov.accent;
+  const headline = ov.text || ov.title || "";
   return (
-    <LeftRail>
-      <div style={{ transform: `scale(${scale})`, opacity }}>
-        <TextBlock maxWidth="64%">
+    <ZoneRail zone={zone}>
+      <div style={{ transform: `scale(${scale})`, opacity, transformOrigin: zone === "right_third" ? "right center" : "left center" }}>
+        <TextBlock maxWidth="58%">
           {isOutro ? (
             <>
               <div
@@ -319,25 +376,11 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
                 Kresna
               </div>
               <div style={{ fontFamily: font.sans, fontSize: 18, color: color.inkMuted }}>
-                {ov.text || ov.title}
+                {headline}
               </div>
             </>
           ) : (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontFamily: font.mono,
-                  fontSize: 11,
-                  letterSpacing: letterSpacing.caps,
-                  color: color.inkMuted,
-                  marginBottom: 14,
-                }}
-              >
-                <span>KRESNA</span>
-                <span>+</span>
-              </div>
               {ov.kicker ? (
                 <div
                   style={{
@@ -346,6 +389,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
                     fontWeight: 500,
                     fontSize: 16,
                     marginBottom: 6,
+                    color: color.inkMuted,
                   }}
                 >
                   {ov.kicker.toLowerCase()}
@@ -355,12 +399,12 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
                 style={{
                   fontFamily: font.sans,
                   fontWeight: 900,
-                  fontSize: 56,
+                  fontSize: 64,
                   lineHeight: 0.98,
                   letterSpacing: letterSpacing.tight,
                 }}
               >
-                {ov.text || ov.title}
+                <StaggerRise text={headline} />
                 {ov.accent ? (
                   <>
                     <br />
@@ -376,7 +420,6 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
                 gap: 10,
                 marginTop: 18,
                 paddingTop: 10,
@@ -394,7 +437,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           ) : null}
         </TextBlock>
       </div>
-    </LeftRail>
+    </ZoneRail>
   );
 };
 
@@ -407,6 +450,7 @@ const TitleCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
 const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const zone = resolveZone(ov.zone, "stat");
   const s = punchSpring(frame, fps);
   const scale = interpolate(s, [0, 1], [0.94, 1]);
   const countProgress = Math.min(1, Math.max(0, punchSpring(frame, fps, 0, 300)));
@@ -417,13 +461,11 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const labelDelay = Math.round(0.08 * fps) + Math.round(0.3 * fps);
   const labelOpacity = easeOutFade(frame, fps, labelDelay, 260);
   const displayValue = ov.value ? countUpText(ov.value, countProgress) : "";
+  const origin = zone === "right_third" ? "right bottom" : "left bottom";
   return (
-    <BottomLeftRail>
-      {/* Wrapped in a plain div, not a direct flex child of the rail —
-       * keeps display:table's shrink-wrap consistent with every other
-       * kind here. */}
+    <ZoneRail zone={zone}>
       <div>
-        <TextBlock maxWidth="64%">
+        <TextBlock maxWidth="58%">
         {ov.sourceLabel ? (
           <div style={{ opacity: labelOpacity }}>
             <MonoBadge tone={ov.tone}>{ov.sourceLabel}</MonoBadge>
@@ -433,7 +475,7 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           style={{
             opacity: numberOpacity,
             transform: `scale(${scale})`,
-            transformOrigin: "left bottom",
+            transformOrigin: origin,
             whiteSpace: "nowrap",
           }}
         >
@@ -442,7 +484,7 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
               style={{
                 fontFamily: font.sans,
                 fontWeight: 900,
-                fontSize: 110,
+                fontSize: 128,
                 lineHeight: 0.84,
                 letterSpacing: letterSpacing.tight,
                 fontVariantNumeric: "tabular-nums",
@@ -474,7 +516,7 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
         ) : null}
         </TextBlock>
       </div>
-    </BottomLeftRail>
+    </ZoneRail>
   );
 };
 
@@ -485,13 +527,21 @@ const StatCallout: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
 const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const main = slideIn(frame, fps, 0);
-  const tags = ov.steps || [];
+  const zone = resolveZone(ov.zone, "lower_third");
+  const fromPx = zone === "right_third" ? -12 : 12;
+  const axis = zone === "right_third" || zone === "left_third" ? "x" : "y";
+  const main = slideIn(frame, fps, 0, axis, fromPx);
+  const tags = (ov.steps || []).slice(0, 1);
   return (
-    <BottomLeftRail>
-      <div style={{ opacity: main.opacity, transform: `translateY(${main.y}px)` }}>
+    <ZoneRail zone={zone}>
+      <div
+        style={{
+          opacity: main.opacity,
+          transform: `translate(${main.x}px, ${main.y}px)`,
+        }}
+      >
         <TextBlock maxWidth="none">
-          <div style={{ fontFamily: font.sans, fontWeight: 900, fontSize: 36, letterSpacing: letterSpacing.tight }}>
+          <div style={{ fontFamily: font.sans, fontWeight: 900, fontSize: 40, letterSpacing: letterSpacing.tight }}>
             {ov.text}
           </div>
           {ov.title ? (
@@ -518,7 +568,7 @@ const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           ) : null}
         </TextBlock>
       </div>
-    </BottomLeftRail>
+    </ZoneRail>
   );
 };
 
@@ -529,17 +579,20 @@ const LowerThird: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
 const TagBadge: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const s = slideIn(frame, fps, 0);
+  const zone = resolveZone(ov.zone, "tag");
+  const fromPx = zone === "right_third" ? -12 : 12;
+  const axis = zone === "right_third" || zone === "left_third" ? "x" : "y";
+  const s = slideIn(frame, fps, 0, axis, fromPx);
   return (
-    <AbsoluteFill style={{ alignItems: "flex-start", justifyContent: "flex-start", padding: "8%" }}>
-      <div style={{ opacity: s.opacity, transform: `translateY(${s.y}px)` }}>
+    <ZoneRail zone={zone}>
+      <div style={{ opacity: s.opacity, transform: `translate(${s.x}px, ${s.y}px)` }}>
         <TextBlock maxWidth="none">
           <span style={{ fontFamily: font.mono, fontWeight: 600, fontSize: 14, letterSpacing: letterSpacing.caps }}>
             {ov.text}
           </span>
         </TextBlock>
       </div>
-    </AbsoluteFill>
+    </ZoneRail>
   );
 };
 
@@ -556,6 +609,7 @@ function dividerNumeral(kicker: string | null | undefined): string | null {
 const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const zone = resolveZone(ov.zone, "divider");
   const s = punchSpring(frame, fps);
   const scale = interpolate(s, [0, 1], [0.94, 1]);
   const opacity = interpolate(frame, [0, 6], [0, 1], {
@@ -564,8 +618,8 @@ const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   });
   const numeral = dividerNumeral(ov.kicker);
   return (
-    <LeftRail>
-      <div style={{ transform: `scale(${scale})`, opacity, position: "relative", maxWidth: "64%" }}>
+    <ZoneRail zone={zone}>
+      <div style={{ transform: `scale(${scale})`, opacity, position: "relative", maxWidth: "58%" }}>
         <TextBlock maxWidth="none">
           {numeral ? (
             <div
@@ -613,7 +667,7 @@ const SectionDivider: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           </div>
         </TextBlock>
       </div>
-    </LeftRail>
+    </ZoneRail>
   );
 };
 
@@ -648,55 +702,56 @@ function renderTextWithAccent(text: string, accent: string | undefined | null, i
 const QuoteCard: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const zone = resolveZone(ov.zone, "quote");
   const s = punchSpring(frame, fps);
   const scale = interpolate(s, [0, 1], [0.94, 1]);
   const opacity = interpolate(frame, [0, 6], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const body = ov.text || "";
   return (
-    <LeftRail>
-      <div style={{ transform: `scale(${scale})`, opacity }}>
-        <TextBlock maxWidth="64%">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontFamily: font.mono,
-              fontSize: 11,
-              letterSpacing: letterSpacing.caps,
-              color: color.inkMuted,
-              marginBottom: 14,
-            }}
-          >
-            <span>KUTIPAN</span>
-            <span>”</span>
-          </div>
-          <div
-            style={{
-              fontFamily: font.sans,
-              fontStyle: "italic",
-              fontWeight: 500,
-              fontSize: 16,
-              marginBottom: 6,
-            }}
-          >
-            {ov.kicker ? ov.kicker.toLowerCase() : "kata mereka"}
-          </div>
+    <ZoneRail zone={zone}>
+      <div
+        style={{
+          transform: `scale(${scale})`,
+          opacity,
+          transformOrigin: zone === "right_third" ? "right center" : "left center",
+        }}
+      >
+        <TextBlock maxWidth="58%">
+          {ov.kicker ? (
+            <div
+              style={{
+                fontFamily: font.sans,
+                fontStyle: "italic",
+                fontWeight: 500,
+                fontSize: 16,
+                marginBottom: 6,
+                color: color.inkMuted,
+              }}
+            >
+              {ov.kicker.toLowerCase()}
+            </div>
+          ) : null}
           <div
             style={{
               fontFamily: font.sans,
               fontWeight: 900,
-              fontSize: 40,
+              fontSize: 48,
               lineHeight: 0.98,
               letterSpacing: letterSpacing.tight,
             }}
           >
-            {renderTextWithAccent(ov.text || "", ov.accent, ov.id)}
+            {ov.accent ? (
+              renderTextWithAccent(body, ov.accent, ov.id)
+            ) : (
+              <StaggerRise text={body} />
+            )}
           </div>
         </TextBlock>
       </div>
-    </LeftRail>
+    </ZoneRail>
   );
 };
 
@@ -738,12 +793,13 @@ function renderCodeLine(line: string, key: string): React.ReactNode {
 const CodeSnippet: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const zone = resolveZone(ov.zone, "code");
   const lines = ov.steps || [];
   const panelOpacity = easeOutFade(frame, fps, 0, 220);
   const y = interpolate(panelOpacity, [0, 1], [10, 0]);
   const cursorOn = Math.floor(frame / Math.round(fps * 0.5)) % 2 === 0;
   return (
-    <LeftRail>
+    <ZoneRail zone={zone}>
       <div
         style={{
           opacity: panelOpacity,
@@ -823,7 +879,7 @@ const CodeSnippet: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           })}
         </div>
       </div>
-    </LeftRail>
+    </ZoneRail>
   );
 };
 
@@ -1036,7 +1092,7 @@ const Illustration: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
     }
   })();
   return (
-    <LeftRail>
+    <ZoneRail zone={resolveZone(ov.zone, "illustration")}>
       <div style={{ opacity }}>
         <TextBlock maxWidth={usesContrastPair ? "74%" : "none"}>
           {ov.title ? (
@@ -1056,7 +1112,7 @@ const Illustration: React.FC<{ ov: TimelineOverlay }> = ({ ov }) => {
           {body}
         </TextBlock>
       </div>
-    </LeftRail>
+    </ZoneRail>
   );
 };
 
