@@ -64,8 +64,9 @@ Only `ae new` produces a pipeline-valid episode. Full layout:
    short slug once.
 2. Run `ae new <abs-path>` (add `--force` only after they confirm overwrite).
 3. Verify `project.yaml`, `raw/`, and `edit/` exist under that path.
-4. Tell them: drop `raw/cam.mp4` (and optional `raw/screen.mp4`), then say
-   "footage sudah di raw".
+4. Tell them: drop `raw/cam.mp4` (and optional `raw/screen.mp4` — **not** for
+   `style: mockup` / Skill Lab, which is cam-only), then say "footage sudah di
+   raw".
 5. `cd` to the episode for all later `ae` commands (`.` = episode).
 
 ### 1. Map the request to commands
@@ -83,6 +84,7 @@ An **episode** is a folder with `project.yaml` + `raw/` + `edit/`. `cd` into it;
 | "oke", "terapkan", "apply", "lanjut" | `ae edl-suggest . --apply` → `ae cut .` |
 | "lihat hasilnya", "preview video", "studio" | `ae compose . --studio` (or open `edit/preview.mp4` after `ae cut .`) |
 | "tampilin layar", "cover", "bagian demo" | `ae cover-suggest .` → propose ranges → STOP → `ae cover .` |
+| "skill lab", "video skill claude", "drawn screen", `style: mockup` episode | `ae mockup-suggest .` → fill `<TODO>` + real `fromSec`/`toSec` → propose scenes → STOP → `ae mockup-suggest . --apply` → `ae cover .` (see `references/rules.md` #11 + `styles/series/claude-skill-lab/mockup-system.md`) |
 | "cek potongan", "QA" | `ae qa .`, then point at `edit/verify/` |
 | "judul / deskripsi / chapter", "shownotes" | read `edit/takes_packed.md`, write `edit/shownotes.md` (see `references/pipeline.md`) |
 

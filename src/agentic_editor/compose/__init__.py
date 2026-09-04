@@ -429,6 +429,15 @@ def prepare_compose(episode: Path, *, verbose: bool = True) -> Path:
                 json.dumps(cover, indent=2) + "\n", encoding="utf-8"
             )
 
+    # style: mockup — drawn-screen scenes live in edit/mockup.json (kept out
+    # of cover.json so cover-suggest / overlay-suggest never clobber them).
+    mockup_path = edit / "mockup.json"
+    if mockup_path.is_file():
+        if cover is None:
+            cover = {}
+        mk = json.loads(mockup_path.read_text(encoding="utf-8"))
+        cover["mockups"] = mk.get("scenes") if isinstance(mk, dict) else mk
+
     # Prefer edit/mezzanine/* (deliverable size) over multi-GB raw masters.
     compose_sources = resolve_compose_sources(
         episode, abs_sources, cfg, verbose=verbose

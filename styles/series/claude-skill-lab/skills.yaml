@@ -1,0 +1,62 @@
+# Skill → GitHub source registry for Claude Skill Lab.
+#
+# `ae mockup-suggest` reads this to build a RepoView scene: it derives the
+# repo web URL and the raw SKILL.md URL, fetches the real markdown, and
+# caches it under edit/.mockup-cache/. Unknown slugs fall back to
+# anthropics/skills + skills/<slug>.
+#
+# fields:  source   "Anthropic" | "community"  (shown as the chip)
+#          repo     "<owner>/<name>"
+#          branch   default "main"
+#          path     dir holding SKILL.md; "" = repo root
+#          skill_md optional explicit raw URL override
+
+avoid-ai-writing:
+  source: community
+  repo: conorbronsdon/avoid-ai-writing
+  path: ""
+
+pptx:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/pptx
+
+xlsx:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/xlsx
+
+docx:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/docx
+
+pdf:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/pdf
+
+skill-creator:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/skill-creator
+
+algorithmic-art:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/algorithmic-art
+
+discernment-nudge:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/discernment-nudge
+
+slack-gif-creator:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/slack-gif-creator
+
+canvas-design:
+  source: Anthropic
+  repo: anthropics/skills
+  path: skills/canvas-design

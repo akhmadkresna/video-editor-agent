@@ -245,6 +245,20 @@ def cmd_cover(args: argparse.Namespace) -> int:
     edl["sources"] = sources
     cover = json.loads(cover_path.read_text(encoding="utf-8"))
     style_name = str(cfg.get("style") or "tutorial")
+
+    # style: mockup — drawn-screen scenes live in their own file so
+    # ae cover-suggest / overlay-suggest never clobber them.
+    mockup_path = edit / "mockup.json"
+    if mockup_path.is_file():
+        mk = json.loads(mockup_path.read_text(encoding="utf-8"))
+        cover["mockups"] = mk.get("scenes") if isinstance(mk, dict) else mk
+    elif style_name == "mockup":
+        print(
+            "Note: style is mockup but no edit/mockup.json — run "
+            "`ae mockup-suggest .` first, or the render will be plain talking-head.",
+            file=sys.stderr,
+        )
+
     from agentic_editor.compose import apply_screen_aspect
 
     se = load_screen_explainer(style_name)
@@ -480,6 +494,71 @@ def cmd_cutaway_suggest(args: argparse.Namespace) -> int:
         print(
             "Skipped --apply. If cover.cutaways[] is leftover, delete it and run ae cover."
         )
+    return 0
+
+
+def cmd_mockup_suggest(args: argparse.Namespace) -> int:
+    episode = resolve_episode(args.episode)
+    cfg = load_project(episode)
+    style_name = str(cfg.get("style") or "tutorial")
+    if style_name != "mockup":
+        print(
+            f"Note: project style is {style_name!r}, not 'mockup'. Drawn-screen "
+            "scenes only render on `style: mockup` (Claude Skill Lab).",
+            file=sys.stderr,
+        )
+    from agentic_editor.cover.mockup import (
+        suggest_mockups,
+        validate_mockup,
+        write_mockup_suggest,
+    )
+
+    data = suggest_mockups(episode)
+    meta = data.get("_meta") or {}
+    if meta.get("error"):
+        print(f"mockup-suggest: {meta['error']}", file=sys.stderr)
+        return 1
+    out = write_mockup_suggest(episode, data)
+    unmatched = meta.get("unmatched_beats") or []
+    print(
+        f"Wrote {out.relative_to(episode)} "
+        f"({meta.get('scenes', 0)} scene(s) from {meta.get('beats', 0)} script beat(s); "
+        f"mode={meta.get('mode')}, skill={meta.get('skill')}, "
+        f"transcript={'yes' if meta.get('has_transcript') else 'NO'})"
+    )
+    if meta.get("mode") == "keyword-guess":
+        print(
+            "  No [MOCKUP: X] cues in edit/script.md — guessed from keywords "
+            "(noisy). Add `[MOCKUP: ClaudeChat|DiffPanel|AppWindow|SkillsPanel|RepoView …]` "
+            "lines where you want a drawn scene, then re-run."
+        )
+    hints = meta.get("keyword_hint_beats") or []
+    if hints:
+        print(f"  Beats that mention a screen but have no [MOCKUP:] cue: {', '.join(hints)}")
+    if meta.get("repo"):
+        got = "fetched" if meta.get("repo_md_fetched") else "NOT fetched (offline?) — paste SKILL.md by hand"
+        print(f"  RepoView source: {meta['repo']}  (SKILL.md {got})")
+    if not meta.get("has_transcript"):
+        print(
+            "  No cam transcript yet — scene fromSec/toSec are guesses. "
+            "Run `ae ingest .` first for real windows."
+        )
+    if unmatched:
+        print(f"  Beats with no transcript match (add scenes by hand): {', '.join(unmatched)}")
+    print("  Review edit/mockup.suggest.json, fill every <TODO>, then:")
+    print("  ae mockup-suggest . --apply   (validates → writes edit/mockup.json)")
+    if args.apply:
+        errs = validate_mockup(data)
+        if errs:
+            print("Cannot apply — fix these first:", file=sys.stderr)
+            for e in errs:
+                print(f"  • {e}", file=sys.stderr)
+            return 1
+        dest = episode / "edit" / "mockup.json"
+        dest.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        print(f"Wrote {dest.relative_to(episode)} — now: ae cover . && ae compose .")
     return 0
 
 
@@ -977,6 +1056,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="No-op (cutaways retired); kept so old scripts do not fail",
     )
     csug.set_defaults(func=cmd_cutaway_suggest)
+
+    mksug = sub.add_parser(
+        "mockup-suggest",
+        help="Draft drawn-screen scenes from edit/script.md (style: mockup / Skill Lab)",
+    )
+    mksug.add_argument("episode", nargs="?", default=".")
+    mksug.add_argument(
+        "--apply",
+        action="store_true",
+        help="Validate the suggest file and write edit/mockup.json (after review)",
+    )
+    mksug.set_defaults(func=cmd_mockup_suggest)
 
     ssug = sub.add_parser(
         "sfx-suggest",

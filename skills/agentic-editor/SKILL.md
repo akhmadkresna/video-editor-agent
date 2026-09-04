@@ -56,6 +56,25 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     After ingest: `ae evidence-suggest` ties ASR to stills. Cover events `evidence` /
     `evidence_with_cam`; MG may use `callout`. Promote knobs into `styles/evidence/style.md`.
     Docs: `docs/catalog/features/evidence-style.md`.
+10c. **Mockup episodes (`style: mockup`) — Claude Skill Lab.** No screen
+    recording: the "screen" is a Remotion-drawn mockup (`MockStage` + a
+    surface: `ClaudeChat` / `DiffPanel` / `AppWindow` / `SkillsPanel` /
+    `RepoView`), with a virtual camera (`MockCam`) and the cam PIP always
+    composited on top. `RepoView` shows the **real** SKILL.md — `ae
+    mockup-suggest` resolves the repo from
+    `styles/series/claude-skill-lab/skills.yaml` and fetches it (cache:
+    `edit/.mockup-cache/`).
+    Cam-only source. Rule 11's "no picture-takeover" is **waived** for this
+    pack; `ae cutaway-suggest` stays off. Path: `ae ingest` → radio-edit →
+    `ae cut` → **`ae mockup-suggest .`** (drafts `edit/mockup.suggest.json`
+    from `edit/script.md` + transcript) → fill every `<TODO>` + real
+    `fromSec`/`toSec` (cam source seconds) → **confirm** →
+    `ae mockup-suggest . --apply` (validates → `edit/mockup.json`) → `ae
+    cover .` → `ae compose .`. Scenes stay in `edit/mockup.json`, never
+    `cover.json`, so cover-/overlay-suggest can't clobber them. Preview the
+    components alone via the `MockupLab` Remotion composition. Keep drawn
+    scenes to ≲ 40% of runtime (full-frame Remotion is render-heavy). Full
+    spec: `styles/series/claude-skill-lab/mockup-system.md`.
 11. **MG overlays:** after EDL (and preferably cover) is confirmed, run `ae overlay-suggest .`,
     propose the plan, **wait for confirm**, then write `cover.json` `overlays[]` **and** any
     companion `framing` events (or `ae overlay-suggest . --apply` only after confirm).
@@ -89,6 +108,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
       concern + solutions, no “kampus primitive” / roasting lecturers / “kuliah
       percuma”. Prefer MG quote cards over third-party clips. Do not paste source
       YouTube transcripts into the teleprompter — rewrite the angle.
+    - `series: claude-skill-lab` → `styles/series/claude-skill-lab/thumbnail.md`.
+      Accent `#c084fc`, tag `SKILL LAB`, host RIGHT, export **1280×720**.
+      `style: mockup` (drawn screen, no recording — see rule 10c). Series
+      bible + `research.md` (living topic list) + `mockup-system.md` in that
+      folder.
     Agents must not redesign per episode.
 13. **Portrait social cut:** never mutate the confirmed long-form EDL/cover.
     After confirming the short strategy, write sibling `edit/social/edl.json` and
@@ -129,6 +153,33 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 4. **Propose** radio-edit → **wait for confirm** → `edit/edl.json` → `ae cut .`
 5. **Evidence cover** — `ae evidence-suggest .` (plan + ASR) → confirm → `--apply`
 6. **Overlays / SFX / compose** — as below (callout for estimator numbers)
+
+### Mockup series (`style: mockup`) — Claude Skill Lab
+
+Talking head only; every "screen" is drawn. `raw/cam.mp4` only.
+
+0. **Scaffold** — `ae new G:\AI\episodes\claude-skill-lab-NN-<skill>`, then set
+   `project.yaml`: `style: mockup`, `series: claude-skill-lab`, `sources.cam`
+   only. Copy `styles/series/claude-skill-lab/naskah-template.md` →
+   `edit/script.md` and fill it. Mark each drawn scene with a
+   `[MOCKUP: <Component> — note]` line — only cued beats become scenes.
+1. **Record** — host reads `edit/script.md` (no screen capture) → `raw/cam.mp4`
+2. **Inventory** — `ae ingest .`
+3. **Propose** radio-edit → **wait for confirm** → `edit/edl.json` → `ae cut .`
+4. **Draft scenes** — `ae mockup-suggest .` → `edit/mockup.suggest.json`
+   (one skeleton per script beat: derived surface + camera + `<TODO>`s).
+5. **Fill + confirm** — set real `fromSec`/`toSec` (cam source seconds) per
+   scene, replace every `<TODO>`, adjust `camera[]` and `layers`. Propose the
+   scene list to the user → **wait for confirm**.
+6. **Apply** — `ae mockup-suggest . --apply` (validates → `edit/mockup.json`).
+7. **Overlays** (optional) — `ae overlay-suggest .` as below; MG renders above
+   the mockup.
+8. **Compose** — `ae cover .` → `ae compose . --studio` / render. `ae cover`
+   remaps scenes to output time and adds a `pip_corner` cam clip per scene.
+9. **QA** — check a mock scene: host PIP present, camera holds/pulls, MG above.
+
+Never hand-author `cover.cutaways[]` here. Iterating: edit `edit/mockup.json`
+directly (it's scene data, not cut ranges), re-run `ae cover .`.
 
 ### Default / tutorial path
 

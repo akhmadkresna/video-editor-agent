@@ -52,7 +52,10 @@ def slice_timeline(timeline: dict[str, Any], limit_sec: float) -> dict[str, Any]
     out["durationSec"] = float(limit_sec)
     out["durationInFrames"] = max(1, int(round(limit_sec * fps)))
 
-    for key in ("clips", "effects", "overlays", "captions", "sfx"):
+    # mockups/cutaways are output-time fromSec+durationSec like overlays; a
+    # scene half-cut by the draft window keeps its (now out-of-range)
+    # scene-local camera/turn atSec — acceptable for a rough draft.
+    for key in ("clips", "effects", "overlays", "captions", "sfx", "cutaways", "mockups"):
         trimmed: list[dict[str, Any]] = []
         for item in timeline.get(key) or []:
             if not isinstance(item, dict):

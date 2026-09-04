@@ -311,6 +311,13 @@ def build_timeline_from_edl_and_cover(
     timeline_sfx = build_timeline_sfx(edl, cover, style_name=style_name, sfx_cfg=load_sfx(style_name))
     timeline_privacy = build_timeline_privacy(edl, cover)
 
+    # Drawn-screen scenes (style: mockup). Scenes cover the picture; the
+    # returned pip clips keep the host in frame (shot grammar: full cam ⇄
+    # mockup + PIP). No-op when cover has no `mockups`.
+    from agentic_editor.cover.mockup import build_timeline_mockups, load_mockup
+
+    timeline_mockups, mock_pip_clips = build_timeline_mockups(edl, cover)
+
     out_t = 0.0
     global_clip_i = 0
     for i, r in enumerate(edl["ranges"]):
@@ -437,6 +444,8 @@ def build_timeline_from_edl_and_cover(
                     }
                 )
 
+    clips.extend(mock_pip_clips)
+
     sources = dict(edl.get("sources") or {})
     timeline: dict[str, Any] = {
         "fps": fps,
@@ -450,6 +459,7 @@ def build_timeline_from_edl_and_cover(
         "captions": captions,
         "overlays": timeline_overlays,
         "cutaways": timeline_cutaways,
+        "mockups": timeline_mockups,
         "sfx": timeline_sfx,
         "privacy": timeline_privacy,
         "camera_play": {
@@ -462,6 +472,8 @@ def build_timeline_from_edl_and_cover(
         },
         "presentation": {"screenExplainer": se, "overlays": ov_style},
     }
+    if style_name == "mockup" or timeline_mockups:
+        timeline["presentation"]["mockup"] = load_mockup(style_name)
     if composite_cfg.get("enabled"):
         timeline["composite"] = {
             "enabled": True,

@@ -10,7 +10,9 @@ import {
 import { SourceClip } from "./components/SourceClip";
 import { CaptionLayer } from "./components/CaptionLayer";
 import { CutawayLayer } from "./components/CutawayLayer";
+import { MockupLayer } from "./components/MockupLayer";
 import { OverlayLayer } from "./components/OverlayLayer";
+import { PrivacyLayer } from "./components/PrivacyLayer";
 import { SfxLayer } from "./components/SfxLayer";
 import { CtaBadge } from "./components/CtaBadge";
 import { MissingTimelineBanner } from "./components/MissingTimelineBanner";
@@ -141,6 +143,13 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
         })}
       </AbsoluteFill>
 
+      {/* Drawn-screen scenes (style: mockup). Full-frame; cam PIP + MG
+          overlays composite on top, below. */}
+      <MockupLayer
+        scenes={timeline.mockups}
+        style={timeline.presentation?.mockup}
+      />
+
       {pipClips.map((clip) => {
         const from = Math.round(clip.fromSec * fps);
         const duration = Math.max(1, Math.round(clip.durationSec * fps));
@@ -163,6 +172,8 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
       })}
 
       <CutawayLayer cutaways={timeline.cutaways} />
+
+      <PrivacyLayer privacy={timeline.privacy || []} />
 
       <CaptionLayer
         captions={timeline.captions || []}

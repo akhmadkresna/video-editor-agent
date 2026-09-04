@@ -356,6 +356,145 @@ export type TimelineCutaway = {
   note?: string;
 };
 
+// ───────────────────────── Mockup scenes (Skill Lab) ─────────────────────────
+// The "drawn screen": a Remotion mock that stands in for a screen recording.
+// Full-frame between talking-head beats; cam PIP composites on top (a
+// pip_corner clip added by compose). MG overlays render above. See
+// styles/series/claude-skill-lab/mockup-system.md.
+
+export type MockChrome = "claude" | "app" | "browser" | "none";
+export type MockCamState = "establish" | "read" | "focus";
+export type MockReveal = "instant" | "type" | "stream";
+
+/** One virtual-camera keyframe. `atSec` is scene-local. */
+export type MockCamKeyframe = {
+  atSec: number;
+  state: MockCamState;
+  /** Focus region name: chat.input | chat.caret | chat.turn.assistant |
+   *  chat.turn.N | diff.before | diff.after | app.window. */
+  focus?: string;
+  /** Explicit focus point (0–1 of the stage) — fallback when no region. */
+  focusPoint?: [number, number];
+  /** Per-frame trailing follow of a live region. */
+  track?: "caret" | "cursor";
+};
+
+export type MockAttachment = { name: string; kind?: string };
+export type MockToolBlock = { label?: string; lines: string[] };
+
+export type MockTurn = {
+  role: "user" | "assistant";
+  text: string;
+  reveal?: MockReveal;
+  /** Scene-local seconds this turn starts appearing; auto-sequenced if absent. */
+  atSec?: number;
+  /** "▸ Pakai skill · avoid-ai-writing" pill shown before an assistant turn. */
+  skillBadge?: string;
+  attachments?: MockAttachment[];
+  toolBlock?: MockToolBlock;
+};
+
+export type MockDiffMark = { type: "add" | "del"; span: [number, number] };
+
+export type MockCursorWaypoint = {
+  atSec: number;
+  target?: string;
+  point?: [number, number];
+  action?: "move" | "hover" | "click";
+  dwell?: number;
+};
+
+export type MockLayer =
+  | { component: "ClaudeChat"; data: { turns: MockTurn[]; typeCps?: number } }
+  | {
+      component: "DiffPanel";
+      data: {
+        before: string;
+        after: string;
+        beforeMarks?: MockDiffMark[];
+        afterMarks?: MockDiffMark[];
+        atSec?: number;
+      };
+    }
+  | { component: "Cursor"; data: { path: MockCursorWaypoint[] } }
+  | {
+      component: "AppWindow";
+      data: { app: string; content?: string; src?: string; atSec?: number };
+    }
+  | {
+      component: "SkillsPanel";
+      data: {
+        skills: Array<{ name: string; source?: string; on: boolean }>;
+        action?: string;
+        atSec?: number;
+      };
+    }
+  | {
+      component: "RepoView";
+      data: {
+        repoUrl: string;
+        repo?: string;
+        path?: string;
+        source?: string;
+        /** real SKILL.md text (fetched by `ae mockup-suggest`) */
+        markdown: string;
+        scroll?: boolean;
+        atSec?: number;
+      };
+    };
+
+export type TimelineMockScene = {
+  id: string;
+  fromSec: number;
+  durationSec: number;
+  stage: { title?: string; chrome?: MockChrome };
+  camera?: MockCamKeyframe[];
+  layers: MockLayer[];
+  /** Dissolve against cam, seconds (default 0.35). */
+  in?: number;
+  out?: number;
+};
+
+export type MockCamConfig = {
+  easeMs: number;
+  holdMinSec: number;
+  scales: { establish: number; read: number; focus: number };
+  maxScale: number;
+  /** 0–1: trailing-follow lag is (0.55 - followGain*0.4)s. Lower = looser. */
+  followGain: number;
+  settleAfterRead: boolean;
+  intensity: "calm" | "standard";
+};
+
+/** Mist theme — mock surfaces only. MG overlay tokens stay in glass/tokens.ts.
+ *  The stage always renders light: it is a screen, not a themed document. */
+export type MockStyle = {
+  stageBg: string;
+  window: string;
+  windowBorder: string;
+  windowShadow: string;
+  rail: string;
+  railLine: string;
+  chromeTitle: string;
+  chromeDot: string;
+  userBubble: string;
+  userInk: string;
+  asstInk: string;
+  badgeBg: string;
+  badgeInk: string;
+  chipBorder: string;
+  chipInk: string;
+  inputBg: string;
+  inputInk: string;
+  caret: string;
+  cursor: string;
+  pipGradient: string;
+  pipRing: string;
+  diffDel: string;
+  diffAdd: string;
+  cam: MockCamConfig;
+};
+
 /** Additive SFX under cam VO (output time after EDL remap). */
 export type TimelineSfx = {
   id: string;
@@ -528,13 +667,17 @@ export type Timeline = {
   captions: Caption[];
   overlays?: TimelineOverlay[];
   cutaways?: TimelineCutaway[];
+  /** Drawn-screen scenes (Skill Lab `style: mockup`). */
+  mockups?: TimelineMockScene[];
   sfx?: TimelineSfx[];
   /** Solid bars masking on-screen credentials (EDL-remapped). */
   privacy?: TimelinePrivacy[];
   presentation?: {
     screenExplainer?: ScreenExplainerStyle;
     overlays?: OverlayStyle;
-    profile?: "tutorial" | "evidence" | "social";
+    /** Mist tokens + MockCam config (Skill Lab). */
+    mockup?: MockStyle;
+    profile?: "tutorial" | "evidence" | "social" | "mockup";
     captions?: {
       style?: "off" | "plain" | "karaoke";
       accent?: string;
@@ -560,8 +703,46 @@ export const emptyTimeline: Timeline = {
   captions: [],
   overlays: [],
   cutaways: [],
+  mockups: [],
   sfx: [],
   privacy: [],
+};
+
+/** Locked "Mist" mock treatment + calm MockCam (mirror styles/mockup). */
+export const DEFAULT_MOCK_STYLE: MockStyle = {
+  stageBg: "#eceff1",
+  window: "#fdfefe",
+  windowBorder: "#dee3e6",
+  windowShadow:
+    "0 18px 44px -24px rgba(38,58,68,0.24), 0 2px 8px -4px rgba(38,58,68,0.10)",
+  rail: "#f4f6f7",
+  railLine: "#e6eaec",
+  chromeTitle: "#7d878d",
+  chromeDot: "#c3ccd1",
+  userBubble: "#eef2f4",
+  userInk: "#293136",
+  asstInk: "#3a434b",
+  badgeBg: "#e9eef0",
+  badgeInk: "#496573",
+  chipBorder: "#d8dfe2",
+  chipInk: "#79848b",
+  inputBg: "#f1f4f5",
+  inputInk: "#98a2a8",
+  caret: "#496573",
+  cursor: "#2f3a40",
+  pipGradient: "linear-gradient(150deg, #ccd5da, #a4b2ba)",
+  pipRing: "rgba(255,255,255,0.60)",
+  diffDel: "#b1566b",
+  diffAdd: "#5c8a68",
+  cam: {
+    easeMs: 420,
+    holdMinSec: 1.2,
+    scales: { establish: 1.0, read: 1.2, focus: 1.45 },
+    maxScale: 1.6,
+    followGain: 0.12,
+    settleAfterRead: true,
+    intensity: "calm",
+  },
 };
 
 /** Locked cozy + cool mist defaults (mirror styles/tutorial). */

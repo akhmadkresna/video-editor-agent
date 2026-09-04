@@ -1149,6 +1149,19 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     camera_play = effective_camera_play(cover, cfg)
     play_enabled = is_camera_play_enabled(camera_play)
     screen_wins = screen_windows(cover_events)
+    # style: mockup — a drawn scene covers the picture like screen_with_cam,
+    # so overlays landing in it stay wide/hold (no framing companion).
+    mk_path = edit / "mockup.json"
+    if mk_path.is_file():
+        try:
+            mk = json.loads(mk_path.read_text(encoding="utf-8"))
+            for sc in (mk.get("scenes") if isinstance(mk, dict) else mk) or []:
+                s, e = sc.get("fromSec"), sc.get("toSec")
+                if isinstance(s, (int, float)) and isinstance(e, (int, float)) and e > s:
+                    screen_wins.append((float(s), float(e)))
+            screen_wins.sort()
+        except (json.JSONDecodeError, OSError):
+            pass
     punch_wins = [
         (a, b)
         for a, b in punch_windows(cover_events)

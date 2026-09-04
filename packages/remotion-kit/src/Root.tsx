@@ -2,6 +2,7 @@ import React from "react";
 import { Composition, getInputProps } from "remotion";
 import { AgenticTimeline } from "./Composition";
 import { CutawayLab, LAB_CUTAWAY } from "./CutawayLab";
+import { MockupLab, LAB_MOCK_SCENES } from "./MockupLab";
 import type { TimelineProps } from "./types";
 import { emptyTimeline } from "./types";
 
@@ -55,6 +56,27 @@ export const RemotionRoot: React.FC = () => {
           const dur = props.cutaway?.durationSec ?? LAB_CUTAWAY.durationSec;
           return {
             durationInFrames: Math.max(1, Math.round(dur * 30)),
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          };
+        }}
+      />
+      <Composition
+        id="MockupLab"
+        component={MockupLab}
+        durationInFrames={24 * 30}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ scenes: LAB_MOCK_SCENES }}
+        calculateMetadata={async ({ props }) => {
+          const end = (props.scenes ?? LAB_MOCK_SCENES).reduce(
+            (a, s) => Math.max(a, s.fromSec + s.durationSec),
+            1,
+          );
+          return {
+            durationInFrames: Math.max(1, Math.round(end * 30)),
             fps: 30,
             width: 1920,
             height: 1080,
