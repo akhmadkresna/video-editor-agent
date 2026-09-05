@@ -88,45 +88,16 @@ def step_keywords(step: str) -> list[str]:
     return out
 
 
-def _phrase_windows(
-    words: list[dict[str, Any]],
-    *,
-    start: float,
-    end: float,
-    gap_sec: float = 0.45,
-) -> list[dict[str, Any]]:
-    """Group words in [start, end] into phrase-ish windows on silence gaps."""
-    win = [
-        w
-        for w in words
-        if float(w["end"]) > start and float(w["start"]) < end
-    ]
-    if not win:
-        return []
-    phrases: list[dict[str, Any]] = []
-    buf: list[dict[str, Any]] = [win[0]]
-    for prev, cur in zip(win, win[1:]):
-        gap = float(cur["start"]) - float(prev["end"])
-        if gap >= gap_sec:
-            phrases.append(
-                {
-                    "start": float(buf[0]["start"]),
-                    "end": float(buf[-1]["end"]),
-                    "text": " ".join(str(w["text"]) for w in buf),
-                }
-            )
-            buf = [cur]
-        else:
-            buf.append(cur)
-    if buf:
-        phrases.append(
-            {
-                "start": float(buf[0]["start"]),
-                "end": float(buf[-1]["end"]),
-                "text": " ".join(str(w["text"]) for w in buf),
-            }
-        )
-    return phrases
+#: How many words a local match window may span, and how big a silence
+#: inside it may be before it's cut short. Fluid conversational Indonesian
+#: routinely runs 10+ seconds between pauses over 0.45s — grouping on
+#: silence alone (the old approach) merged an entire multi-sentence stretch
+#: into one "phrase", so only the *first* step in a list could ever match
+#: it (every other step's keywords were technically inside that phrase too,
+#: but the phrase was already claimed) and fell back to being evenly
+#: spaced across the window regardless of when it was actually said.
+_MATCH_WINDOW_WORDS = 5
+_MATCH_WINDOW_GAP_SEC = 0.6
 
 
 def _score_phrase(phrase_text: str, keywords: list[str]) -> float:
@@ -173,31 +144,56 @@ def align_diagram_step_source_times(
     usable1 = t1
     span = max(0.2, usable1 - usable0)
 
-    # Explicit per-step source times on cover (optional) — validated later by caller.
-    phrases = _phrase_windows(words, start=t0, end=t1) if words else []
+    in_range = sorted(
+        (w for w in words if float(w["end"]) > t0 and float(w["start"]) < t1),
+        key=lambda w: float(w["start"]),
+    ) if words else []
     assigned: list[float | None] = [None] * n
-    used_phrase_i: set[int] = set()
+    used_word_i: set[int] = set()
 
     for si, step in enumerate(steps):
         kws = step_keywords(step)
-        if not kws or not phrases:
+        if not kws or not in_range:
             continue
-        best_i = -1
+        # Candidates must start at/after where the previous step actually
+        # landed — not the lead-in point. Using the lead-in here was the
+        # other half of the bug: a step's own real utterance often starts
+        # inside [t0, usable0), so filtering against usable0 discarded the
+        # correct match before scoring ever ran, and every later step
+        # inherited the same wrong floor once the first one came up empty.
+        cursor = t0 if si == 0 else (assigned[si - 1] if assigned[si - 1] is not None else t0)
         best_score = 0.0
-        cursor = usable0 if si == 0 else (assigned[si - 1] or usable0)
-        for pi, ph in enumerate(phrases):
-            if pi in used_phrase_i:
+        best_hit_start: float | None = None
+        best_hits: list[int] = []
+        for i, w in enumerate(in_range):
+            if i in used_word_i:
                 continue
-            ph_s = float(ph["start"])
-            if ph_s + 1e-3 < cursor - 0.05:
+            wt = float(w["start"])
+            if wt + 1e-3 < cursor - 0.05:
                 continue
-            score = _score_phrase(str(ph["text"]), kws)
+            # A short local window from this anchor, cut off at a real pause
+            # — not a silence-delimited "phrase" that can run for a whole
+            # multi-sentence stretch of fluid speech and swallow every other
+            # step's words along with it.
+            window: list[int] = [i]
+            j = i + 1
+            while j < len(in_range) and len(window) < _MATCH_WINDOW_WORDS:
+                gap = float(in_range[j]["start"]) - float(in_range[window[-1]]["end"])
+                if gap >= _MATCH_WINDOW_GAP_SEC:
+                    break
+                window.append(j)
+                j += 1
+            text = " ".join(str(in_range[k]["text"]) for k in window)
+            score = _score_phrase(text, kws)
             if score > best_score:
-                best_score = score
-                best_i = pi
-        if best_i >= 0 and best_score >= min_score:
-            used_phrase_i.add(best_i)
-            assigned[si] = max(usable0, float(phrases[best_i]["start"]))
+                hits = [k for k in window if any(kw in _fold(str(in_range[k]["text"])) for kw in kws)]
+                if hits:
+                    best_score = score
+                    best_hit_start = min(float(in_range[k]["start"]) for k in hits)
+                    best_hits = hits
+        if best_hit_start is not None and best_score >= min_score:
+            assigned[si] = max(usable0, best_hit_start)
+            used_word_i.update(best_hits)
 
     # Fill gaps evenly; enforce min gaps + clamp.
     out: list[float] = []
