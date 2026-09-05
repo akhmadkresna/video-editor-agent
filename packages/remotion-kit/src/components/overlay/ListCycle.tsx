@@ -15,7 +15,7 @@
  */
 import React from "react";
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { cqh, estimateWidthPx, nameSizeCqh } from "./sizing";
+import { cqh, cqw, estimateWidthPx } from "./sizing";
 import { EASE_OUT } from "./motion";
 import type { OverlayTheme } from "./theme";
 
@@ -25,6 +25,7 @@ export type ListCycleProps = {
   /** Sequence-local seconds per item; falls back to a fixed interval. */
   stepAtSec?: number[];
   intervalMs?: number;
+  maxWidthCqw?: number;
   theme: OverlayTheme;
 };
 
@@ -33,15 +34,38 @@ export const ListCycle: React.FC<ListCycleProps> = ({
   items,
   stepAtSec,
   intervalMs = 1500,
+  maxWidthCqw,
   theme,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, height } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
 
   if (!items?.length) return null;
 
-  const prefixPx = cqh(theme.bands.bodyCqh, height);
-  const itemPx = cqh(nameSizeCqh(theme), height);
+  // Meaningfully smaller than the old bodyCqh/subCqh pair — a prefix +
+  // rotating item read fine at label scale, and the old sizes routinely
+  // wrapped the prefix onto its own line inside a narrow zone box.
+  const gapPx = cqh(theme.bands.labelCqh, height) * 0.5;
+  let prefixPx = cqh(theme.bands.subCqh, height);
+  let itemPx = cqh(theme.bands.metaCqh * 1.3, height);
+
+  // Deterministic shrink: if the widest item next to the prefix would still
+  // overflow the box, scale both down by the same ratio (pure function of
+  // text/box/base size, so every render worker agrees).
+  if (maxWidthCqw) {
+    const boxWidthPx = cqw(maxWidthCqw, width);
+    const widest = items.reduce(
+      (max, it) => Math.max(max, estimateWidthPx(it, itemPx)),
+      0,
+    );
+    const totalPx = estimateWidthPx(prefix, prefixPx) + gapPx + widest;
+    if (totalPx > boxWidthPx) {
+      const scale = Math.max(0.5, boxWidthPx / totalPx);
+      prefixPx *= scale;
+      itemPx *= scale;
+    }
+  }
+
   const t = frame / fps;
 
   let active = 0;
@@ -79,7 +103,7 @@ export const ListCycle: React.FC<ListCycleProps> = ({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: prefixPx * 0.24,
+        gap: gapPx,
         fontFamily: theme.fontSans,
         color: theme.ink,
         textShadow: theme.textShadow,
@@ -91,6 +115,7 @@ export const ListCycle: React.FC<ListCycleProps> = ({
           fontWeight: theme.weightHero,
           lineHeight: theme.lhTight,
           letterSpacing: theme.lsTight,
+          whiteSpace: "nowrap",
         }}
       >
         {prefix}

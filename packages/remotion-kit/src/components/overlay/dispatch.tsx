@@ -59,6 +59,15 @@ export function boxOptsForKind(
         topCqh: theme.diagram.topCqh,
         insetCqw: theme.diagram.leftCqw,
       };
+    case "list_cycle":
+      // Prefix + rotating item sit side by side (not stacked, unlike
+      // diagram's steps), so it needs a wider box than the 40cqw diagram
+      // default or the prefix wraps onto its own line.
+      return {
+        maxWidthCqw: 68,
+        topCqh: theme.diagram.topCqh,
+        insetCqw: theme.diagram.leftCqw,
+      };
     case "chip":
     case "tag":
       return {
@@ -277,6 +286,7 @@ export function renderOverlayBody(
           prefix={ov.text || ""}
           items={ov.steps || []}
           stepAtSec={ov.stepAtSec}
+          maxWidthCqw={maxWidthCqw}
           theme={theme}
         />
       );
