@@ -7,11 +7,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-CONTINUATION_START_RE = re.compile(
-    r"(?i)^(oke|ok|nah|lanjut|setelah|kemudian|selanjutnya|now|so)\b"
-)
-
-
 def load_edl(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     validate_edl(data)
@@ -95,25 +90,6 @@ def _words_in_gap(
     return out
 
 
-def _first_clause_text(
-    words: list[dict[str, Any]], t: float, *, radius: float = 4.0
-) -> str:
-    parts: list[str] = []
-    for w in words:
-        try:
-            ws = float(w["start"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if ws < t - 0.05 or ws > t + radius:
-            continue
-        tok = str(w.get("text") or w.get("word") or "").strip()
-        if tok:
-            parts.append(tok)
-        if len(parts) >= 6:
-            break
-    return " ".join(parts)
-
-
 #: `edl_suggest`'s gap-classify loop tags nearly every hard-cut range with
 #: one of these two notes — "speech" is the default for a THINK cut,
 #: "speech+wait-beat" for AI_WAIT. They carry no topic information at all
@@ -146,25 +122,19 @@ def merge_bridge_gaps(
     max_gap_sec: float = 8.0,
     note_bridge_max_gap_sec: float = 3.0,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Merge adjacent keeps across short silent gaps (same topic / continuation).
+    """Merge adjacent keeps across essentially-zero gaps (rounding noise only).
 
-    Fixes hard jumps when radio-edit cuts a mid pause (THINK/AI_WAIT) between
-    clauses that belong to one beat — e.g. WinFSP explanation → brief silence →
-    "Oke setelah kita install…".
-
-    Two signals justify keeping the silence instead of a hard cut, and they
-    are not equally strong evidence of continuity — so they don't share one
-    ceiling:
-      - An explicit continuation opener on the next clause ("Oke", "Nah",
-        "Setelah", ...) is a real content signal — trusted up to
-        ``max_gap_sec`` (a speaker can pause a while before "Oke, lanjut…").
-      - Two clauses merely sharing the same generic gap-class ``note`` (both
-        "speech", say) is *not* a content signal — almost every clause is
-        tagged "speech", so this fires on nearly any adjacent pair regardless
-        of whether they're actually the same thought. Giving it the same 8s
-        ceiling as an explicit continuation word silently keeps long, truly
-        unrelated silences (e.g. between two separate, complete sentences on
-        different sub-topics) — capped tighter at ``note_bridge_max_gap_sec``.
+    This used to also bridge on an explicit continuation opener ("Oke", "Nah",
+    "Setelah", ...) trusted up to ``max_gap_sec``. For a speaker who opens
+    nearly every sentence with "Nah"/"Oke" as a verbal tic — not as a signal
+    the new sentence continues the previous one — that path was silently
+    un-cutting most of what the THINK/AI_WAIT gap classification had just
+    correctly identified as a pause worth removing: "just cut the silence"
+    kept coming back as "silence is still there sometimes." Gap classification
+    in ``edl_suggest`` is now the sole authority on what gets cut; this only
+    stitches together ranges the classifier itself treated as unbroken
+    (floating-point boundary noise) or that explicitly share a *specific*
+    (non-generic) note.
     """
     if len(ranges) < 2 or max_gap_sec <= 0:
         return ranges, 0
@@ -187,11 +157,8 @@ def merge_bridge_gaps(
                 word_rows, float(cur["end"]), float(nxt["start"])
             ):
                 break
-            nxt_open = _first_clause_text(word_rows, float(nxt["start"]))
-            has_continuation_word = bool(nxt_open and CONTINUATION_START_RE.search(nxt_open))
             bridgeable = (
                 gap <= 0.05
-                or has_continuation_word
                 or (
                     _note_bridgeable(cur.get("note"), nxt.get("note"))
                     and gap <= note_bridge_max_gap_sec

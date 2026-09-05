@@ -118,8 +118,16 @@ def test_retake_dropped():
     assert edl["_meta"]["dropped_repeat"] >= 1
 
 
-def test_bridge_merges_silent_continuation_gap():
-    """Short silent gap + 'Oke setelah…' → one keep (no hard jump)."""
+def test_bridge_no_longer_keeps_gap_on_continuation_word_alone():
+    """An opener like "Oke setelah…" is not, by itself, reason to keep a gap.
+
+    This used to bridge purely because the next clause started with "Oke" —
+    but for a speaker who opens most sentences with "Nah"/"Oke" as a verbal
+    tic, that treated nearly every pause as a continuation and silently
+    undid the gap classifier's own THINK cut. Two ranges with distinct,
+    non-generic notes and a real gap between them should now stay separate;
+    gap classification, not a discourse-marker guess, decides what's cut.
+    """
     words = [
         {"text": "Explorer.", "start": 323.5, "end": 323.95, "type": "word"},
         {"text": "Oke", "start": 329.9, "end": 330.3, "type": "word"},
@@ -142,7 +150,5 @@ def test_bridge_merges_silent_continuation_gap():
         },
     ]
     merged, n = merge_bridge_gaps(ranges, words, max_gap_sec=8.0)
-    assert n == 1
-    assert len(merged) == 1
-    assert merged[0]["start"] == 313.71
-    assert merged[0]["end"] == 335.65
+    assert n == 0
+    assert len(merged) == 2
