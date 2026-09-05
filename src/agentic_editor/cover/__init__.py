@@ -74,11 +74,35 @@ def _events_overlapping(
     return out
 
 
+def _snap_split_point(t: float, words: list[dict[str, Any]] | None) -> float:
+    """Push a time-based camera-hold split past any word it lands inside.
+
+    `_subdivide_range` used to pick split points by elapsed time alone, with
+    no idea where speech is. Checked against this episode's real transcript,
+    18 of its 19 splits landed *inside* a spoken word — each one a hard
+    camera cut mid-word, audible as the word getting truncated (reported as
+    "bau bau AI" coming out "bau bau A"). Word timing is already available
+    to every other stage of this pipeline (EDL cuts, overlay timing); this
+    was the one spot that ignored it.
+    """
+    if not words:
+        return t
+    for w in words:
+        try:
+            s, e = float(w["start"]), float(w["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if s < t < e:
+            return e
+    return t
+
+
 def _subdivide_range(
     start: float,
     end: float,
     *,
     max_hold: float,
+    words: list[dict[str, Any]] | None = None,
 ) -> list[tuple[float, float]]:
     """Split long source ranges so fake-cam framing can change mid-beat."""
     dur = end - start
@@ -88,6 +112,8 @@ def _subdivide_range(
     t = start
     while t < end - 0.05:
         nxt = min(end, t + max_hold)
+        if nxt < end:
+            nxt = min(end, _snap_split_point(nxt, words))
         # avoid a tiny tail; absorb into previous
         if end - nxt < 4.0 and nxt < end:
             nxt = end
@@ -374,7 +400,9 @@ def build_timeline_from_edl_and_cover(
             else:
                 do_snap = snap and layout == "full"
                 segments = (
-                    _subdivide_range(seg_start, seg_end, max_hold=max_hold)
+                    _subdivide_range(
+                        seg_start, seg_end, max_hold=max_hold, words=cam_words
+                    )
                     if do_snap
                     else [(seg_start, seg_end)]
                 )
