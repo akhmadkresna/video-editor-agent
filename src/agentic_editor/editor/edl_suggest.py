@@ -41,8 +41,13 @@ DEFAULT_RADIO_CFG: dict[str, Any] = {
     "activity_wait_min_sec": 3.5,
     # Hygiene
     "min_keep_sec": 0.90,
-    "pad_before_sec": 0.08,
-    "pad_after_sec": 0.12,
+    # faster-whisper's word_timestamps come from cross-attention weights,
+    # not forced alignment — they routinely under-run a word's true end by
+    # 100-300ms, worst right before a pause (verified on real audio: "AI."
+    # tagged ending at 6.44s, actually ends 6.71s). The pad has to be wide
+    # enough to swallow that error or the cut chops the tail off a word.
+    "pad_before_sec": 0.20,
+    "pad_after_sec": 0.30,
     "cut_repeats": True,
     "repeat_similarity": 0.75,
     "repeat_window_sec": 90.0,
@@ -443,8 +448,8 @@ def suggest_edl_from_words(
     activity_wait_min_sec: float = 3.5,
     # Hygiene
     min_keep_sec: float = 0.90,
-    pad_before_sec: float = 0.08,
-    pad_after_sec: float = 0.12,
+    pad_before_sec: float = 0.20,
+    pad_after_sec: float = 0.30,
     source_start: float | None = None,
     source_end: float | None = None,
     snap: bool = True,

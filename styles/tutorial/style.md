@@ -175,8 +175,11 @@ radio_edit:
   activity_wait_min_sec: 3.5
   hold_sec: 0.4             # visible beat (hold_tail survives word-snap)
   min_keep_sec: 0.90
-  pad_before_sec: 0.08
-  pad_after_sec: 0.12
+  # Wide enough to swallow faster-whisper's word-end timestamp error
+  # (attention-derived, not forced-aligned — under-runs by 100-300ms
+  # before a pause), so a cut never chops a word's tail.
+  pad_before_sec: 0.20
+  pad_after_sec: 0.30
   cut_repeats: true
   repeat_similarity: 0.75
   repeat_window_sec: 90
