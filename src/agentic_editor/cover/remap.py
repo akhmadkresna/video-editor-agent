@@ -618,7 +618,12 @@ def _attach_diagram_step_motion(
     words: list[dict[str, Any]] | None,
     dwell: dict[str, Any] | None = None,
 ) -> None:
-    """Add ``stepAtSec`` cues; widen speech search past short cover windows."""
+    """Add ``stepAtSec`` cues; widen speech search past short cover windows.
+
+    Shared by ``diagram`` and ``list_cycle`` — both are a fixed list of steps
+    that should reveal in sync with when each one is actually said, not on a
+    generic timer.
+    """
     steps = list(ov.get("steps") or [])
     if not steps:
         return
@@ -759,7 +764,7 @@ def build_timeline_overlays(
             and all(isinstance(v, (int, float)) and 0.0 <= float(v) <= 1.0 for v in at)
         ):
             inst["at"] = [float(at[0]), float(at[1])]
-        if kind == "diagram" and ov.get("steps"):
+        if kind in ("diagram", "list_cycle") and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell
             )

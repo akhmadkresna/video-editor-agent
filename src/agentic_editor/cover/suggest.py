@@ -142,8 +142,29 @@ def apply_screen_bias(cover_cfg: dict[str, Any], bias: float | None = None) -> d
     return out
 
 
+#: Known ASR mishearings, applied to every word as it's loaded. Whisper-family
+#: models have no "Claude" in their vocabulary and consistently transcribe an
+#: Indonesian speaker saying it as "cloud" — this recurs in every episode of
+#: this series, so it's corrected once here rather than in each downstream
+#: consumer (overlay/EDL suggestion, quote/label text).
+_ASR_WORD_FIXES = {"cloud": "Claude"}
+_ASR_WORD_FIX_RE = re.compile(
+    r"^(\W*)(" + "|".join(re.escape(k) for k in _ASR_WORD_FIXES) + r")(\W*)$",
+    re.IGNORECASE,
+)
+
+
+def _apply_asr_word_fixes(text: str) -> str:
+    m = _ASR_WORD_FIX_RE.match(text)
+    if not m:
+        return text
+    prefix, core, suffix = m.groups()
+    return f"{prefix}{_ASR_WORD_FIXES[core.lower()]}{suffix}"
+
+
 def _word_text(w: dict[str, Any]) -> str:
-    return str(w.get("word") or w.get("text") or "").strip()
+    text = str(w.get("word") or w.get("text") or "").strip()
+    return _apply_asr_word_fixes(text)
 
 
 def load_cam_words(edit: Path) -> list[dict[str, Any]]:

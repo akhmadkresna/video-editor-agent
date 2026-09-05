@@ -357,7 +357,13 @@ def short_label(note: str, *, fallback: str | None = None) -> str:
     if t.lower() in _GENERIC_NOTES:
         return fallback or "Section"
     if len(t) > 40:
-        t = t[:37].rstrip() + "…"
+        cut = t[:37]
+        # Snap to the last word boundary — a raw character slice can land
+        # mid-word (e.g. "...caranya b…", "...tadi. Sk…"), which reads as a
+        # typo on screen rather than an intentional truncation.
+        if " " in cut:
+            cut = cut[: cut.rfind(" ")]
+        t = cut.rstrip() + "…"
     return t or (fallback or "Section")
 
 
@@ -886,18 +892,41 @@ def _label_and_start_near_time(
         hits.sort(key=lambda h: abs(float(h["start"]) - t))
         text = str(hits[0].get("text") or "")
         return (text, float(hits[0]["start"])) if text else None
-    nearby_words = [
+    candidates = [
         w
         for w in words
         if abs(float(w.get("start") or 0) - t) <= radius
         and w.get("start") is not None
     ]
-    if not nearby_words:
+    if not candidates:
         return None
-    nearby_words.sort(key=lambda x: float(x["start"]))
+    candidates.sort(key=lambda w: float(w["start"]))
+    # Anchor on the word closest to `t` (not the earliest one inside the
+    # ±radius window — radius can be 14s wide, so "earliest in window" is
+    # often a different sentence than the one nearest t), then expand
+    # outward only within the same spoken phrase. A gap over PHRASE_GAP_SEC
+    # means a new sentence started; walking past it used to splice two
+    # unrelated sentences into one on-screen line (e.g. the tail of "...di
+    # setting cloud code-nya ya." glued to the next sentence's "Lama-lama").
+    PHRASE_GAP_SEC = 0.6
+    anchor_i = min(
+        range(len(candidates)), key=lambda i: abs(float(candidates[i]["start"]) - t)
+    )
+    lo = anchor_i
+    while lo > 0 and float(candidates[lo]["start"]) - float(
+        candidates[lo - 1].get("end") or candidates[lo - 1]["start"]
+    ) < PHRASE_GAP_SEC:
+        lo -= 1
+    hi = anchor_i
+    while hi < len(candidates) - 1 and float(candidates[hi + 1]["start"]) - float(
+        candidates[hi].get("end") or candidates[hi]["start"]
+    ) < PHRASE_GAP_SEC:
+        hi += 1
+    phrase_words = candidates[lo : hi + 1]
+
     tokens: list[str] = []
     first_start: float | None = None
-    for w in nearby_words:
+    for w in phrase_words:
         tok = str(w.get("text") or "").strip()
         if not tok or _norm_token(tok) in FILLER:
             continue
