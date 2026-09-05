@@ -95,7 +95,6 @@ export function renderOverlayBody(
       return (
         <PunchWord
           text={ov.text || ""}
-          eyebrow={ov.kicker}
           accent={ov.accent}
           size="xl"
           align={align}
@@ -110,7 +109,6 @@ export function renderOverlayBody(
       return (
         <PunchWord
           text={ov.text || ""}
-          eyebrow={ov.kicker}
           size="lg"
           align={align}
           underline={theme.emphasis.underline !== false}
@@ -151,7 +149,6 @@ export function renderOverlayBody(
       return (
         <StatCallout
           value={ov.value || ov.text || ""}
-          eyebrow={ov.title}
           meta={ov.sourceLabel}
           align={align}
           valueSizeCqh={valueSizeCqh(theme)}
@@ -171,7 +168,6 @@ export function renderOverlayBody(
         return (
           <StatCallout
             value={ov.value}
-            eyebrow={ov.sourceLabel || ov.kicker}
             meta={ov.title}
             align={align}
             valueSizeCqh={theme.callout.valueSizeCqh}
@@ -196,7 +192,6 @@ export function renderOverlayBody(
       return (
         <PunchWord
           text={ov.text || ""}
-          eyebrow={ov.sourceLabel || ov.kicker}
           size="lg"
           align={align}
           underline={theme.emphasis.underline !== false}

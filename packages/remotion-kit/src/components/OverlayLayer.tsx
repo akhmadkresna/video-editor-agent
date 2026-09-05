@@ -10,7 +10,7 @@
  */
 import React from "react";
 import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
-import type { OverlayStyle, TimelineMockScene, TimelineOverlay } from "../types";
+import type { OverlayStyle, TimelineOverlay } from "../types";
 import { GlassOverlay } from "./glass/GlassOverlays";
 import { resolveZone, zoneBoxStyle } from "./overlayZones";
 import { AnnotationGrid, gridDensityFromNote } from "./overlay/AnnotationGrid";
@@ -99,16 +99,14 @@ const OneOverlay: React.FC<{ ov: TimelineOverlay; theme: OverlayTheme }> = ({ ov
 export const OverlayLayer: React.FC<{
   overlays: TimelineOverlay[];
   styleTokens?: OverlayStyle;
-  /** Active mockup scenes — boosts the veil over `style: mockup`'s light stage. */
-  mockups?: TimelineMockScene[];
-}> = ({ overlays, styleTokens, mockups }) => {
+}> = ({ overlays, styleTokens }) => {
   const { fps } = useVideoConfig();
   if (!overlays?.length) return null;
   const theme = resolveTheme(styleTokens);
 
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      <OverlayVeil overlays={overlays} theme={theme} mockups={mockups} />
+      <OverlayVeil overlays={overlays} theme={theme} />
       {overlays.map((ov) => {
         const from = Math.round(ov.fromSec * fps);
         const duration = Math.max(1, Math.round(ov.durationSec * fps));

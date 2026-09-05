@@ -12,46 +12,18 @@
  */
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import type { OverlayZone, TimelineMockScene, TimelineOverlay } from "../../types";
+import type { OverlayZone, TimelineOverlay } from "../../types";
 import { resolveZone, zoneVeilBackground } from "../overlayZones";
 import type { OverlayTheme } from "./theme";
 
 const ZONES: OverlayZone[] = ["left_third", "right_third", "lower_raised", "top_sparse"];
 
-/**
- * White ink relies on the veil for contrast, and the veil's gradient stops
- * are tuned against typical a-roll footage (medium-to-dark). A `style: mockup`
- * scene's stage is a near-white "Mist" surface (`stageBg: #eceff1`) — the
- * opposite case. Over that background the normal veil reads as barely-there
- * and text (chapter markers especially) becomes illegible against the drawn
- * UI — and no amount of *layer opacity* can fix it, since the gradient's own
- * peak alpha is the real ceiling regardless of how close opacity gets to 1.
- *
- * `zoneVeilBackground(zone, true)` swaps in a genuinely darker gradient for
- * this one case; everywhere else the veil is unchanged.
- */
-const MOCKUP_VEIL_MIN = 0.6;
-
-function isDuringMockup(
-  frame: number,
-  fps: number,
-  mockups: { fromSec: number; durationSec: number }[],
-): boolean {
-  return mockups.some((m) => {
-    const from = m.fromSec * fps;
-    const end = from + m.durationSec * fps;
-    return frame >= from && frame <= end;
-  });
-}
-
 export const OverlayVeil: React.FC<{
   overlays: TimelineOverlay[];
   theme: OverlayTheme;
-  mockups?: TimelineMockScene[];
-}> = ({ overlays, theme, mockups }) => {
+}> = ({ overlays, theme }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const overMockup = mockups?.length ? isDuringMockup(frame, fps, mockups) : false;
 
   const rampFrames = Math.max(1, (theme.durFast / 1000) * fps);
   const exitFrames = Math.max(1, (theme.exitMs / 1000) * fps);
@@ -92,20 +64,16 @@ export const OverlayVeil: React.FC<{
 
   return (
     <>
-      {ZONES.filter((z) => (byZone.get(z) ?? 0) > 0).map((z) => {
-        const base = (byZone.get(z) ?? 0) * damp;
-        const opacity = overMockup ? Math.max(base, MOCKUP_VEIL_MIN) : base;
-        return (
-          <AbsoluteFill
-            key={z}
-            style={{
-              background: zoneVeilBackground(z, overMockup),
-              opacity,
-              pointerEvents: "none",
-            }}
-          />
-        );
-      })}
+      {ZONES.filter((z) => (byZone.get(z) ?? 0) > 0).map((z) => (
+        <AbsoluteFill
+          key={z}
+          style={{
+            background: zoneVeilBackground(z),
+            opacity: (byZone.get(z) ?? 0) * damp,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
     </>
   );
 };

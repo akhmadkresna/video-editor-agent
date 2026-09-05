@@ -18,7 +18,6 @@ import type { OverlayTheme } from "./theme";
 
 export type StatCalloutProps = {
   value: string | number;
-  eyebrow?: string;
   /** Small line under the value (`sourceLabel`). */
   meta?: string;
   align?: "left" | "center" | "right";
@@ -53,7 +52,6 @@ export function countUpText(raw: string, progress: number): string {
 
 export const StatCallout: React.FC<StatCalloutProps> = ({
   value,
-  eyebrow,
   meta,
   align = "left",
   valueSizeCqh,
@@ -65,7 +63,7 @@ export const StatCallout: React.FC<StatCalloutProps> = ({
   const { fps, width, height } = useVideoConfig();
 
   const raw = String(value ?? "");
-  if (!raw && !eyebrow && !meta) return null;
+  if (!raw && !meta) return null;
 
   const progress = countUp(frame, fps, { countMs: theme.countMs });
   const display = countUpText(raw, progress);
@@ -80,7 +78,6 @@ export const StatCallout: React.FC<StatCalloutProps> = ({
     lineHeight: theme.lhTight,
   });
 
-  const eyebrowEnter = slideUp(frame, fps, { durMs: theme.durBase, fromPx: 12 });
   const metaOpacity = fadeIn(frame, fps, { durMs: theme.durBase, delayMs: theme.durBase });
 
   // Value fades 0.35 → 1 and scales 0.6 → 1 in lockstep with the count.
@@ -102,23 +99,6 @@ export const StatCallout: React.FC<StatCalloutProps> = ({
         maxWidth: boxWidthPx,
       }}
     >
-      {eyebrow ? (
-        <span
-          style={{
-            fontSize: cqh(theme.bands.labelCqh, height),
-            fontWeight: 700,
-            letterSpacing: theme.lsCaps,
-            textTransform: "uppercase",
-            marginBottom: fontSize * 0.04,
-            opacity: eyebrowEnter.opacity,
-            transform: `translateY(${eyebrowEnter.translateY}px)`,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {eyebrow}
-        </span>
-      ) : null}
-
       {/* Drip rail — three offset particles, running the whole dwell so the
           beat is never fully static (§5 closing rule). */}
       <span

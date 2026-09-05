@@ -182,7 +182,6 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
       <OverlayLayer
         overlays={timeline.overlays || []}
         styleTokens={timeline.presentation?.overlays || DEFAULT_OVERLAY_STYLE}
-        mockups={timeline.mockups}
       />
       <CTATag
         cta={timeline.presentation?.cta}

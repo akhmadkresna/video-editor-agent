@@ -14,7 +14,6 @@ import type { OverlayTheme } from "./theme";
 
 export type PunchWordProps = {
   text: string;
-  eyebrow?: string;
   /** Rendered as a second line, same size, continuing the word stagger. */
   accent?: string;
   size?: SizeName;
@@ -30,7 +29,6 @@ export type PunchWordProps = {
 
 export const PunchWord: React.FC<PunchWordProps> = ({
   text,
-  eyebrow,
   accent,
   size = "lg",
   align = "left",
@@ -110,20 +108,6 @@ export const PunchWord: React.FC<PunchWordProps> = ({
         maxWidth: boxWidthPx,
       }}
     >
-      {eyebrow ? (
-        <span
-          style={{
-            fontSize: cqh(theme.bands.eyebrowCqh, height),
-            fontWeight: 700,
-            letterSpacing: theme.lsCaps,
-            textTransform: "uppercase",
-            opacity: 0.82,
-          }}
-        >
-          {eyebrow}
-        </span>
-      ) : null}
-
       <span style={{ display: "inline-flex", alignItems: "baseline" }}>
         <span style={headlineStyle}>
           {words.map((w, i) => renderWord(w, i))}

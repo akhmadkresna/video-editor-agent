@@ -122,28 +122,18 @@ export function zoneCorner(zone: OverlayZone): "top-left" | "top-right" {
 
 /**
  * Veil behind type — follows the side the text sits on (not face-center).
- *
- * `strong` renders with a much higher peak alpha. The normal stops are tuned
- * against typical a-roll footage (medium-to-dark); a `style: mockup` scene's
- * drawn stage is a near-white "Mist" surface, the opposite case, and no
- * amount of *layer opacity* on the normal gradient can darken it past its own
- * 0.42 peak — the gradient itself has to be darker.
  */
-export function zoneVeilBackground(zone: OverlayZone, strong = false): string {
-  const peak = strong ? 0.82 : 0.42;
-  const mid = strong ? 0.5 : 0.1;
-  const midSecondary = strong ? 0.55 : 0.12;
-  const midTop = strong ? 0.5 : 0.1;
+export function zoneVeilBackground(zone: OverlayZone): string {
   switch (zone) {
     case "right_third":
-      return `linear-gradient(270deg, rgba(0,0,0,${peak}) 0%, rgba(0,0,0,${mid}) 32%, transparent 50%)`;
+      return "linear-gradient(270deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.1) 32%, transparent 50%)";
     case "lower_raised":
-      return `linear-gradient(0deg, rgba(0,0,0,${strong ? 0.78 : 0.38}) 0%, rgba(0,0,0,${midSecondary}) 40%, transparent 62%)`;
+      return "linear-gradient(0deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 40%, transparent 62%)";
     case "top_sparse":
-      return `linear-gradient(180deg, rgba(0,0,0,${strong ? 0.76 : 0.36}) 0%, rgba(0,0,0,${midTop}) 36%, transparent 55%)`;
+      return "linear-gradient(180deg, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0.1) 36%, transparent 55%)";
     case "left_third":
     default:
-      return `linear-gradient(90deg, rgba(0,0,0,${peak}) 0%, rgba(0,0,0,${mid}) 32%, transparent 50%)`;
+      return "linear-gradient(90deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.1) 32%, transparent 50%)";
   }
 }
 
