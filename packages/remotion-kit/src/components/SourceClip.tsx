@@ -66,7 +66,55 @@ type Props = {
   volume?: number;
   windowCrop?: WindowCropNorm;
   screenExplainer?: ScreenExplainerStyle;
+  /** True when this clip's audio does NOT continue from/into its neighbour —
+   * a real EDL splice rather than a camera-hold subdivision of one
+   * continuous take. See useDeclickedVolume. */
+  fadeInAudio?: boolean;
+  fadeOutAudio?: boolean;
 };
+
+//: Every a-roll clip played at a flat volume from frame 0, cut instantly to
+//: the next clip's audio at the Sequence boundary. Two spliced takes rarely
+//: line up in phase/amplitude at the join, so this produced an audible
+//: click/pop at *every* hard cut — reported as a spoken word sounding
+//: "cut weirdly" even though the words themselves were intact (verified by
+//: spectrogram diff against the raw footage). A camera-hold subdivision of
+//: one continuous take (sourceOut of one clip == sourceIn of the next) has
+//: genuinely continuous audio and must NOT fade — only real splices should.
+const AUDIO_DECLICK_SEC = 0.03;
+
+function useDeclickedVolume(
+  baseVolume: number,
+  durationSec: number,
+  fadeIn: boolean | undefined,
+  fadeOut: boolean | undefined,
+): number {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  if (baseVolume <= 0 || (!fadeIn && !fadeOut)) return baseVolume;
+  const totalFrames = Math.max(1, Math.round(durationSec * fps));
+  const fadeFrames = Math.max(1, Math.round(AUDIO_DECLICK_SEC * fps));
+  let gain = 1;
+  if (fadeIn) {
+    gain = Math.min(
+      gain,
+      interpolate(frame, [0, fadeFrames], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      }),
+    );
+  }
+  if (fadeOut) {
+    gain = Math.min(
+      gain,
+      interpolate(frame, [totalFrames - fadeFrames, totalFrames], [1, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      }),
+    );
+  }
+  return baseVolume * gain;
+}
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i;
 
@@ -271,12 +319,19 @@ export const SourceClip: React.FC<Props> = ({
   volume,
   windowCrop,
   screenExplainer,
+  fadeInAudio,
+  fadeOutAudio,
 }) => {
   const { width, height, fps } = useVideoConfig();
   const startFrom = Math.max(0, Math.round(sourceIn * fps));
   const liveScale = useMotionScale(scale, motion, durationSec);
   const resolvedSrc = resolveSrc(src);
-  const vol = volume ?? (muted ? 0 : 1);
+  const vol = useDeclickedVolume(
+    volume ?? (muted ? 0 : 1),
+    durationSec,
+    fadeInAudio,
+    fadeOutAudio,
+  );
   const se = screenExplainer || DEFAULT_SCREEN_EXPLAINER;
   const screenCfg = { ...DEFAULT_SCREEN_EXPLAINER.screen, ...se.screen };
   const pipCfg = { ...DEFAULT_SCREEN_EXPLAINER.pip, ...se.pip };

@@ -16,8 +16,50 @@ import { PrivacyLayer } from "./components/PrivacyLayer";
 import { SfxLayer } from "./components/SfxLayer";
 import { CTATag } from "./components/overlay/CTATag";
 import { MissingTimelineBanner } from "./components/MissingTimelineBanner";
-import { DEFAULT_OVERLAY_STYLE, DEFAULT_SCREEN_EXPLAINER, type TimelineProps } from "./types";
+import {
+  DEFAULT_OVERLAY_STYLE,
+  DEFAULT_SCREEN_EXPLAINER,
+  type TimelineClip,
+  type TimelineProps,
+} from "./types";
 import { isLetterboxPresentation } from "./letterbox";
+
+/**
+ * Which clips need an audio declick fade (see SourceClip's
+ * useDeclickedVolume) — a clip whose `sourceIn` doesn't pick up exactly
+ * where the previous same-source clip's `sourceOut` left off is a real EDL
+ * splice, not a camera-hold subdivision of one continuous take, and hard
+ * cutting its audio in/out clicks audibly. Grouped per source so cam and
+ * screen tracks (if ever both carry audio) aren't compared against each
+ * other.
+ */
+function computeAudioSpliceFades(
+  clips: TimelineClip[],
+): Map<string, { fadeIn: boolean; fadeOut: boolean }> {
+  const flags = new Map<string, { fadeIn: boolean; fadeOut: boolean }>();
+  const bySource = new Map<string, TimelineClip[]>();
+  for (const c of clips) {
+    if (c.muted) continue; // nothing audible to declick
+    const list = bySource.get(c.source) ?? [];
+    list.push(c);
+    bySource.set(c.source, list);
+  }
+  for (const list of bySource.values()) {
+    list.sort((a, b) => a.fromSec - b.fromSec);
+    for (let i = 0; i < list.length; i++) {
+      const cur = list[i];
+      const prev = list[i - 1] as TimelineClip | undefined;
+      const next = list[i + 1] as TimelineClip | undefined;
+      const continuousBefore = !!prev && Math.abs(cur.sourceIn - prev.sourceOut) < 0.02;
+      const continuousAfter = !!next && Math.abs(next.sourceIn - cur.sourceOut) < 0.02;
+      flags.set(cur.id, {
+        fadeIn: !!prev && !continuousBefore,
+        fadeOut: !!next && !continuousAfter,
+      });
+    }
+  }
+  return flags;
+}
 
 function looksLikeEmptyTimeline(timeline: TimelineProps["timeline"]): string | null {
   const clips = timeline?.clips || [];
@@ -102,6 +144,7 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
   const mainClips = (timeline.clips || []).filter(
     (c) => c.layout === "full" || c.layout === "float_centered",
   );
+  const audioFades = computeAudioSpliceFades(mainClips);
   const pipClips = (timeline.clips || []).filter((c) => c.layout === "pip_corner");
   // Only mute punch on the *current* float beat — not for the whole episode.
   const activeMainIsFloat = mainClips.some(
@@ -125,6 +168,7 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
           const duration = Math.max(1, Math.round(clip.durationSec * fps));
           const src = timeline.sources[clip.source];
           if (!src) return null;
+          const fade = audioFades.get(clip.id);
           return (
             <Sequence key={clip.id} from={from} durationInFrames={duration} name={clip.id}>
               <SourceClip
@@ -137,6 +181,8 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
                 muted={clip.muted ?? clip.source !== "cam"}
                 windowCrop={clip.windowCrop}
                 screenExplainer={screenExplainer}
+                fadeInAudio={fade?.fadeIn}
+                fadeOutAudio={fade?.fadeOut}
               />
             </Sequence>
           );
