@@ -21,17 +21,33 @@ click:
   volume: 0.32
   max_sec: 0.22
 paper:
-  file: paper_page.wav
-  volume: 0.35
-  max_sec: 0.45
+  # Was paper_page.wav (450ms page-rustle) — read as heavy/mechanical when
+  # it fires on every title/stat/quote/divider/illustration/code appear
+  # (15x in a typical episode). soft_tick.wav is the same crisp, light
+  # click used for `tick`; 0.22 max_sec keeps a 70ms safety margin over its
+  # measured 150ms length so it never gets cut mid-decay (see SfxLayer.tsx
+  # hard Sequence crop).
+  file: soft_tick.wav
+  volume: 0.30
+  max_sec: 0.22
 tick:
   file: soft_tick.wav
   volume: 0.28
   max_sec: 0.15
+# NOTE: this section is documentation only — the real per-style mapping read
+# at runtime lives in style_load.DEFAULT_SFX["mg"] + each style.md's own
+# `sfx.mg` override. Keep them in sync.
 mg:
   enabled: true
-  chapter: shutter
-  diagram: shutter
+  # shutter.wav is a real double-transient mechanical-shutter recording
+  # (mirror-slap + curtain click) — right for an actual cut-snap, but reads
+  # as "the sound is doubled" on a chapter/diagram MG appear (e.g. a mockup
+  # scene entrance). click_0X are genuinely single-transient (verified via
+  # ffmpeg silencedetect) — use those for MG appear, reserve shutter for
+  # real cut/punch/framing-snap events (hardcoded in sfx_suggest.py, not
+  # routed through this mg table).
+  chapter: click
+  diagram: click
   emphasis: click
   chip: click
   title: paper

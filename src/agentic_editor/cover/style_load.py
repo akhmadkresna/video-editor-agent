@@ -205,7 +205,7 @@ DEFAULT_SFX: dict[str, Any] = {
     "enabled": True,
     "no_whoosh": True,
     "pack": "assets/sfx",
-    "volumes": {"typing": 0.38, "shutter": 0.48, "click": 0.32, "paper": 0.35, "tick": 0.28},
+    "volumes": {"typing": 0.38, "shutter": 0.48, "click": 0.32, "paper": 0.30, "tick": 0.28},
     "density": {
         "sec_per_sfx": 30,
         "min_gap_sec": 1.2,
@@ -217,13 +217,21 @@ DEFAULT_SFX: dict[str, Any] = {
     "shutter": {"max_sec": 0.22},
     "click": {"max_sec": 0.22},
     # paper = MG appear (glass kinds); tick = small "tag" chip appear.
-    "paper": {"max_sec": 0.45},
+    # Both point at soft_tick.wav (pack.yaml) — 0.22 keeps a safety margin
+    # over its measured 0.15s so the Remotion Sequence crop never truncates it.
+    "paper": {"max_sec": 0.22},
     "tick": {"max_sec": 0.15},
-    # One-shot at MG appear (cover.overlays).
+    # One-shot at MG appear (cover.overlays). shutter.wav is a genuine
+    # double-transient mechanical-shutter recording (mirror-slap + curtain
+    # click) — right for an actual cut-snap, but reads as "doubled sound" on
+    # a chapter/diagram appear (e.g. a mockup scene entrance). click_0X are
+    # single-transient (verified via ffmpeg silencedetect); shutter stays
+    # reserved for real cut/punch/framing-snap events, which are hardcoded
+    # in sfx_suggest.py and don't go through this table.
     "mg": {
         "enabled": True,
-        "chapter": "shutter",
-        "diagram": "shutter",
+        "chapter": "click",
+        "diagram": "click",
         "emphasis": "click",
         "chip": "click",
     },

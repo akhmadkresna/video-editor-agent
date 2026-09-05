@@ -36,9 +36,12 @@ def test_pack_yaml_lists_required_files_that_exist():
     names = listed_pack_files(pack)
     assert "shutter.wav" in names
     assert any(n.startswith("click_") for n in names)
-    assert "paper_page.wav" in names
+    # paper kind reuses soft_tick.wav (crisp) — see pack.yaml comment.
+    # paper_page.wav stays on disk (licensed, available) but isn't the
+    # default mapping for any kind any more.
     assert "soft_tick.wav" in names
     assert "typing-thock.wav" in names
+    assert (pack / "paper_page.wav").is_file()
     for name in names:
         assert (pack / name).is_file(), name
 

@@ -130,12 +130,27 @@ def merge_bridge_gaps(
     words: list[dict[str, Any]] | None = None,
     *,
     max_gap_sec: float = 8.0,
+    note_bridge_max_gap_sec: float = 3.0,
 ) -> tuple[list[dict[str, Any]], int]:
     """Merge adjacent keeps across short silent gaps (same topic / continuation).
 
     Fixes hard jumps when radio-edit cuts a mid pause (THINK/AI_WAIT) between
     clauses that belong to one beat — e.g. WinFSP explanation → brief silence →
     "Oke setelah kita install…".
+
+    Two signals justify keeping the silence instead of a hard cut, and they
+    are not equally strong evidence of continuity — so they don't share one
+    ceiling:
+      - An explicit continuation opener on the next clause ("Oke", "Nah",
+        "Setelah", ...) is a real content signal — trusted up to
+        ``max_gap_sec`` (a speaker can pause a while before "Oke, lanjut…").
+      - Two clauses merely sharing the same generic gap-class ``note`` (both
+        "speech", say) is *not* a content signal — almost every clause is
+        tagged "speech", so this fires on nearly any adjacent pair regardless
+        of whether they're actually the same thought. Giving it the same 8s
+        ceiling as an explicit continuation word silently keeps long, truly
+        unrelated silences (e.g. between two separate, complete sentences on
+        different sub-topics) — capped tighter at ``note_bridge_max_gap_sec``.
     """
     if len(ranges) < 2 or max_gap_sec <= 0:
         return ranges, 0
@@ -159,11 +174,16 @@ def merge_bridge_gaps(
             ):
                 break
             nxt_open = _first_clause_text(word_rows, float(nxt["start"]))
-            if (
+            has_continuation_word = bool(nxt_open and CONTINUATION_START_RE.search(nxt_open))
+            bridgeable = (
                 gap <= 0.05
-                or _note_bridgeable(cur.get("note"), nxt.get("note"))
-                or (nxt_open and CONTINUATION_START_RE.search(nxt_open))
-            ):
+                or has_continuation_word
+                or (
+                    _note_bridgeable(cur.get("note"), nxt.get("note"))
+                    and gap <= note_bridge_max_gap_sec
+                )
+            )
+            if bridgeable:
                 cur["end"] = round(float(nxt["end"]), 3)
                 if cur.get("note") != nxt.get("note") and nxt.get("note"):
                     cur["note"] = str(cur.get("note") or nxt.get("note"))

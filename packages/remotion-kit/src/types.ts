@@ -560,8 +560,6 @@ export type OverlayStyle = {
   preset?: string;
   treatment?: "bold";
   ink?: string;
-  /** @deprecated legacy veil colour — unused by the A-Roll Text Motion System. */
-  dim?: string;
   inkMuted?: string;
   inkFaint?: string;
   fonts?: { sans?: string; mono?: string };
@@ -726,6 +724,10 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
 export type CtaBadgeStyle = {
   enabled?: boolean;
   text?: string;
+  /** DS name for `text`; either is accepted. */
+  label?: string;
+  /** solid = white fill + ink text (the one inverted element); outline = 2px white border. */
+  variant?: "solid" | "outline";
   blink?: boolean;
   blinkPeriodSec?: number;
   /** band_top_center = sit on the letterbox 16:9 stage (Option A). */

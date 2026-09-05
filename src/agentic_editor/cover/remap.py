@@ -132,6 +132,16 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
             "top_sparse",
         ):
             entry["zone"] = zone
+        # CalloutArrow target: [x, y] as 0-1 of frame. A `callout` carrying one
+        # draws an arrow at that point; without it the beat falls back to a
+        # PunchWord rather than rendering nothing.
+        at = item.get("at")
+        if (
+            isinstance(at, (list, tuple))
+            and len(at) == 2
+            and all(isinstance(v, (int, float)) and 0.0 <= float(v) <= 1.0 for v in at)
+        ):
+            entry["at"] = [float(at[0]), float(at[1])]
         # Optional manual source-time cues for diagram steps (cam seconds).
         raw_starts = item.get("stepStarts") or item.get("step_starts")
         if isinstance(raw_starts, list):
@@ -735,6 +745,16 @@ def build_timeline_overlays(
             inst["accent"] = ov["accent"]
         if ov.get("zone"):
             inst["zone"] = ov["zone"]
+        # CalloutArrow's target, [x, y] as 0-1 of frame. Without this the field
+        # is dropped here and the arrow renderer is unreachable — the handoff's
+        # "no remap.py change needed" is wrong on this one point.
+        at = ov.get("at")
+        if (
+            isinstance(at, (list, tuple))
+            and len(at) == 2
+            and all(isinstance(v, (int, float)) and 0.0 <= float(v) <= 1.0 for v in at)
+        ):
+            inst["at"] = [float(at[0]), float(at[1])]
         if kind == "diagram" and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell

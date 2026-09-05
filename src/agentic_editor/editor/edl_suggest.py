@@ -150,8 +150,20 @@ def phrase_similarity(a: str, b: str) -> float:
         na, nb = normalize_phrase(a), normalize_phrase(b)
         return 1.0 if na and na == nb else 0.0
     jaccard = len(ta & tb) / max(1, len(ta | tb))
-    containment = len(ta & tb) / max(1, min(len(ta), len(tb)))
-    return max(jaccard, containment)
+    # Containment ("is the shorter phrase a subset of the longer one") is
+    # only a reliable retake signal once the shorter side carries at least 2
+    # words. At 1 word it degenerates: any clause whose lone word happens to
+    # also appear somewhere in a much longer, unrelated clause scores a
+    # perfect 1.0 and gets silently dropped as a "retake" of that unrelated
+    # line (e.g. a 1-word clause "Skillnya" vs the later, unrelated sentence
+    # "Nama skillnya itu adalah Avoid AI Writing ya." sharing only the token
+    # "skillnya" — real bug, chopped a sentence's subject out of the cut).
+    # Below 2 words, fall back to plain Jaccard so only a near-identical
+    # short phrase (true exact-word repeat) still scores high.
+    if min(len(ta), len(tb)) >= 2:
+        containment = len(ta & tb) / max(1, min(len(ta), len(tb)))
+        return max(jaccard, containment)
+    return jaccard
 
 
 def is_wait_speech(text: str) -> bool:

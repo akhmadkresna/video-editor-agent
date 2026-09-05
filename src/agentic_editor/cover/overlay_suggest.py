@@ -855,6 +855,24 @@ def _label_near_time(
     words: list[dict[str, Any]], t: float, *, radius: float = 8.0
 ) -> str | None:
     """Best payoff label near t, else a short content phrase from local words."""
+    found = _label_and_start_near_time(words, t, radius=radius)
+    return found[0] if found else None
+
+
+def _label_and_start_near_time(
+    words: list[dict[str, Any]], t: float, *, radius: float = 8.0
+) -> tuple[str, float] | None:
+    """Best payoff label near t, plus **the label's own start time** (not
+    ``t``) — a radius search of up to ±14s (see
+    ``find_speech_stride_emphasis``) can land on a hit spoken well away from
+    the grid point that triggered the search. A caller that displays the
+    text but schedules it at ``t`` shows content seconds before/after it's
+    actually said (real bug: a "soal X, tapi soal Y" quote spoken at ~10s
+    surfaced on-screen at 23s because it was the closest hit within radius
+    of a stride point at 23s). Callers that don't reposition the overlay to
+    match (e.g. a punch-in reaction sting, where the beat's own timing is
+    what matters) can keep using ``_label_near_time`` for just the text.
+    """
     hits = [
         h
         for h in find_payoff_hits(words)
@@ -862,24 +880,32 @@ def _label_near_time(
     ]
     if hits:
         hits.sort(key=lambda h: abs(float(h["start"]) - t))
-        return str(hits[0].get("text") or "") or None
+        text = str(hits[0].get("text") or "")
+        return (text, float(hits[0]["start"])) if text else None
     nearby_words = [
         w
         for w in words
         if abs(float(w.get("start") or 0) - t) <= radius
         and w.get("start") is not None
     ]
+    if not nearby_words:
+        return None
+    nearby_words.sort(key=lambda x: float(x["start"]))
     tokens: list[str] = []
-    for w in sorted(nearby_words, key=lambda x: float(x["start"])):
+    first_start: float | None = None
+    for w in nearby_words:
         tok = str(w.get("text") or "").strip()
         if not tok or _norm_token(tok) in FILLER:
             continue
+        if first_start is None:
+            first_start = float(w["start"])
         tokens.append(tok)
         if len(tokens) >= 6:
             break
-    if not tokens:
+    if not tokens or first_start is None:
         return None
-    return short_label(" ".join(tokens), fallback=tokens[0].title())
+    label = short_label(" ".join(tokens), fallback=tokens[0].title())
+    return (label, first_start) if label else None
 
 
 def pick_sting_kind(text: str, *, slot: int) -> str:
@@ -1101,11 +1127,17 @@ def find_speech_stride_emphasis(
             continue
         if not _in_edl(ranges, src, src + 0.3):
             continue
-        label = _label_near_time(words, src, radius=14.0)
-        if not label:
+        found = _label_and_start_near_time(words, src, radius=14.0)
+        if not found:
             continue
-        s = max(0.0, src - EMPHASIS_PAD)
-        e = src + hold_sec
+        label, label_start = found
+        # Anchor to where the text is actually spoken, not the stride grid
+        # point that triggered the ±14s search — the two can be far apart
+        # (real bug: a line spoken at ~10s showing up on-screen at 23s).
+        if not _in_edl(ranges, label_start, label_start + 0.3):
+            continue
+        s = max(0.0, label_start - EMPHASIS_PAD)
+        e = label_start + hold_sec
         if words:
             s, e = snap_window_to_words(s, e, words)
         out.append(
@@ -1704,13 +1736,20 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         if best is None:
             break
         _, _, src = best
-        label = _label_near_time(words, src, radius=18.0)
-        if not label:
+        found = _label_and_start_near_time(words, src, radius=18.0)
+        if not found:
             # Skip this midpoint by marking a tiny used span so we don't loop forever
             used_spans.append((src, src + 0.05))
             continue
-        s = max(0.0, src - EMPHASIS_PAD)
-        e = src + emphasis_hold
+        label, label_start = found
+        # Anchor to where the text is actually spoken, not the gap midpoint
+        # that triggered the ±18s search (same class of bug fixed in
+        # find_speech_stride_emphasis — see _label_and_start_near_time).
+        if not _in_edl(ranges, label_start, label_start + 0.3):
+            used_spans.append((src, src + 0.05))
+            continue
+        s = max(0.0, label_start - EMPHASIS_PAD)
+        e = label_start + emphasis_hold
         if words:
             s, e = snap_window_to_words(s, e, words)
         slot = sting_count() + 1

@@ -14,7 +14,7 @@ import { MockupLayer } from "./components/MockupLayer";
 import { OverlayLayer } from "./components/OverlayLayer";
 import { PrivacyLayer } from "./components/PrivacyLayer";
 import { SfxLayer } from "./components/SfxLayer";
-import { CtaBadge } from "./components/CtaBadge";
+import { CTATag } from "./components/overlay/CTATag";
 import { MissingTimelineBanner } from "./components/MissingTimelineBanner";
 import { DEFAULT_OVERLAY_STYLE, DEFAULT_SCREEN_EXPLAINER, type TimelineProps } from "./types";
 import { isLetterboxPresentation } from "./letterbox";
@@ -182,10 +182,12 @@ export const AgenticTimeline: React.FC<TimelineProps> = ({ timeline }) => {
       <OverlayLayer
         overlays={timeline.overlays || []}
         styleTokens={timeline.presentation?.overlays || DEFAULT_OVERLAY_STYLE}
+        mockups={timeline.mockups}
       />
-      <CtaBadge
+      <CTATag
         cta={timeline.presentation?.cta}
         screenExplainer={screenExplainer}
+        styleTokens={timeline.presentation?.overlays || DEFAULT_OVERLAY_STYLE}
       />
       <SfxLayer sfx={timeline.sfx || []} />
     </AbsoluteFill>

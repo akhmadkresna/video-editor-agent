@@ -265,7 +265,13 @@ def build_timeline_mockups(
                 "framing": "medium",
                 "scale": 1.0,
                 "motion": "hold",
-                "muted": False,
+                # This clip and the underlying main a_roll "full" clip source
+                # the *same* cam audio for the *same* window (the pip bubble
+                # is a picture-in-picture of the same take) — both unmuted
+                # plays the voiceover twice, phasing/doubling audibly. The
+                # main clip carries the continuous voiceover across cuts;
+                # the pip bubble is visual only.
+                "muted": True,
             }
         )
     return out_scenes, pip_clips

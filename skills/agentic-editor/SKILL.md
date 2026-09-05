@@ -45,11 +45,18 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     onset ≤ 50 ms) by `ae doctor` + `tests/test_sfx_pack.py`. Run `ae sfx-suggest .` after cover;
     confirm then `--apply`.
 10. **Locked look (`style: tutorial`):** house default for Odoo/tech screen demos.
-    A-roll MG = **"Open Overlay" v7** — white ink straight on the a-roll, no panel,
-    no accent color; readability from a darker veil scrim behind the text, not a card
-    surface or a hue. Screen stage = cool-mist canvas. No full/karaoke captions.
-    Do not invent episode-local colors/fonts — change `styles/tutorial/style.md`
-    (+ `style_load.py` / remotion-kit theme) instead.
+    A-roll MG = the **A-Roll Text Motion System** — white ink straight on the a-roll,
+    no panel, no hue anywhere; readability from a darker veil scrim behind the text,
+    not a card surface. Type scale is `sizeBands` (cqh = % of frame height, hero 22)
+    with deterministic shrink-to-fit; motion is the DS's own recipes (pop-in with
+    overshoot, word stagger, count-up, drip / traveling dot / marching pointer /
+    float — a beat should never go fully static once its entrance settles).
+    Components live in `packages/remotion-kit/src/components/overlay/`; preview any
+    kind in isolation with the **`OverlayLab`** Remotion composition (and
+    `OverlayLabSocial` for the letterbox pack). Screen stage = cool-mist canvas.
+    No full/karaoke captions. Do not invent episode-local colors/fonts — change
+    `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
+    Spec: `styles/aroll-text-motion/overlay-aroll-design.md`.
 10b. **Evidence episodes (`style: evidence`):** start with **`ae brief`** (script + research)
     then **`ae evidence-gather`** (real screenshots into `raw/evidence/`). Never AI-generate
     fake dashboards. Host records from `edit/script.md` speaking `[[EVIDENCE:]]` cues aloud.

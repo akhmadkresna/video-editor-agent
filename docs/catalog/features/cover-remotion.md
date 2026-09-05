@@ -16,7 +16,7 @@
 | Screen + soft-float PIP | `screen_with_cam` (alias `cam_pip`) | Cool-mist canvas, **cozy** floated screen (`float_centered`) + cam PIP at **stage lower-right** | Cam only |
 
 **Locked tutorial presentation** (`styles/tutorial`):
-- A-roll MG (`overlays`): `open_overlay` preset, **"Open Overlay" v7 (2026-08, LOCKED)** — white
+- A-roll MG (`overlays`): `aroll_text_motion` preset, the **A-Roll Text Motion System** — white
   ink straight on the a-roll, **no panel of any kind, no accent color**. Readability comes from a
   darker scrim (`OverlayLayer`'s veil gradient) behind the text, not a card surface or a hue. The
   only color beyond white is a translucent-white text-selection highlight on `title`/`quote` accent
@@ -51,7 +51,7 @@
 | Confirm | Agent proposes plan → **wait** |
 | Write | `cover.json` `overlays[]` **and** companion `framing` in `events[]` (cam source time) |
 | Remap | `ae cover` / compose → `timeline.overlays[]` (output `fromSec`) |
-| Render | Remotion `OverlayLayer` (Open Overlay) |
+| Render | Remotion `OverlayLayer` → `components/overlay/*` (A-Roll Text Motion System); preview via the `OverlayLab` composition |
 
 `GlassOverlays.tsx`-dispatched kinds: `title` · `stat` · `lower_third` ·
 `tag` · `divider` · `quote` · `code` · `illustration`. `OneOverlay`-dispatched

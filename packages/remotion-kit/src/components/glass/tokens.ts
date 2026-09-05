@@ -26,8 +26,6 @@ export const color = {
   terminalBg: "#141312",
   terminalHeaderBg: "#1e1c19",
   terminalBorder: "#333029",
-  /** @deprecated legacy selection-highlight — dies with the v7 renderers. */
-  highlight: "rgba(255,255,255,0.22)",
 } as const;
 
 /** cqh ≈ % of frame height. */
@@ -73,6 +71,13 @@ export const easing = {
   out: [0.16, 1.0, 0.3, 1] as const,
 };
 
+// The v7 renderer that needed `duration` pinned at these values
+// (GlassOverlays.tsx punchSpring/sweep) is deleted — only `code` and
+// `illustration` remain there now, neither of which reads this token. The
+// A-Roll Text Motion System components (`components/overlay/`) read
+// `theme.durFast/durBase/durSlow`, which resolve through
+// `OverlayStyle.motion` (style-pack config) and fall back to these values
+// only when that's absent. Safe to carry the DS's own values now.
 export const duration: { fast: number; base: number; slow: number } = {
   fast: 220,
   base: 420,

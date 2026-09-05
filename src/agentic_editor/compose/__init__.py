@@ -1067,25 +1067,33 @@ _MG_REVIEW_KINDS = (
     "emphasis",
     "diagram",
     "chip",
+    "list_cycle",
 )
 
 #: Seconds into an overlay's fromSec where its entrance motion has settled —
 #: see styles/tutorial/style.md's "Motion (exact...)" section. stat needs
 #: longer (300ms count-up + 80ms delay + 260ms label fade ≈ 640ms). Punch
 #: kinds capture mid-entrance so mg-review stills show motion, not only rest.
+#: Seconds past an overlay's start to grab its review still.
+#: Retuned for the A-Roll Text Motion System: entrances are `durBase` 420ms
+#: plus up to 540ms of word stagger (and `countMs` 900ms for stat), where the
+#: old v7 motion settled in ~220ms. The previous values now land mid-entrance,
+#: so a still would show a half-arrived beat and look broken even though the
+#: render is fine.
 _MG_REVIEW_SETTLE_SEC = {
-    "stat": 0.85,
-    "emphasis": 0.28,
-    "title": 0.32,
-    "quote": 0.32,
-    "chapter": 0.45,
-    "diagram": 0.55,
-    "chip": 0.35,
-    "callout": 0.40,
+    "stat": 1.10,
+    "emphasis": 0.75,
+    "title": 0.85,
+    "quote": 0.85,
+    "chapter": 0.70,
+    "diagram": 1.20,
+    "chip": 0.70,
+    "callout": 0.90,
     "illustration": 0.50,
-    "divider": 0.30,
-    "lower_third": 0.40,
-    "tag": 0.35,
+    "divider": 0.70,
+    "lower_third": 0.55,
+    "tag": 0.70,
+    "list_cycle": 0.90,
 }
 _MG_REVIEW_SETTLE_DEFAULT = 0.6
 #: Per-still retry count — see the comment at the retry loop in

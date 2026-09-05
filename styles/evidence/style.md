@@ -68,7 +68,7 @@ sfx:
     typing: 0.38
     shutter: 0.48
     click: 0.32
-    paper: 0.35
+    paper: 0.30
     tick: 0.28
   density:
     sec_per_sfx: 30
@@ -76,7 +76,7 @@ sfx:
     shutter_click_min_gap_sec: 0.4
     typing_merge_gap_sec: 1.5
   paper:
-    max_sec: 0.45
+    max_sec: 0.22
   tick:
     max_sec: 0.15
   typing:
@@ -89,11 +89,14 @@ sfx:
     max_sec: 0.22
   mg:
     enabled: true
-    chapter: shutter
-    diagram: shutter
+    # click_0X is single-transient; shutter.wav is a genuine double-transient
+    # mechanical-shutter recording — right for a real cut-snap, reads as a
+    # doubled sound on an MG appear. See style_load.DEFAULT_SFX["mg"].
+    chapter: click
+    diagram: click
     emphasis: click
     chip: click
-    callout: shutter
+    callout: click
     # Kinds that used to carry a paper card — a page-turn still reads well
     # as their appear cue even after the card was dropped (v7, no panel);
     # tag is a small chip, gets a lighter tick instead.

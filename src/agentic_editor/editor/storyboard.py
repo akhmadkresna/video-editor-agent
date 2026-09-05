@@ -12,10 +12,47 @@ from pathlib import Path
 from typing import Any
 
 from agentic_editor.asr.ingest import ffprobe_summary
+from agentic_editor.cover.mockup import load_mockup
 from agentic_editor.cover.remap import collect_overlay_defs
 from agentic_editor.cover.suggest import load_cam_words
 from agentic_editor.editor.qa import extract_frame
 from agentic_editor.project import load_project, resolve_source
+
+# Mirrors packages/remotion-kit/src/components/overlayZones.ts zoneBoxStyle —
+# same cqw/cqh percentages the real A-roll renderer uses, so an on-frame chip
+# here lands roughly where the actual overlay will land on the real render.
+_ZONE_BOX_STYLE: dict[str, str] = {
+    "right_third": "right:4.5%;left:auto;top:18%;text-align:right;max-width:42%",
+    "lower_raised": "left:4.5%;bottom:28%;top:auto;max-width:42%",
+    "top_sparse": "left:4.5%;top:10%;max-width:38%",
+    "left_third": "left:4.5%;top:12%;max-width:42%",
+}
+_DEFAULT_ZONE_FOR_KIND: dict[str, str] = {
+    "lower_third": "lower_raised",
+    "stat": "lower_raised",
+    "callout": "lower_raised",
+    "emphasis": "lower_raised",
+    "chip": "top_sparse",
+    "tag": "top_sparse",
+    "chapter": "top_sparse",
+    "divider": "top_sparse",
+}
+
+
+def _zone_for_overlay(overlay: dict[str, Any]) -> str:
+    zone = str(overlay.get("zone") or "").strip()
+    if zone in _ZONE_BOX_STYLE:
+        return zone
+    return _DEFAULT_ZONE_FOR_KIND.get(str(overlay.get("kind") or ""), "left_third")
+
+
+def _overlay_chip_text(overlay: dict[str, Any]) -> str:
+    kind = str(overlay.get("kind") or "overlay")
+    for field in ("value", "text", "title", "kicker"):
+        val = str(overlay.get(field) or "").strip()
+        if val:
+            return val if len(val) <= 60 else val[:59].rstrip() + "…"
+    return kind
 
 
 def plan_digest(path: Path) -> str:
@@ -67,6 +104,44 @@ def _resolve_edl_path(episode: Path) -> tuple[Path, dict[str, Any]]:
     raise FileNotFoundError(
         "Missing edit plan. Run `ae edl-suggest .` first (or provide edit/edl.json)."
     )
+
+
+def _resolve_mockup_scenes(episode: Path) -> list[dict[str, Any]]:
+    """``edit/mockup.json`` scenes, cam **source** seconds — same coordinate
+    space ``_build_cards`` iterates EDL ranges in, so overlap is a plain
+    interval check, no output-time remap needed here."""
+    path = episode / "edit" / "mockup.json"
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    scenes = data.get("scenes") if isinstance(data, dict) else None
+    return [s for s in (scenes or []) if isinstance(s, dict)]
+
+
+def mockup_scenes_for_range(
+    scenes: list[dict[str, Any]],
+    start: float,
+    end: float,
+) -> list[dict[str, Any]]:
+    """Scenes overlapping ``[start, end)`` (cam source seconds).
+
+    A scene straddling an EDL cut boundary will overlap two range cards —
+    intentionally surfaced (not clamped to one slice like the real compose
+    step does) so a straddling scene is visible during review, not hidden.
+    """
+    out: list[dict[str, Any]] = []
+    for sc in scenes:
+        try:
+            s = float(sc.get("fromSec"))
+            e = float(sc.get("toSec", sc.get("fromSec", 0)) or 0)
+        except (TypeError, ValueError):
+            continue
+        if _interval_overlaps(start, end, s, e):
+            out.append(sc)
+    return out
 
 
 def _resolve_cover(episode: Path) -> dict[str, Any] | None:
@@ -226,6 +301,127 @@ def cover_mg_items_for_range(
         )
     )
     return items
+
+
+def render_frame_overlay_chips_html(items: list[dict[str, Any]]) -> str:
+    """Small chips positioned ON the frame at each overlay's real zone —
+    a cheap, no-Remotion-needed approximation of where MG will actually
+    land, so a card shows "what + roughly where" at a glance.
+
+    A card spans real time, so two overlays with the same zone but
+    different (non-overlapping) moments both show up here at once — stack
+    them (chronological order) instead of letting them print on top of
+    each other unreadably.
+    """
+    overlays = [it for it in items if it.get("category") == "overlay"]
+    overlays.sort(key=lambda it: float(it.get("start") or 0))
+    chips: list[str] = []
+    zone_counts: dict[str, int] = {}
+    for item in overlays:
+        zone = _zone_for_overlay(item)
+        stack_index = zone_counts.get(zone, 0)
+        zone_counts[zone] = stack_index + 1
+        style = _ZONE_BOX_STYLE.get(zone, _ZONE_BOX_STYLE["left_third"])
+        if stack_index:
+            style += f";transform:translateY({stack_index * 30}px)"
+        kind = html.escape(str(item.get("kind") or "overlay"))
+        text = html.escape(_overlay_chip_text(item))
+        chips.append(
+            f'<div class="frame-chip frame-chip-{kind}" style="{style}">'
+            f'<span class="frame-chip-kind">{kind}</span>{text}</div>'
+        )
+    return "".join(chips)
+
+
+def _mockup_layer_text(layer: dict[str, Any]) -> str:
+    comp = str(layer.get("component") or "")
+    data = layer.get("data") if isinstance(layer.get("data"), dict) else {}
+    if comp == "ClaudeChat":
+        turns = data.get("turns") if isinstance(data.get("turns"), list) else []
+        parts = []
+        for t in turns[:2]:
+            if not isinstance(t, dict):
+                continue
+            role = str(t.get("role") or "")
+            text = str(t.get("text") or "").strip()
+            if text:
+                parts.append(f"{role}: {text}")
+        return " / ".join(parts)
+    if comp == "DiffPanel":
+        before = str(data.get("before") or "").strip().splitlines()[0:1]
+        after = str(data.get("after") or "").strip().splitlines()[0:1]
+        b = (before[0] if before else "")[:70]
+        a = (after[0] if after else "")[:70]
+        return f"− {b}\n+ {a}" if (b or a) else ""
+    if comp == "RepoView":
+        return str(data.get("repo") or data.get("repoUrl") or "")
+    if comp == "SkillsPanel":
+        skills = data.get("skills") if isinstance(data.get("skills"), list) else []
+        names = [str(s.get("name")) for s in skills if isinstance(s, dict) and s.get("name")]
+        return ", ".join(names)
+    if comp == "AppWindow":
+        return f"{data.get('app', '')} · {data.get('content', '')}"
+    return ""
+
+
+def render_mockup_scene_card_html(
+    scene: dict[str, Any],
+    *,
+    mock_tokens: dict[str, Any],
+    overlay_chips_html: str = "",
+) -> str:
+    """Synthesized 'Mist' stage placeholder for a drawn-screen mockup scene.
+
+    No real frame exists to grab (style: mockup records no screen) — this
+    renders the same stage/window/chrome-dot chrome + a text summary per
+    layer component, so the scene is visible in review instead of silently
+    missing from the storyboard entirely.
+    """
+    stage = scene.get("stage") if isinstance(scene.get("stage"), dict) else {}
+    title = html.escape(str(stage.get("title") or "").strip())
+    layers = [ly for ly in (scene.get("layers") or []) if isinstance(ly, dict)]
+    components = [str(ly.get("component") or "") for ly in layers if ly.get("component")]
+    comp_pills = "".join(
+        f'<span class="mock-comp-pill">{html.escape(c)}</span>'
+        for c in components
+        if c != "Cursor"
+    )
+    body_lines: list[str] = []
+    for ly in layers:
+        if ly.get("component") == "Cursor":
+            continue
+        text = _mockup_layer_text(ly)
+        if text:
+            body_lines.append(
+                f'<div class="mock-layer-text">{html.escape(text)}</div>'
+            )
+    start = float(scene.get("fromSec", 0))
+    end = float(scene.get("toSec", scene.get("fromSec", 0)) or 0)
+    win_bg = html.escape(str(mock_tokens.get("window") or "#fdfefe"))
+    stage_bg = html.escape(str(mock_tokens.get("stageBg") or "#eceff1"))
+    win_border = html.escape(str(mock_tokens.get("windowBorder") or "#dee3e6"))
+    chrome_dot = html.escape(str(mock_tokens.get("chromeDot") or "#c3ccd1"))
+    chrome_title = html.escape(str(mock_tokens.get("chromeTitle") or "#7d878d"))
+    scene_id = html.escape(str(scene.get("id") or ""))
+    return (
+        f'<div class="mock-card" style="background:{stage_bg}">'
+        f'<div class="mock-window" style="background:{win_bg};border-color:{win_border}">'
+        '<div class="mock-chrome">'
+        f'<span class="mock-dot" style="border-color:{chrome_dot}"></span>'
+        f'<span class="mock-dot" style="border-color:{chrome_dot}"></span>'
+        f'<span class="mock-dot" style="border-color:{chrome_dot}"></span>'
+        f'<span class="mock-chrome-title" style="color:{chrome_title}">{title}</span>'
+        "</div>"
+        f'<div class="mock-body">{"".join(body_lines) or "<em>(no content authored yet)</em>"}</div>'
+        f"{overlay_chips_html}"
+        "</div>"
+        '<div class="mock-foot">'
+        f'<span class="mock-scene-id">mockup · {scene_id}</span>'
+        f'<span class="mock-pills">{comp_pills}</span>'
+        f'<span class="mock-time">{start:.1f}s–{end:.1f}s (source)</span>'
+        "</div>"
+        "</div>"
+    )
 
 
 def _evidence_rel_path(episode: Path, src: str) -> str | None:
@@ -467,6 +663,8 @@ def render_range_card_html(
     thumb_relative: str | None,
     badges: list[dict[str, str]],
     mg_stack_html: str = "",
+    frame_chips_html: str = "",
+    mockup_cards_html: str = "",
 ) -> str:
     if thumb_relative:
         media = f'<img src="{thumb_relative}" alt="">'
@@ -474,7 +672,8 @@ def render_range_card_html(
         media = '<div class="thumb-missing">No preview</div>'
     return (
         '<article class="card">'
-        f"{media}"
+        f'<div class="frame">{media}{frame_chips_html}</div>'
+        f"{mockup_cards_html}"
         f'<div class="body">'
         f"<strong>#{index} · {html.escape(source_name)}</strong>"
         f'<div class="time">Edit {format_clock(timeline_start)} → '
@@ -535,12 +734,15 @@ def _build_cards(
     cover: dict[str, Any] | None,
     still_index: dict[str, Path] | None = None,
     mg_render_mode: str = "mock",
+    mockup_scenes: list[dict[str, Any]] | None = None,
+    mock_tokens: dict[str, Any] | None = None,
 ) -> tuple[str, set[Path]]:
     cards: list[str] = []
     used_assets: set[Path] = set()
     ranges = [r for r in (edl.get("ranges") or []) if isinstance(r, dict)]
     timeline_cursor = 0.0
     prev_end: float | None = None
+    mockup_scenes = mockup_scenes or []
 
     for idx, rng in enumerate(ranges, start=1):
         source_name = str(rng.get("source") or "cam")
@@ -576,6 +778,25 @@ def _build_cards(
         speech = speech_for_range(words, start, end)
         badges = cover_badges_for_range(cover, start, end)
         mg_items = cover_mg_items_for_range(cover, start, end)
+
+        # A mockup scene replaces the cam picture with a drawn screen — any
+        # overlay landing inside that window should preview on the drawn
+        # stage, not floated over an cam frame the viewer won't see there.
+        scenes_here = (
+            mockup_scenes_for_range(mockup_scenes, start, end) if source_name == "cam" else []
+        )
+
+        def _in_a_scene(item: dict[str, Any], _scenes=scenes_here) -> bool:
+            mid_t = (float(item.get("start", 0)) + float(item.get("end", 0))) / 2
+            return any(
+                float(sc.get("fromSec", 0)) <= mid_t < float(sc.get("toSec", sc.get("fromSec", 0)) or 0)
+                for sc in _scenes
+            )
+
+        frame_items = [it for it in mg_items if not (scenes_here and _in_a_scene(it))]
+        scene_items = [it for it in mg_items if scenes_here and _in_a_scene(it)]
+
+        frame_chips = render_frame_overlay_chips_html(frame_items)
         mg_stack = render_mg_stack_html(
             mg_items,
             episode=episode,
@@ -583,6 +804,27 @@ def _build_cards(
             dashboard=dashboard,
             render_mode=mg_render_mode,
         )
+
+        mockup_cards = ""
+        if scenes_here:
+            tokens = mock_tokens or {}
+            mockup_cards = "".join(
+                render_mockup_scene_card_html(
+                    sc,
+                    mock_tokens=tokens,
+                    overlay_chips_html=render_frame_overlay_chips_html(
+                        [
+                            it
+                            for it in scene_items
+                            if float(sc.get("fromSec", 0))
+                            <= (float(it.get("start", 0)) + float(it.get("end", 0))) / 2
+                            < float(sc.get("toSec", sc.get("fromSec", 0)) or 0)
+                        ]
+                    ),
+                )
+                for sc in scenes_here
+            )
+
         note = str(rng.get("note") or "speech")
 
         cards.append(
@@ -598,6 +840,8 @@ def _build_cards(
                 speech=speech,
                 thumb_relative=thumb_relative,
                 badges=badges,
+                frame_chips_html=frame_chips,
+                mockup_cards_html=mockup_cards,
                 mg_stack_html=mg_stack,
             )
         )
@@ -617,7 +861,7 @@ def _mg_review_banner_html(
     if mg_render_mode == "remotion" and still_count:
         return (
             f'<p class="mg-banner mg-banner-ok"><strong>MG renders:</strong> '
-            f"{still_count} Remotion still(s) embedded — exact Open Overlay v7 on A-roll. "
+            f"{still_count} Remotion still(s) embedded — exact A-Roll Text Motion System on A-roll. "
             f'Full gallery: <a href="../mg-review/review.html">edit/mg-review/review.html</a></p>'
         )
     if render_mg:
@@ -678,6 +922,9 @@ def generate_storyboard(
                 still_index = cached
                 mg_render_mode = "remotion"
 
+    mockup_scenes = _resolve_mockup_scenes(episode)
+    mock_tokens = load_mockup(str(cfg.get("style") or "mockup")) if mockup_scenes else {}
+
     dashboard = edit / "storyboard"
     dashboard.mkdir(parents=True, exist_ok=True)
     cards_html, used_assets = _build_cards(
@@ -688,6 +935,8 @@ def generate_storyboard(
         cover=cover,
         still_index=still_index or None,
         mg_render_mode=mg_render_mode,
+        mockup_scenes=mockup_scenes,
+        mock_tokens=mock_tokens,
     )
 
     assets = dashboard / "assets"
@@ -723,9 +972,33 @@ header{{background:#171d27;border-bottom:1px solid #293242}} h1{{margin:0 0 8px}
 .meta,.description{{color:#9ca9ba}} .grid{{display:grid;
 grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:8px}}
 .card{{background:#171d27;border:1px solid #293242;border-radius:10px;overflow:hidden}}
-.card>img{{width:100%;aspect-ratio:16/9;object-fit:cover;background:#080a0d;display:block}}
+.frame{{position:relative}}
+.frame>img{{width:100%;aspect-ratio:16/9;object-fit:cover;background:#080a0d;display:block}}
 .thumb-missing{{width:100%;aspect-ratio:16/9;background:#080a0d;color:#6b7280;
 display:flex;align-items:center;justify-content:center;font-size:13px}}
+.frame-chip{{position:absolute;padding:3px 8px;border-radius:5px;font-size:11px;line-height:1.3;
+background:rgba(10,13,18,.72);border:1px solid rgba(255,255,255,.22);color:#fff;
+text-shadow:0 1px 3px rgba(0,0,0,.5);pointer-events:none;overflow:hidden;text-overflow:ellipsis}}
+.frame-chip-kind{{display:block;font-size:9px;font-weight:700;text-transform:uppercase;
+letter-spacing:.06em;color:#a5b4fc;margin-bottom:1px}}
+.mock-card{{padding:10px;border-top:1px solid #293242;border-bottom:1px solid #293242}}
+.mock-window{{position:relative;border-radius:8px;border:1px solid;padding:8px 10px 10px;
+aspect-ratio:16/9;overflow:hidden;display:flex;flex-direction:column}}
+.mock-chrome{{display:flex;align-items:center;gap:5px;margin-bottom:8px}}
+.mock-dot{{width:8px;height:8px;border-radius:999px;border:1.5px solid;background:transparent}}
+.mock-chrome-title{{font-size:11px;margin-left:6px;font-weight:600}}
+.mock-body{{flex:1;overflow:hidden;font-size:12px;color:#3a434b;display:flex;
+flex-direction:column;gap:6px}}
+.mock-layer-text{{white-space:pre-wrap;background:rgba(255,255,255,.55);border-radius:4px;
+padding:4px 6px}}
+.mock-body em{{color:#98a2a8}}
+.mock-foot{{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;
+font-size:11px;color:#9ca9ba}}
+.mock-scene-id{{font-weight:700;color:#c7d2fe}}
+.mock-pills{{display:flex;gap:4px;flex-wrap:wrap}}
+.mock-comp-pill{{padding:2px 7px;border-radius:999px;background:#101826;border:1px solid #334155;
+color:#7dd3fc;font-size:10px}}
+.mock-time{{font:11px ui-monospace;color:#64748b;margin-left:auto}}
 .body{{padding:14px}} .time{{font:13px ui-monospace;color:#7dd3fc;margin-top:6px}}
 .source{{font:12px ui-monospace;color:#9ca9ba;margin-top:4px}}
 .note{{margin:8px 0 0;color:#c6d0db}} .speech{{color:#e8bd72;margin:6px 0 0}}

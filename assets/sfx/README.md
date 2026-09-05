@@ -10,7 +10,7 @@ Dry UI / camera one-shots under cam VO. **No whoosh, riser, or swoosh.**
 |------|---------|-----------|
 | `shutter` | `shutter.wav` | punch / framing snap / cut snap / MG chapter+diagram |
 | `click` | `click_01`…`04.wav` | Screen-enter, click deixis / MG emphasis+chip |
-| `paper` | `paper_page.wav` | MG title/stat/quote/divider/illustration/code appear |
+| `paper` | `soft_tick.wav` | MG title/stat/quote/divider/illustration/code appear — crisp, not the old `paper_page.wav` rustle (too heavy/mechanical when it fires 10-15x/episode) |
 | `tick` | `soft_tick.wav` | MG tag appear |
 | `typing` | `typing-thock.wav` | **Opt-in only** (`sfx.typing.enabled: true`) |
 
@@ -28,5 +28,13 @@ click) must not land in this pack. CI + `ae doctor` enforce:
 - onset within the first **50 ms** (no long quiet head)
 - duration ≥ **30 ms**
 - every `pack.yaml` file exists as 16-bit mono/stereo WAV
+
+`sfx.<kind>.max_sec` (per-style, `style_load.DEFAULT_SFX` for the shared
+default) must stay ≥ the mapped file's real duration, with margin — the
+Remotion `<Sequence durationInFrames>` around each cue (`SfxLayer.tsx`) hard-
+crops the `<Audio>` at that window, so a too-short `max_sec` truncates the
+sound mid-decay instead of just padding trailing silence. `paper_page.wav`
+is no longer referenced by default (kept on disk, still license-listed) but
+would need `max_sec` ≥ ~0.47 if re-enabled.
 
 See `agentic_editor.cover.sfx_validate` and `tests/test_sfx_pack.py`.

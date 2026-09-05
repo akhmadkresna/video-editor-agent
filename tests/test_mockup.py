@@ -66,7 +66,10 @@ def test_remap_scene_and_inner_atsec_to_scene_local():
     assert pips[0]["layout"] == "pip_corner"
     assert pips[0]["source"] == "cam"
     assert pips[0]["sourceIn"] == 10.0 and pips[0]["sourceOut"] == 28.0
-    assert pips[0]["muted"] is False
+    # Muted: the underlying main a_roll "full" clip covers this same window
+    # with the same cam audio (the voiceover) — leaving the pip bubble
+    # unmuted too doubles/phases it audibly. Pip is visual-only.
+    assert pips[0]["muted"] is True
 
 
 def test_scene_spanning_a_cut_clamps_to_longest_slice():

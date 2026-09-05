@@ -3,8 +3,24 @@ import { Composition, getInputProps } from "remotion";
 import { AgenticTimeline } from "./Composition";
 import { CutawayLab, LAB_CUTAWAY } from "./CutawayLab";
 import { MockupLab, LAB_MOCK_SCENES } from "./MockupLab";
-import type { TimelineProps } from "./types";
-import { emptyTimeline } from "./types";
+import { LAB_OVERLAYS, OverlayLab, labDurationInFrames } from "./OverlayLab";
+import type { OverlayStyle, TimelineProps } from "./types";
+import { DEFAULT_OVERLAY_STYLE, emptyTimeline } from "./types";
+
+/**
+ * Mirrors the size/placement overrides in `styles/social/style.md` — social
+ * shrinks per-kind sizes hard so MG fits its letterbox top bar while leaving
+ * `sizeBands.heroCqh` at 22. It is the pack most likely to regress on a sizing
+ * change, so it gets its own Lab composition.
+ */
+const SOCIAL_OVERLAY_STYLE: OverlayStyle = {
+  ...DEFAULT_OVERLAY_STYLE,
+  chapter: { kickerSizeCqh: 1.4, titleSizeCqh: 4.2, leftCqw: 5, topCqh: 10, maxWidthCqw: 90 },
+  emphasis: { sizeCqh: 5.2, leftCqw: 5, topCqh: 12, maxWidthCqw: 90, underline: true },
+  callout: { leftCqw: 5, topCqh: 10, valueSizeCqh: 5.6, sourceSizeCqh: 1.6, maxWidthCqw: 90 },
+  diagram: { leftCqw: 5, topCqh: 8, maxWidthCqw: 90, stepSizeCqh: 2.2, connector: "traveling_dot" },
+  chip: { leftCqw: 5, topCqh: 14, sizeCqh: 2.0, iconEm: 1.15, float: true },
+};
 
 /**
  * Props come from Remotion CLI: `remotion studio … --props=…/remotion-props.json`
@@ -82,6 +98,36 @@ export const RemotionRoot: React.FC = () => {
             height: 1080,
           };
         }}
+      />
+      <Composition
+        id="OverlayLab"
+        component={OverlayLab}
+        durationInFrames={labDurationInFrames(LAB_OVERLAYS)}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{ overlays: LAB_OVERLAYS, styleTokens: DEFAULT_OVERLAY_STYLE }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: labDurationInFrames(props.overlays ?? LAB_OVERLAYS),
+          fps: 30,
+          width: 1920,
+          height: 1080,
+        })}
+      />
+      <Composition
+        id="OverlayLabSocial"
+        component={OverlayLab}
+        durationInFrames={labDurationInFrames(LAB_OVERLAYS)}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ overlays: LAB_OVERLAYS, styleTokens: SOCIAL_OVERLAY_STYLE }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: labDurationInFrames(props.overlays ?? LAB_OVERLAYS),
+          fps: 30,
+          width: 1080,
+          height: 1920,
+        })}
       />
     </>
   );
