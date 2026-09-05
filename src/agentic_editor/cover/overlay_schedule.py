@@ -37,6 +37,33 @@ def dwell_for(kind: str, dwell: dict[str, Any] | None = None) -> float:
     )
 
 
+#: Comfortable on-screen reading speed. Lower than pure cold-reading rates
+#: (~15 cps) since the same words are usually also being spoken aloud —
+#: the viewer is confirming/skimming, not reading from a standing start.
+_READING_CPS = 22.0
+_READING_BASE_SEC = 0.9
+_READING_FLOOR_MAX_SEC = 6.0
+
+
+def reading_floor_sec(overlay: dict[str, Any]) -> float:
+    """Minimum dwell so on-screen text is actually readable.
+
+    `dwell_for` returns one fixed constant per *kind* — `quote`, `title`,
+    `tag`, `divider`, `stat` and `lower_third` aren't even in its map, so
+    they all fell through to the generic 1.8s floor regardless of how much
+    text they actually carried. A 12-word quote and a one-word tag got the
+    identical 1.8s, which reads as the overlay having "too little screen
+    time" on anything longer than a few words.
+    """
+    text = " ".join(
+        str(overlay.get(k) or "")
+        for k in ("text", "title", "value", "sourceLabel")
+    ).strip()
+    if not text:
+        return 0.0
+    return min(_READING_FLOOR_MAX_SEC, _READING_BASE_SEC + len(text) / _READING_CPS)
+
+
 def diagram_floor(n_steps: int, dwell: dict[str, Any] | None = None) -> float:
     d = {**DEFAULT_DWELL, **(dwell or {})}
     base = float(d["diagram_sec"])

@@ -114,9 +114,23 @@ def _first_clause_text(
     return " ".join(parts)
 
 
+#: `edl_suggest`'s gap-classify loop tags nearly every hard-cut range with
+#: one of these two notes — "speech" is the default for a THINK cut,
+#: "speech+wait-beat" for AI_WAIT. They carry no topic information at all
+#: (they don't mean "same beat", they mean "this range has spoken words in
+#: it", which is true of almost every range), so treating a match between
+#: them as bridging evidence defeats the THINK hard-cut for nearly any pause
+#: under `note_bridge_max_gap_sec` regardless of whether the two clauses are
+#: actually related — this was the bug behind "weird silent" pauses
+#: surviving the radio-edit uncut.
+_GENERIC_BRIDGE_NOTES = frozenset({"speech", "speech+wait-beat", ""})
+
+
 def _note_bridgeable(a: str | None, b: str | None) -> bool:
     na, nb = (a or "").strip().lower(), (b or "").strip().lower()
     if not na or not nb:
+        return False
+    if na in _GENERIC_BRIDGE_NOTES or nb in _GENERIC_BRIDGE_NOTES:
         return False
     if na == nb:
         return True

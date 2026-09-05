@@ -706,6 +706,7 @@ def build_timeline_overlays(
         diagram_floor,
         dwell_for,
         finalize_overlays,
+        reading_floor_sec,
     )
 
     timeline_dur = edl_keep_duration_sec(edl)
@@ -725,7 +726,7 @@ def build_timeline_overlays(
         floor = (
             diagram_floor(n_steps, dwell)
             if kind == "diagram"
-            else dwell_for(kind, dwell)
+            else max(dwell_for(kind, dwell), reading_floor_sec(ov))
         )
         remaining = max(0.05, timeline_dur - float(sl["fromSec"]))
         dur = min(max(float(sl["durationSec"]), floor), remaining)
