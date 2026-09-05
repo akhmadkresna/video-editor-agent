@@ -381,13 +381,31 @@ def _split_beats(script: str) -> list[tuple[str, str]]:
     return [b for b in beats if b[1].strip()]
 
 
-def _match_time(tokens: list[str], words: list[dict[str, Any]]) -> float | None:
-    """Best cam-source start second for a run of transcript words overlapping `tokens`."""
+def _match_time(
+    tokens: list[str], words: list[dict[str, Any]], *, min_t: float = 0.0
+) -> float | None:
+    """Best cam-source start second for a run of transcript words overlapping `tokens`.
+
+    Only searched from ``min_t`` onward. Script beats are delivered in order,
+    but this is a bag-of-words match against a paraphrased ad-lib (the
+    speaker rarely reads the teleprompter verbatim) — a handful of common
+    words ("nah", "bagian", "juga", "tadi", ...) can coincidentally cluster
+    somewhere earlier in the transcript and score just as high as the beat's
+    real occurrence. Without a floor, `suggest_mockups` calling this once
+    per beat with no ordering constraint let a later beat's match land
+    *before* an earlier beat's — a mockup scene opening while the previous
+    section was still being spoken.
+    """
     if not tokens or not words:
         return None
-    want = set(tokens[:10])
+    want = set(tokens[:16])
     wtok = [_norm_tokens(w["text"]) for w in words]
-    flat = [(t, words[i]["start"]) for i, ts in enumerate(wtok) for t in ts]
+    flat = [
+        (t, float(words[i]["start"]))
+        for i, ts in enumerate(wtok)
+        for t in ts
+        if float(words[i]["start"]) >= min_t
+    ]
     best_score, best_t = 0, None
     win = 14
     for i in range(len(flat)):
@@ -607,12 +625,25 @@ def suggest_mockups(episode: Path) -> dict[str, Any]:
     from agentic_editor.cover.suggest import load_cam_words
 
     words = load_cam_words(edit)
-    times: list[float | None] = [_match_time(_norm_tokens(b[1]), words) for b in beats]
 
     # If the script uses `[MOCKUP: X]` cues anywhere, they are the ONLY
     # source of scenes — other beats stay full cam. A script with no cues
     # falls back to keyword guessing (older scripts) with a loud warning.
     any_cue = any(_explicit_cues(b[1]) for b in beats)
+
+    # Only beats that will actually place a scene should advance the
+    # ordering cursor. A beat like the script's H1 metadata/instructions
+    # block is never spoken and can bag-of-words match anywhere by
+    # coincidence — letting that feed the floor pushed every real beat
+    # after it out to a wrong, much-too-late position.
+    times: list[float | None] = []
+    cursor = 0.0
+    for _head, body in beats:
+        relevant = bool(_explicit_cues(body)) if any_cue else True
+        t = _match_time(_norm_tokens(body), words, min_t=cursor)
+        times.append(t)
+        if t is not None and relevant:
+            cursor = t
 
     scenes: list[dict[str, Any]] = []
     unmatched: list[str] = []
