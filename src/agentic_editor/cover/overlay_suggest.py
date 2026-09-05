@@ -305,13 +305,17 @@ def find_section_candidates(
             note = _note_for_window(ranges, w0, w1)
             label = short_label(note, fallback="")
             if not label or label.lower() in _GENERIC_NOTES:
-                nearby = [
-                    h
-                    for h in find_payoff_hits(words)
-                    if abs(float(h["start"]) - w0) < 12
-                ]
-                nearby.sort(key=lambda h: abs(float(h["start"]) - w0))
-                label = str(nearby[0]["text"]) if nearby else "Demo"
+                # `find_payoff_hits` is a curated lexicon tuned for tech/Odoo
+                # screen demos — it rarely matches an explainer style like
+                # Claude Skill Lab (no live demo, nothing to "screen-enter"
+                # into), so this used to fall through to a hardcoded "Demo"
+                # label that doesn't fit that framing at all.
+                # `_label_and_start_near_time`'s own fallback (nearby spoken
+                # words, not just lexicon hits) gives a real content label
+                # instead; "Lanjut" only fires if there's truly no speech
+                # nearby.
+                found = _label_and_start_near_time(words, w0, radius=12.0)
+                label = found[0] if found else "Lanjut"
             candidates.append(
                 {
                     "start": w0,
@@ -1428,7 +1432,14 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         if overlaps_any(w0, head_end, used_spans):
             continue  # already have MG at enter
         note = _note_for_window(ranges, w0, w1)
-        label = short_label(note, fallback=f"Section {wi + 1}")
+        label = short_label(note, fallback="")
+        if not label or label.lower() in _GENERIC_NOTES:
+            # Same reasoning as the screen-enter path above: a numbered
+            # "Section N" placeholder doesn't respect the explainer framing
+            # when nothing content-specific is available. Prefer nearby
+            # speech over a numbered placeholder.
+            found = _label_and_start_near_time(words, w0, radius=12.0)
+            label = found[0] if found else f"Section {wi + 1}"
         rs, end = w0, head_end
         if words:
             rs, end = snap_window_to_words(rs, end, words)

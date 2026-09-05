@@ -57,10 +57,11 @@ def remap_source_window(
 #: white-ink, no-panel look as the kinds below, see
 #: packages/remotion-kit/src/components/OverlayLayer.tsx.
 _LEGACY_OVERLAY_KINDS = ("chapter", "emphasis", "diagram", "chip", "callout")
-#: Kinds dispatched to GlassOverlays.tsx (2026-08+, "Open Overlay" v7) —
-#: no panel, same palette as the kinds above, just a different component
-#: per kind's structure. See
-#: packages/remotion-kit/src/components/glass/GlassOverlays.tsx.
+#: Kinds dispatched through the A-Roll Text Motion System
+#: (packages/remotion-kit/src/components/overlay/dispatch.tsx) — white ink,
+#: no panel, same palette as the kinds above, just a different primitive per
+#: kind's structure. `code`/`illustration` stay on the legacy GlassOverlays.tsx
+#: renderer (explicitly out of scope for the port).
 _GLASS_OVERLAY_KINDS = (
     "title",
     "stat",
@@ -70,6 +71,9 @@ _GLASS_OVERLAY_KINDS = (
     "quote",
     "code",
     "illustration",
+    # Added to TimelineOverlay/OverlayKind in the step-1 tokens commit but
+    # never added here — silently dropped by collect_overlay_defs until now.
+    "list_cycle",
 )
 _ALLOWED_OVERLAY_KINDS = _LEGACY_OVERLAY_KINDS + _GLASS_OVERLAY_KINDS
 

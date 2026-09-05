@@ -69,7 +69,17 @@ export const CalloutArrow: React.FC<CalloutArrowProps> = ({ label, to, from, the
       <svg
         width={width}
         height={height}
-        style={{ position: "absolute", inset: 0, overflow: "visible" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflow: "visible",
+          // The line/dot/head are pure white with no other contrast
+          // mechanism (unlike the label, which gets theme.textShadow) — over
+          // a light background (e.g. a mockup stage) a plain white stroke is
+          // effectively invisible. A drop-shadow on the whole SVG matches the
+          // same visual language as the text shadow everywhere else.
+          filter: "drop-shadow(0 1px 3px rgba(0,0,0,.65))",
+        }}
       >
         <line
           x1={x1}
