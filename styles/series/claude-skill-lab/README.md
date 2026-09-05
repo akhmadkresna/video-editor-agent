@@ -122,16 +122,21 @@ Episode framing: `Claude Skill Lab #N: <skill>`. Intro line stays:
 
 Research + full skill inventory: [`research.md`](research.md).
 
-### Launch 6
+### Locked front (reworked 2026-09-05)
 
 | # | Skill | Source | Hook | Task shown |
 |---|-------|--------|------|-----------|
-| 01 | `avoid-ai-writing` | GitHub | "Tulisan kamu ketahuan AI?" | Paste AI paragraph → run skill → before/after |
-| 02 | `pptx` | Bawaan | "Catatan rapat → deck, 2 menit" | Messy notes → real .pptx, open in PowerPoint |
-| 03 | `skill-creator` | Bawaan (pre-installed) | "Berhenti jelasin ulang tiap hari" | Build one `SKILL.md` for a real repeat task |
-| 04 | `algorithmic-art` | Bawaan | "Satu prompt, seni yang bisa diulang persis" | Prompt → p5.js art → tweak the seed |
-| 05 | `discernment-nudge` | Bawaan | "Skill biar kamu nggak kelewat percaya AI" | Ask for an estimate → watch the nudge fire |
-| 06 | `xlsx` | Bawaan | "CSV berantakan → laporan rapi + chart" | Kopong CSV → clean sheet + formulas + chart |
+| 01 | `avoid-ai-writing` | GitHub | "Tulisan kamu ketahuan AI?" | Paste AI paragraph → run skill → before/after · *in production* |
+| 02 | **build `naskah-santai-id`** (via `skill-creator`) | Bawaan | "Claude nulis Bahasa Indonesia kaku? Bikin skill sendiri" | Live-build a custom `SKILL.md` for natural, non-boring Indonesian YouTube scripts → run it on a real stiff draft → **spontaneous on-camera reaction**. *Build episode.* |
+| 03 | "how Claude talks to you" — `discernment-nudge` + anti-glazing skill | Bawaan + hand-written | "Skill yang ngatur cara Claude ngomong ke kamu" | Everyday behavior skills: kill "You're absolutely right!" sycophancy + overtrust nudge |
+| 04+ | TBD order | — | — | `algorithmic-art` · `skill-creator` proper (meta angle) · Bench roundups |
+
+**Dropped 2026-09-05 (user call):** `pptx`, `xlsx` — "bikin file" demos, weak for this
+audience. Only candidates for a future "skill keren tapi nggak kepake" teardown.
+
+**Ep 02 is a format variant:** the Demo beat is a live build + genuine reaction
+(not a pre-planned mock run), still drawn on the MockStage. Jujurnya carries the
+unscripted "does it sound like me?" reaction. Allowed for *build* episodes only.
 
 ### Bench (episodes 7+)
 

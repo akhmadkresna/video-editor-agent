@@ -3,7 +3,7 @@
 **Living doc.** Come back here to pick the next episode. Update the date
 and the inventory whenever Anthropic or the community ships skills.
 
-Last updated: **2026-09-04** · Sources at bottom.
+Last updated: **2026-09-05** · Sources at bottom.
 
 ---
 
@@ -78,6 +78,7 @@ above once; episodes don't re-teach it.
 | Skill | What it does |
 |---|---|
 | `avoid-ai-writing` | Audits + rewrites text to strip 21 categories of AI tells (43-entry replacement table) |
+| `adenaufal/anti-slop-writing` (`indonesian/SKILL.md`) | Natural Bahasa Indonesia: kills stiff formality, template phrases (`tidak hanya… tetapi juga`), forced `Kesimpulan` endings, translationese; restores particles (`nah / sih / dong / kan`). Removal-focused, overlaps ep 1 — reference for ep 2's custom skill, not its own episode. |
 | `collision-zone-thinking` | Merges unrelated domains to surface hidden insights/constraints |
 | `scale-game` | Stress-tests an idea at extreme scales to expose weak points |
 | `think-deeply` | Forces multi-perspective analysis instead of a knee-jerk answer |
@@ -94,15 +95,15 @@ Community collections: `travisvn/awesome-claude-skills`,
 
 ---
 
-## Episode slate (locked order — see README backlog for the table)
+## Episode slate (reworked 2026-09-05 — see README backlog for the table)
 
-**Launch 6:**
-1. `avoid-ai-writing` (GitHub) — "Tulisan kamu ketahuan AI?" · paste AI para → before/after
-2. `pptx` (bawaan) — "Catatan rapat → deck, 2 menit" · messy notes → real .pptx
-3. `skill-creator` (bawaan) — "Berhenti jelasin ulang tiap hari" · build one SKILL.md for a real repeat task
-4. `algorithmic-art` (bawaan) — "Satu prompt, seni yang bisa diulang persis" · prompt → p5.js → tweak seed
-5. `discernment-nudge` (bawaan) — "Skill biar kamu nggak kelewat percaya AI" · ask for an estimate → watch the nudge
-6. `xlsx` (bawaan) — "CSV berantakan → laporan rapi + chart"
+**Locked front:**
+1. `avoid-ai-writing` (GitHub) — "Tulisan kamu ketahuan AI?" · paste AI para → before/after *(in production)*
+2. **build `naskah-santai-id`** via `skill-creator` (bawaan) — "Claude nulis Bahasa Indonesia kaku? Bikin skill sendiri" · build a custom SKILL.md for natural, non-boring Indonesian YouTube scripts, then run it on a real stiff draft with spontaneous on-camera reaction. *Build episode* (demo = live build + genuine reaction, still on the mockup). Full beat sketch: session 2026-09-05.
+3. **"how Claude talks to you"** — `discernment-nudge` (bawaan) + an anti-glazing / brutal-honesty behavior skill · "Skill yang ngatur cara Claude ngomong ke kamu" · everyday behavior skills — fixes sycophancy ("You're absolutely right!") + overtrust. Confirmed for the series 2026-09-05.
+4+. TBD order — `algorithmic-art`, `skill-creator` proper (meta angle, now that ep 2 already used it once), Bench roundups.
+
+**Dropped from the slate (user call 2026-09-05):** `pptx`, `xlsx` — "bikin file" demos, weak for this audience. May only resurface inside a "skill keren tapi nggak kepake" teardown.
 
 **Bench:** `canvas-design`/`theme-factory` (poster & consistent look) ·
 `slack-gif-creator` (GIF buat WA/Discord) · `web-asset-generator`
@@ -123,3 +124,12 @@ kapan skill nggak cukup) · "skill keren tapi nggak kepake" honest teardown.
 - https://www.getclaudeskills.com/blog/how-to-install-skills-in-claude-desktop
 - https://raw.githubusercontent.com/anthropics/skills/main/skills/discernment-nudge/SKILL.md
 - https://raw.githubusercontent.com/anthropics/skills/main/skills/academy-guide/SKILL.md
+
+### Added 2026-09-05 (ep 2 research pass)
+
+- https://github.com/adenaufal/anti-slop-writing — Indonesian anti-slop variant
+- https://github.com/karanb192/awesome-claude-skills
+- https://github.com/ComposioHQ/awesome-claude-skills
+- https://dev.to/suraj_khaitan_f893c243958/i-tried-100-claude-skills-these-are-the-best-1m4a
+- No off-the-shelf skill exists for casual/storytelling Bahasa Indonesia YouTube scripts → ep 2 builds one.
+- Anti-glazing / brutal-honesty skills (e.g. chadbyte/claude-roast, Brutal Honesty Review) are mostly Claude Code plugins — for ep 3, a Desktop-compatible `SKILL.md` behavior file is needed (likely hand-written or built with `skill-creator`).

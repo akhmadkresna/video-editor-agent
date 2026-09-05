@@ -247,7 +247,7 @@ The `> "…"` blockquote branch also appends a light **`Cursor`** to the
 | 1 | **`MockStage`** | Scene container — Mist desktop bg, window frame + chrome, enter/exit, rest state for thumbnails. Renders at `oversample` (2×). Reuses `cutaway/shared` (Backdrop/Grain/Vignette). Hosts one surface. Publishes focus regions to the registry. | `{ title?, chrome?: 'claude'\|'app'\|'browser'\|'none', in, out }` |
 | 2 | **`MockCam`** | Virtual camera — scale + pan over `MockStage` + `Cursor`, keyframed by `camera[]`, damped caret/cursor follow, settle-at-rest. See MockCam section. | `camera[]: { atSec, state:'establish'\|'read'\|'focus', focus?, track?:'caret'\|'cursor' }` |
 | 3 | **`ClaudeChat`** | Stylized conversation. A `reveal: type` **user** turn types into the **input bar** first (dark ink + caret), then "sends" — the bubble pops in and the input clears. Assistant reply reveals in place (`type`/`stream`) with `▸ Pakai skill · X` pill, attachment chips, collapsible tool block. Publishes `chat.*` focus regions; `chat.caret` points at the input bar while composing. | `turns[]: { role:'user'\|'assistant', text, reveal:'instant'\|'type'\|'stream', skillBadge?, attachments?:[{name,kind}], toolBlock?:{label,lines[]}, atSec? }` |
-| 4 | **`DiffPanel`** | Before/after text, token-level highlight (del = strike, add = underline). Reveal: before, then after wipes in, highlights pulse. Publishes `diff.before` / `diff.after`. | `{ before, after, marks?:[{type:'add'\|'del', span:[start,end]}] }` |
+| 4 | **`DiffPanel`** | Before/after text, word-level highlight (del = strike, add = underline). Reveal: before, then after wipes in, highlights pulse. Publishes `diff.before` / `diff.after`. `beforeMarks`/`afterMarks` are **auto-derived** from a word diff of `before` vs `after` at timeline-build time (`diff_marks()` in `cover/mockup.py`); author-supplied marks override. | `{ before, after, beforeMarks?:[{type:'del', span:[start,end]}], afterMarks?:[{type:'add', span:[start,end]}] }` |
 | 5 | **`Cursor`** | Pointer inside `MockCam` (zooms with the stage) — eased hops, hover scale, click ripple + SFX cue to `SfxLayer`. Resolves targets from the registry. | `{ path:[{ atSec, target: string\|[x,y], action?:'move'\|'hover'\|'click', dwell? }] }` |
 | 6 | **`AppWindow`** | "Output opened" frame — pptx/xlsx/docx/preview/browser chrome, open anim. Stylized mock content (or host still). | `{ app:'pptx'\|'xlsx'\|'docx'\|'preview'\|'browser', content:'mock-deck'\|'mock-sheet'\|'mock-doc'\|{src}, panFrames? }` |
 | 7 | **`SkillsPanel`** | Settings → Capabilities → Skills — sidebar, skill rows + toggles, upload drop state. | `{ skills:[{name,source,on}], action?:'toggle:<name>'\|'upload' }` |
@@ -287,35 +287,45 @@ Fallback: a `focusPoint: [x,y]` (0–1 of stage) on the keyframe.
 
 ## `ae mockup-suggest .`
 
-Reads `edit/script.md` (beats split on `#`/`##`) + the cam transcript →
-writes `edit/mockup.suggest.json` with camera skeletons + `<TODO>`
-placeholders. `--apply` runs `validate_mockup()` and writes
-`edit/mockup.json`. Suggest / fill / confirm / apply (house rule 1).
+Reads **only the cam transcript** (`edit/transcripts/cam.json`) → writes
+`edit/mockup.suggest.json` with camera skeletons + `<TODO>` placeholders.
+`--apply` runs `validate_mockup()` and writes `edit/mockup.json`. Suggest /
+fill / confirm / apply (house rule 1).
 
-**Cue mode (preferred).** Put `[MOCKUP: <Component> — note]` lines in the
-script where you want a drawn scene (`ClaudeChat` / `DiffPanel` /
-`AppWindow` / `SkillsPanel` / `RepoView`). Only those beats become scenes
-— every other beat stays full cam. Several cues in one beat → several
-scenes, splitting the beat's window. A script with **no** cues falls back
-to noisy keyword guessing (older scripts) with a loud warning;
-`_meta.mode` says which ran, `_meta.keyword_hint_beats` lists beats that
-name a screen but have no cue.
+The episode script is **not** read — it's a recording guide, not editing
+truth. Placement is driven by what the speaker actually said, so no
+transcript → nothing to place (`_meta.error`, run `ae ingest .` first).
 
-- Beat → `fromSec`/`toSec` by fuzzy-matching the beat's first content words
-  against the transcript. **No transcript yet → `fromSec`/`toSec` are
-  `null`** and `--apply` refuses until you set them (from the storyboard).
-- Surface heuristic (first match wins):
-  `skill.md|dari mana|repo|github|komunitas|sebelum saya percaya` →
-  **`RepoView`** (resolves + fetches the real SKILL.md);
-  `powerpoint|.pptx|deck|slide` → `AppWindow` deck;
-  `excel|.xlsx|sheet|csv` → sheet; `word|.docx|surat` → doc;
-  `settings|capabilities|skills|aktif|unggah|toggle` → `SkillsPanel`;
-  `sebelum|sesudah|revisi|tandai` → `DiffPanel`; a `> "…"` blockquote →
-  `ClaudeChat` + a light `Cursor` (user turn = the quote, `reveal: type`,
-  + a placeholder assistant turn with the skill badge); else a plain
-  `ClaudeChat` placeholder.
-- Skill slug = first hyphenated backtick token in the first ~3 beats,
-  looked up in `skills.yaml`.
+- **Spoken-phrase triggers** (`_MOCKUP_TRIGGERS` in `cover/mockup.py`), each
+  scene anchored to the ASR `start` of its trigger word:
+  `repo` / `di github` / `sumbernya` / `skill.md` → **`RepoView`**;
+  `settings` / `kapabilitas` / `bagian skill` / `toggle` → **`SkillsPanel`**;
+  `sebelum` / `sesudah` / `hasil revisi` → **`DiffPanel`**;
+  `kebuka di` / `pptx` / `xlsx` / `docx` → **`AppWindow`**;
+  a spoken prompt lead-in (`aku bilang …`, `minta claude …`, `aku ketik …`)
+  → **`ClaudeChat`**, user turn = the words the speaker reads aloud after
+  the lead-in, + a light `Cursor`. A spoken prompt **wins** over any
+  keyword trigger in the same window.
+- Multi-word phrase = high confidence; a bare word (`repo`, `settings`,
+  `sebelum`, …) = **low** confidence — the scene is still emitted but listed
+  in `_meta.low_confidence_scenes` and printed with a `⚠` + `mm:ss` for you
+  to verify before `--apply`.
+- Repeat hits of the same component within `min_gap_sec` (default 12 s)
+  collapse to one. Scene `toSec` = next trigger's anchor, else a per-kind
+  dwell (ClaudeChat 22 s, RepoView 14 s, DiffPanel 12 s, others 10 s),
+  clamped to transcript end. `build_timeline_mockups` then clamps each
+  scene to its longest kept cam slice through the EDL.
+- Skill slug = `skill:` in `project.yaml` if set, else the `skills.yaml`
+  slug the speaker mentions most, else none.
+- Override the trigger table / min-gap per style pack in
+  `styles/mockup/style.md`:
+  ```yaml
+  mockup_suggest:
+    min_gap_sec: 12
+    triggers:
+      RepoView: ["repo", "di github", "sumbernya"]
+      SkillsPanel: ["settings", "kapabilitas"]
+  ```
 
 `edit/mockup.json` shape (all times **cam source seconds**):
 

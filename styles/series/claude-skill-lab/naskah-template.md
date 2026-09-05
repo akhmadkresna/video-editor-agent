@@ -41,10 +41,25 @@ milih** kapan dipakai. Itu aja.
 
 ---
 
-Semua tampilan layar digambar ulang (mockup + PIP), bukan rekaman. Tandai
-tiap scene dengan **`[MOCKUP: <Komponen> — catatan]`** — cuma beat yang
-punya cue ini yang jadi scene; sisanya full cam. Komponen:
-`ClaudeChat` · `DiffPanel` · `AppWindow` · `SkillsPanel` · `RepoView`.
+Semua tampilan layar digambar ulang (mockup + PIP), bukan rekaman. Editor
+**tidak baca naskah ini** — scene mockup ditaruh dari transkrip: dari apa
+yang benar-benar kamu **ucapkan**. Jadi sebut pemicunya dengan lantang di
+tempat yang tepat:
+
+- **RepoView** (repo / SKILL.md): ".. buka **repo**-nya di **github** ..",
+  ".. lihat **sumbernya** .."
+- **SkillsPanel** (Settings → Skills): ".. masuk ke **settings**, bagian
+  **skill** ..", ".. **aktifin skill**-nya .."
+- **DiffPanel** (sebelum/sesudah): ".. **sebelumnya** begini .. **sesudah**
+  dirapikan .."
+- **AppWindow** (hasil kebuka di app): ".. **kebuka di** PowerPoint ..",
+  ".. jadi file **pptx** / **xlsx** / **docx** .."
+- **ClaudeChat** (prompt): awali dengan ".. **aku bilang** .." / ".. **aku
+  ketik** .." / ".. **minta claude** .." lalu **baca prompt-nya keras** —
+  kata-kata itu jadi user turn.
+
+Kalau pemicunya cuma satu kata umum (mis. cuma "repo"), scene tetap dibuat
+tapi ditandai low-confidence buat dicek pas review.
 
 ## [1:30–5:00] Demo
 
@@ -52,16 +67,17 @@ Oke, contohnya: **`<TUGAS>`**.
 
 Misalnya kalian punya `<FILE / input — deskripsi singkat>`.
 
-Ini yang saya ketik ke Claude:
+**Aku bilang** ke Claude — (baca keras, ini jadi user turn):
 
-> "`<kutipan prompt — jadi user turn>`"
+> "`<kutipan prompt>`"
 
-`[MOCKUP: ClaudeChat — user turn = kutipan + attachment; assistant turn = skill badge + hasil. Cursor: klik kirim.]`
+<Apa yang skill ini lakukan / bagian yang berubah — sebut "**sebelumnya** ..
+**sesudah** .." kalau mau DiffPanel; sebut "**kebuka di** <app>" kalau
+hasilnya kebuka di pptx/xlsx/docx.>
 
-<Apa yang skill ini lakukan / bagian yang berubah.>
-
-`[MOCKUP: DiffPanel — before = <input>, after = <hasil>]`
-`[MOCKUP: AppWindow — app <pptx|xlsx|docx>, kalau hasilnya "kebuka di app"]`
+> Isi `before`/`after` DiffPanel dan `assistant reply` ClaudeChat kamu
+> lengkapi nanti di `edit/mockup.json` (highlight kata yang berubah
+> dihitung otomatis dari before/after).
 
 <Kalau ada batas yang kelihatan di sini, sebut aja — nggak wajib
 "momen gagal", ini explainer.>
