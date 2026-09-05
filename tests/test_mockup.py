@@ -8,11 +8,26 @@ from agentic_editor.cover import build_timeline_from_edl_and_cover
 from agentic_editor.cover.mockup import (
     DEFAULT_MOCK,
     build_timeline_mockups,
+    diff_marks,
     load_mockup,
     resolve_skill,
     suggest_mockups,
     validate_mockup,
 )
+
+
+def _write_transcript(episode, spoken: str, *, wps: float = 2.5, t0: float = 0.0):
+    """Write edit/transcripts/cam.json from a plain string, one word per token."""
+    (episode / "edit" / "transcripts").mkdir(parents=True, exist_ok=True)
+    words = []
+    t = t0
+    for tok in spoken.split():
+        words.append({"text": tok, "start": round(t, 2), "end": round(t + 1 / wps, 2), "score": 1.0})
+        t += 1 / wps
+    (episode / "edit" / "transcripts" / "cam.json").write_text(
+        json.dumps({"words": words}), encoding="utf-8"
+    )
+    return words
 
 
 def _edl():
@@ -127,61 +142,137 @@ def test_resolve_skill_urls():
     assert u["repo"] == "anthropics/skills" and "skills/totally-made-up" in u["raw_url"]
 
 
-def test_cue_mode_only_cued_beats_become_scenes(tmp_path):
+def test_suggest_needs_a_transcript(tmp_path):
     (tmp_path / "edit").mkdir()
-    (tmp_path / "edit" / "script.md").write_text(
-        "# Hook\n\nSkill `avoid-ai-writing`. Ngomongin pptx dan excel tapi cuma teaser.\n\n"
-        "## Demo\n\n> \"benerin ini\"\n\n"
-        "[MOCKUP: ClaudeChat — user + reply]\n"
-        "[MOCKUP: DiffPanel — before/after]\n\n"
-        "## Verdict\n\nWorth it. Minggu depan pptx.\n",
-        encoding="utf-8",
+    out = suggest_mockups(tmp_path)
+    assert out["scenes"] == []
+    assert "cam.json" in out["_meta"]["error"]
+
+
+def test_suggest_repoview_anchored_to_spoken_github(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "agentic_editor.cover.mockup.fetch_skill_md", lambda *a, **k: "# SKILL\nbody"
+    )
+    # "repo" at token idx 7 (2.8s), "di github" phrase at idx 9 (3.6s)
+    _write_transcript(
+        tmp_path,
+        "oke jadi minggu ini kita coba buka repo nya di github biar kelihatan "
+        "isinya seperti apa dan siapa yang bikin",
     )
     out = suggest_mockups(tmp_path)
-    assert out["_meta"]["mode"] == "cues"
-    comps = [[l["component"] for l in s["layers"]] for s in out["scenes"]]
-    # Hook + Verdict have no cue -> no scene. Demo's 2 cues -> 2 scenes.
-    assert len(out["scenes"]) == 2
-    assert ["ClaudeChat", "Cursor"] in comps
-    assert ["DiffPanel"] in comps
+    repo = [s for s in out["scenes"] if s["layers"][0]["component"] == "RepoView"]
+    assert repo, out["_meta"]
+    # anchored on the spoken repo/github moment, not drifted elsewhere
+    assert 2.5 <= repo[0]["fromSec"] <= 4.5
+    assert repo[0]["layers"][0]["data"]["repoUrl"].startswith("https://github.com/")
 
 
-def test_suggest_emits_repoview_on_source_beat(tmp_path):
-    (tmp_path / "edit").mkdir()
-    (tmp_path / "edit" / "script.md").write_text(
-        "# Hook\n\nSkill `avoid-ai-writing`.\n\n"
-        "## Dari mana\n\nIni bikinan komunitas. Buka SKILL.md-nya, sebelum saya percaya.\n",
-        encoding="utf-8",
+def test_spoken_prompt_beats_repo_keyword_and_fills_user_turn(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "agentic_editor.cover.mockup.fetch_skill_md", lambda *a, **k: "# SKILL"
+    )
+    # A spoken prompt lead-in AND a "skill.md" mention in the same stretch.
+    _write_transcript(
+        tmp_path,
+        "terus aku bilang perbaiki paragraf ini biar rapi. habis itu aku buka "
+        "skill.md nya buat lihat isinya",
     )
     out = suggest_mockups(tmp_path)
-    repo_layers = [
-        l for s in out["scenes"] for l in s["layers"] if l["component"] == "RepoView"
-    ]
-    assert repo_layers, "expected a RepoView layer for the 'dari mana' beat"
-    d = repo_layers[0]["data"]
-    assert d["repoUrl"].startswith("https://github.com/")
-    assert isinstance(d["markdown"], str) and d["markdown"]
+    first = out["scenes"][0]
+    assert first["layers"][0]["component"] == "ClaudeChat"
+    user_turn = first["layers"][0]["data"]["turns"][0]
+    assert user_turn["role"] == "user"
+    assert "perbaiki paragraf ini" in user_turn["text"].lower()
 
 
-def test_suggest_reads_script_and_finds_skill(tmp_path):
-    ep = tmp_path
-    (ep / "edit").mkdir()
-    (ep / "edit" / "script.md").write_text(
-        "# Skill Lab #01 — avoid-ai-writing\n\n"
-        "Style pack: `mockup`.\n\n"
-        "## [0:00–0:30] Hook\n\n"
-        "Skill minggu ini `avoid-ai-writing`.\n\n"
-        "## [1:30–5:00] Demo\n\n"
-        "> \"Perbaiki paragraf ini biar nggak bau AI\"\n\n"
-        "## [5:00–6:30] Buka hasilnya\n\n"
-        "Deck-nya kebuka di PowerPoint.\n",
-        encoding="utf-8",
+def test_generic_single_word_trigger_is_flagged_low_confidence(tmp_path):
+    _write_transcript(
+        tmp_path,
+        "sekarang kita masuk ke settings terus scroll sampai bawah pelan pelan",
     )
-    out = suggest_mockups(ep)
-    assert out["_meta"]["skill"] == "avoid-ai-writing"
-    assert out["_meta"]["beats"] >= 3
-    comps = [l["component"] for s in out["scenes"] for l in s["layers"]]
-    assert "ClaudeChat" in comps and "AppWindow" in comps
-    # no transcript -> windows are null, apply must refuse
-    assert any(s["fromSec"] is None for s in out["scenes"])
-    assert validate_mockup(out)  # has errors (null spans)
+    out = suggest_mockups(tmp_path)
+    assert any(s["layers"][0]["component"] == "SkillsPanel" for s in out["scenes"])
+    low = out["_meta"]["low_confidence_scenes"]
+    assert low and low[0]["component"] == "SkillsPanel"
+
+
+def test_repeat_triggers_collapse_within_min_gap(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "agentic_editor.cover.mockup.fetch_skill_md", lambda *a, **k: "# SKILL"
+    )
+    # two "github" mentions ~4s apart (< default 12s min gap) -> one scene
+    _write_transcript(
+        tmp_path,
+        "buka github sekarang lihat filenya oke balik lagi ke github yang tadi ya",
+    )
+    out = suggest_mockups(tmp_path)
+    repo = [s for s in out["scenes"] if s["layers"][0]["component"] == "RepoView"]
+    assert len(repo) == 1
+
+
+def test_two_distinct_spoken_prompts_stay_separate_scenes(tmp_path):
+    # both prompts are close in this compressed transcript but different text
+    _write_transcript(
+        tmp_path,
+        "aku bilang perbaiki paragraf ini. lalu aku ketik lets improve the "
+        "avoid ai writing skill dong",
+    )
+    out = suggest_mockups(tmp_path)
+    chats = [s for s in out["scenes"] if s["layers"][0]["component"] == "ClaudeChat"]
+    assert len(chats) == 2
+    texts = [c["layers"][0]["data"]["turns"][0]["text"].lower() for c in chats]
+    assert "perbaiki paragraf ini" in texts[0]
+    assert "avoid ai writing skill" in texts[1]
+
+
+def test_diff_marks_word_level_spans():
+    before = "the quick brown fox"
+    after = "the slow brown fox"
+    b, a = diff_marks(before, after)
+    assert b == [{"type": "del", "span": [4, 9]}]  # "quick"
+    assert a == [{"type": "add", "span": [4, 8]}]  # "slow"
+    assert before[4:9] == "quick" and after[4:8] == "slow"
+
+
+def test_diff_marks_insert_and_delete():
+    b, a = diff_marks("keep this", "keep this extra")
+    assert b == []
+    assert a and a[0]["type"] == "add"
+    b2, a2 = diff_marks("drop this word", "drop word")
+    assert b2 and b2[0]["type"] == "del"
+    assert a2 == []
+
+
+def test_build_timeline_injects_diff_marks_and_respects_author_marks():
+    cover = {
+        "mockups": [
+            {
+                "id": "auto",
+                "fromSec": 5.0,
+                "toSec": 20.0,
+                "layers": [
+                    {
+                        "component": "DiffPanel",
+                        "data": {"before": "a red car", "after": "a blue car"},
+                    }
+                ],
+            },
+            {
+                "id": "todo",
+                "fromSec": 55.0,
+                "toSec": 70.0,
+                "layers": [
+                    {
+                        "component": "DiffPanel",
+                        "data": {"before": "<TODO before>", "after": "<TODO after>"},
+                    }
+                ],
+            },
+        ]
+    }
+    scenes, _ = build_timeline_mockups(_edl(), cover)
+    auto = next(s for s in scenes if s["id"] == "auto")["layers"][0]["data"]
+    assert auto["beforeMarks"] == [{"type": "del", "span": [2, 5]}]
+    assert auto["afterMarks"] == [{"type": "add", "span": [2, 6]}]
+    todo = next(s for s in scenes if s["id"] == "todo")["layers"][0]["data"]
+    assert "beforeMarks" not in todo and "afterMarks" not in todo

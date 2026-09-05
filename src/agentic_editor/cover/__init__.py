@@ -515,16 +515,28 @@ def write_timeline(path: Path, timeline: dict[str, Any]) -> None:
     path.write_text(json.dumps(timeline, indent=2) + "\n", encoding="utf-8")
 
 
-def example_cover() -> dict[str, Any]:
+def example_cover(*, style: str = "tutorial") -> dict[str, Any]:
+    camera_play = {
+        "snap_on_cuts": True,
+        "home": "medium",
+        "alt": "close",
+        "wide_on_resets": True,
+        "max_hold_sec": 7,
+        "scales": {"wide": 1.0, "medium": 1.22, "close": 1.42},
+    }
+    if style == "mockup":
+        # Drawn scenes live in mockup.json; cover carries only camera play.
+        # A seeded screen_with_cam here would render a blank screen layout
+        # (no screen source) with just the cam PIP.
+        return {
+            "camera_play": camera_play,
+            "events": [],
+            "captions": [],
+            "overlays": [],
+            "sfx": [],
+        }
     return {
-        "camera_play": {
-            "snap_on_cuts": True,
-            "home": "medium",
-            "alt": "close",
-            "wide_on_resets": True,
-            "max_hold_sec": 7,
-            "scales": {"wide": 1.0, "medium": 1.22, "close": 1.42},
-        },
+        "camera_play": camera_play,
         "events": [
             {
                 "type": "framing",

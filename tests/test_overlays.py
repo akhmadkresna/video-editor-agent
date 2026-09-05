@@ -146,6 +146,33 @@ def test_overlay_zone_passthrough_on_remap():
     assert ov[0]["zone"] == "right_third"
 
 
+def test_list_cycle_duration_capped_past_authored_window():
+    # steps are spoken over a long stretch; without the cap the hold-after
+    # extension would push the list_cycle out to ~last_step + 2.6s.
+    edl = {
+        "sources": {"cam": "/tmp/cam.mp4"},
+        "ranges": [{"source": "cam", "start": 0.0, "end": 120.0}],
+    }
+    cover = {
+        "overlays": [
+            {
+                "id": "lc",
+                "kind": "list_cycle",
+                "start": 5.0,
+                "end": 9.0,  # authored 4s window
+                "text": "kita:",
+                "steps": ["baca teks", "tandai pola", "tulis ulang", "review"],
+                "stepStarts": [6.0, 30.0, 55.0, 80.0],
+            }
+        ]
+    }
+    ov = build_timeline_overlays(edl, cover)
+    lc = next(o for o in ov if o["id"] == "lc")
+    # authored window 4s + _LIST_CYCLE_MAX_EXTEND_SEC (4.0) ceiling
+    assert lc["durationSec"] <= 8.0 + 1e-6
+    assert max(lc.get("stepAtSec") or [0]) <= lc["durationSec"]
+
+
 def test_chapter_note_and_title_helpers():
     assert CHAPTER_NOTE_RE.search("fase 2 setup")
     # curated short labels (not raw note dumps)

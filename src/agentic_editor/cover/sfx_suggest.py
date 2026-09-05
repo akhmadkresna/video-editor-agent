@@ -213,6 +213,9 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
     dens = sfx_cfg.get("density") or {}
     min_gap = float(dens.get("min_gap_sec", 1.2))
     shutter_click_gap = float(dens.get("shutter_click_min_gap_sec", 0.4))
+    # thin cut-snap shutters: a style can demand a wide gap between shutters
+    # so a busy radio edit doesn't fire one every ~15s.
+    shutter_gap = float(dens.get("shutter_min_gap_sec", min_gap))
     typing_merge = float(dens.get("typing_merge_gap_sec", 1.5))
     typing_cfg = sfx_cfg.get("typing") or {}
     typing_enabled = bool(typing_cfg.get("enabled", False))
@@ -440,6 +443,8 @@ def suggest_sfx(episode: Path) -> dict[str, Any]:
                 return True
             return False
         if gap < min_gap and a["kind"] != "typing" and b["kind"] != "typing":
+            return True
+        if a["kind"] == b["kind"] == "shutter" and gap < shutter_gap:
             return True
         if {a["kind"], b["kind"]} == {"shutter", "click"} and gap < shutter_click_gap:
             return True

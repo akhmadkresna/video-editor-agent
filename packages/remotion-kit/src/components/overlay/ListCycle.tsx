@@ -26,6 +26,8 @@ export type ListCycleProps = {
   stepAtSec?: number[];
   intervalMs?: number;
   maxWidthCqw?: number;
+  /** Which edge the row hugs — "right" for the right_third lane. */
+  align?: "left" | "right";
   theme: OverlayTheme;
 };
 
@@ -35,6 +37,7 @@ export const ListCycle: React.FC<ListCycleProps> = ({
   stepAtSec,
   intervalMs = 1500,
   maxWidthCqw,
+  align = "left",
   theme,
 }) => {
   const frame = useCurrentFrame();
@@ -103,6 +106,7 @@ export const ListCycle: React.FC<ListCycleProps> = ({
       style={{
         display: "flex",
         alignItems: "center",
+        justifyContent: align === "right" ? "flex-end" : "flex-start",
         gap: gapPx,
         fontFamily: theme.fontSans,
         color: theme.ink,

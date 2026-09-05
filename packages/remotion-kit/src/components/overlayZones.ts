@@ -14,6 +14,12 @@ export function defaultZoneForKind(kind: OverlayKind): OverlayZone {
     case "chapter":
     case "divider":
       return "top_sparse";
+    case "list_cycle":
+      // Its own lane. `list_cycle` shares diagram's box geometry, so on the
+      // left third it stacks on / fights a `diagram`/`title`/`quote` that
+      // overlaps it in time (they are not in the structure-collision set
+      // together). The right third is otherwise unused by default.
+      return "right_third";
     case "diagram":
     case "title":
     case "quote":

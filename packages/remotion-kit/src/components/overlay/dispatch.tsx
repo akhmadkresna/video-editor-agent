@@ -62,11 +62,12 @@ export function boxOptsForKind(
     case "list_cycle":
       // Prefix + rotating item sit side by side (not stacked, unlike
       // diagram's steps), so it needs a wider box than the 40cqw diagram
-      // default or the prefix wraps onto its own line.
+      // default or the prefix wraps onto its own line. Lives in the
+      // `right_third` lane (see overlayZones.defaultZoneForKind) — no
+      // `insetCqw` so it uses the zone's own right inset, anchored right.
       return {
         maxWidthCqw: 68,
         topCqh: theme.diagram.topCqh,
-        insetCqw: theme.diagram.leftCqw,
       };
     case "chip":
     case "tag":
@@ -287,6 +288,7 @@ export function renderOverlayBody(
           items={ov.steps || []}
           stepAtSec={ov.stepAtSec}
           maxWidthCqw={maxWidthCqw}
+          align={align}
           theme={theme}
         />
       );

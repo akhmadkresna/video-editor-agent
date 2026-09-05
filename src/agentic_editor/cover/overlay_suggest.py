@@ -924,28 +924,47 @@ def _label_and_start_near_time(
         hi += 1
     phrase_words = candidates[lo : hi + 1]
 
+    # Trailing-quantity words: once the label hits its length cap, keep going
+    # only far enough to finish a "<n> <noun> ataupun <n> <noun>" phrase, so
+    # it never clips to "...43 baris ataupun 21".
+    QTY_TAIL = {
+        "baris", "pola", "kata", "jenis", "menit", "detik", "akun", "kali",
+        "persen", "%", "ataupun", "atau", "dan", "sampai", "hingga", "per",
+    }
     tokens: list[str] = []
     first_start: float | None = None
     for w in phrase_words:
         tok = str(w.get("text") or "").strip()
         if not tok or _norm_token(tok) in FILLER:
             continue
+        tl = _norm_token(tok)
+        if len(tokens) >= 6 and (
+            len(tokens) >= 10 or not (tl.isdigit() or tl in QTY_TAIL)
+        ):
+            break
         if first_start is None:
             first_start = float(w["start"])
         tokens.append(tok)
-        if len(tokens) >= 6:
-            break
     if not tokens or first_start is None:
         return None
     label = short_label(" ".join(tokens), fallback=tokens[0].title())
     return (label, first_start) if label else None
 
 
+#: A number under a negation ("nggak fix 43 baris", "bukan 21 pola") is not a
+#: quantitative claim — a stat card that headlines the digit inverts the point.
+_NEG_BEFORE_NUM_RE = re.compile(
+    r"\b(nggak|ngga|ga|gak|enggak|bukan|tidak|tak|belum|tanpa|no|not|non)\b"
+    r"[\s\w]{0,18}?\d",
+    re.I,
+)
+
+
 def pick_sting_kind(text: str, *, slot: int) -> str:
     """Rotate glass + legacy stings so packs are not 26× identical emphasis."""
     words = text.split()
     low = text.lower()
-    if STAT_VALUE_RE.search(text):
+    if STAT_VALUE_RE.search(text) and not _NEG_BEFORE_NUM_RE.search(low):
         return "stat"
     if len(words) >= QUOTE_MIN_WORDS:
         return "quote"
@@ -983,7 +1002,7 @@ def materialize_sting(
     if kind == "stat":
         m = STAT_VALUE_RE.search(text)
         val = m.group(0).strip() if m else text[:16]
-        label = STAT_VALUE_RE.sub("", text).strip(" ·—-:") or "Total"
+        label = re.sub(r"\s{2,}", " ", STAT_VALUE_RE.sub("", text)).strip(" ·—-:") or "Total"
         ov["value"] = val
         ov["text"] = label[:48]
         ov["sourceLabel"] = "LIVE"
@@ -1234,6 +1253,13 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     ]
     keep_sec = _keep_duration(ranges)
     caps = caps_for_duration(keep_sec)
+    # per-style cap overrides (styles/<style>/style.md → overlays.caps).
+    # `chapter: 0` on the mockup pack drops "Bab NN" title cards from the
+    # Skill Lab explainer format.
+    cap_over = (load_overlays(style_name).get("caps") or {})
+    for _k, _v in cap_over.items():
+        if _k in caps and isinstance(_v, (int, float)) and not isinstance(_v, bool):
+            caps[_k] = int(_v)
 
     overlays: list[dict[str, Any]] = []
     framing_events: list[dict[str, Any]] = []

@@ -22,6 +22,15 @@ overlays:
   preset: aroll_text_motion
   treatment: bold
   ink: "#ffffff"
+  # Skill Lab is a short explainer — no "Bab NN" chapter title cards.
+  caps:
+    chapter: 0
+
+sfx:
+  # Modern-tech one-shots, but sparse: the radio edit makes ~45 cuts in
+  # 7 min; without this a cut-snap shutter fires every ~15s.
+  density:
+    shutter_min_gap_sec: 20
 
 # Mist mock surfaces — the stage always renders light (it's a screen).
 mockup:
@@ -58,6 +67,18 @@ mock_cam:
   followGain: 0.12          # caret/cursor trailing-follow strength
   settleAfterRead: true
   intensity: calm
+
+# `ae mockup-suggest` — spoken-phrase triggers → mockup scenes (transcript
+# only; the episode script is not read). Defaults live in
+# `_MOCKUP_TRIGGERS` / `_DEFAULT_MIN_GAP_SEC` in `cover/mockup.py`; override
+# per component here. Bare single words stay low-confidence regardless.
+mockup_suggest:
+  min_gap_sec: 12          # repeat hits of one component inside this window collapse
+  # triggers:
+  #   RepoView:    ["repo", "di github", "sumbernya", "skill.md"]
+  #   SkillsPanel: ["settings", "kapabilitas", "bagian skill", "toggle"]
+  #   DiffPanel:   ["sebelum", "sesudah", "hasil revisi"]
+  #   AppWindow:   ["kebuka di", "pptx", "xlsx", "docx"]
 
 # pip carried over from tutorial verbatim
 screen_explainer:

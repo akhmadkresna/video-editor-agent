@@ -232,7 +232,10 @@ def cmd_cover(args: argparse.Namespace) -> int:
         return 1
     cover_path = edit / "cover.json"
     if not cover_path.is_file():
-        cover_path.write_text(json.dumps(example_cover(), indent=2) + "\n", encoding="utf-8")
+        _style = str(cfg.get("style") or "tutorial")
+        cover_path.write_text(
+            json.dumps(example_cover(style=_style), indent=2) + "\n", encoding="utf-8"
+        )
         print(f"Seeded {cover_path.relative_to(episode)} — edit cover events, re-run ae cover")
     edl = load_edl(edl_path)
     # absolutize sources from project
@@ -245,6 +248,23 @@ def cmd_cover(args: argparse.Namespace) -> int:
     edl["sources"] = sources
     cover = json.loads(cover_path.read_text(encoding="utf-8"))
     style_name = str(cfg.get("style") or "tutorial")
+
+    # `screen_with_cam` / `cam_pip` events need a `screen` source. On a
+    # mockup episode (no screen) a leftover scaffold event renders a blank
+    # screen layout with only the cam PIP — drop them.
+    if "screen" not in sources:
+        _evs = cover.get("events") or []
+        _keep = [
+            e for e in _evs
+            if str(e.get("type") or "").lower() not in ("screen_with_cam", "cam_pip")
+        ]
+        if len(_keep) != len(_evs):
+            print(
+                f"  dropped {len(_evs) - len(_keep)} screen_with_cam/cam_pip "
+                "event(s) — no screen source (mockup uses mockup.json scenes)",
+                file=sys.stderr,
+            )
+            cover["events"] = _keep
 
     # style: mockup — drawn-screen scenes live in their own file so
     # ae cover-suggest / overlay-suggest never clobber them.
@@ -513,52 +533,68 @@ def cmd_mockup_suggest(args: argparse.Namespace) -> int:
         write_mockup_suggest,
     )
 
-    data = suggest_mockups(episode)
-    meta = data.get("_meta") or {}
-    if meta.get("error"):
-        print(f"mockup-suggest: {meta['error']}", file=sys.stderr)
-        return 1
-    out = write_mockup_suggest(episode, data)
-    unmatched = meta.get("unmatched_beats") or []
-    print(
-        f"Wrote {out.relative_to(episode)} "
-        f"({meta.get('scenes', 0)} scene(s) from {meta.get('beats', 0)} script beat(s); "
-        f"mode={meta.get('mode')}, skill={meta.get('skill')}, "
-        f"transcript={'yes' if meta.get('has_transcript') else 'NO'})"
-    )
-    if meta.get("mode") == "keyword-guess":
-        print(
-            "  No [MOCKUP: X] cues in edit/script.md — guessed from keywords "
-            "(noisy). Add `[MOCKUP: ClaudeChat|DiffPanel|AppWindow|SkillsPanel|RepoView …]` "
-            "lines where you want a drawn scene, then re-run."
-        )
-    hints = meta.get("keyword_hint_beats") or []
-    if hints:
-        print(f"  Beats that mention a screen but have no [MOCKUP:] cue: {', '.join(hints)}")
-    if meta.get("repo"):
-        got = "fetched" if meta.get("repo_md_fetched") else "NOT fetched (offline?) — paste SKILL.md by hand"
-        print(f"  RepoView source: {meta['repo']}  (SKILL.md {got})")
-    if not meta.get("has_transcript"):
-        print(
-            "  No cam transcript yet — scene fromSec/toSec are guesses. "
-            "Run `ae ingest .` first for real windows."
-        )
-    if unmatched:
-        print(f"  Beats with no transcript match (add scenes by hand): {', '.join(unmatched)}")
-    print("  Review edit/mockup.suggest.json, fill every <TODO>, then:")
-    print("  ae mockup-suggest . --apply   (validates → writes edit/mockup.json)")
+    suggest_path = episode / "edit" / "mockup.suggest.json"
+
+    # --apply promotes the *reviewed* suggest file (hand-filled <TODO>s, added
+    # or dropped scenes) — it does NOT regenerate, or the review step would be
+    # pointless.
     if args.apply:
-        errs = validate_mockup(data)
+        if not suggest_path.is_file():
+            print(
+                "No edit/mockup.suggest.json — run `ae mockup-suggest .` "
+                "(without --apply) first, then review it.",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            reviewed = json.loads(suggest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"edit/mockup.suggest.json is not valid JSON: {e}", file=sys.stderr)
+            return 1
+        errs = validate_mockup(reviewed)
         if errs:
-            print("Cannot apply — fix these first:", file=sys.stderr)
+            print("Cannot apply — fix these in edit/mockup.suggest.json first:", file=sys.stderr)
             for e in errs:
                 print(f"  • {e}", file=sys.stderr)
             return 1
         dest = episode / "edit" / "mockup.json"
         dest.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            json.dumps(reviewed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
-        print(f"Wrote {dest.relative_to(episode)} — now: ae cover . && ae compose .")
+        n = len(reviewed.get("scenes") or [])
+        print(f"Wrote {dest.relative_to(episode)} ({n} scene(s)) — now: ae cover . && ae compose .")
+        return 0
+
+    data = suggest_mockups(episode)
+    meta = data.get("_meta") or {}
+    if meta.get("error"):
+        print(f"mockup-suggest: {meta['error']}", file=sys.stderr)
+        return 1
+    if suggest_path.is_file():
+        print(
+            "Note: overwriting edit/mockup.suggest.json — prior review edits "
+            "will be lost. (Ctrl-C now to keep them.)",
+            file=sys.stderr,
+        )
+    out = write_mockup_suggest(episode, data)
+    print(
+        f"Wrote {out.relative_to(episode)} "
+        f"({meta.get('scenes', 0)} scene(s) from cam transcript triggers; "
+        f"skill={meta.get('skill')})"
+    )
+    low_conf = meta.get("low_confidence_scenes") or []
+    if low_conf:
+        print("  ⚠ Low-confidence scenes — verify the moment before --apply:")
+        for s in low_conf:
+            mm, ss = divmod(int(s["tSec"]), 60)
+            print(
+                f"    {mm:d}:{ss:02d}  {s['component']}  (trigger: {s['trigger']!r})"
+            )
+    if meta.get("repo"):
+        got = "fetched" if meta.get("repo_md_fetched") else "NOT fetched (offline?) — paste SKILL.md by hand"
+        print(f"  RepoView source: {meta['repo']}  (SKILL.md {got})")
+    print("  Review edit/mockup.suggest.json, fill every <TODO>, then:")
+    print("  ae mockup-suggest . --apply   (validates that file → writes edit/mockup.json)")
     return 0
 
 

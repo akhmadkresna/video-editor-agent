@@ -7,6 +7,14 @@ from typing import Any
 # Prefer slices at least this long; sole short slices are still kept.
 _MIN_PREFERRED_SLICE = 0.5
 
+# `_attach_diagram_step_motion` can push a stepped overlay's end out to
+# `last_step + diagram_hold_after_last_sec` when the steps are spoken over a
+# long stretch. A `diagram` earns that (it stays as a stacked block you keep
+# reading); a `list_cycle` is a one-line rotating item — letting it run for
+# 15s crossing other overlays is the "two overlays fighting" bug. Cap how far
+# past its authored cover window step-motion may stretch a `list_cycle`.
+_LIST_CYCLE_MAX_EXTEND_SEC = 4.0
+
 
 def edl_keep_duration_sec(edl: dict[str, Any]) -> float:
     """Total output duration of all EDL keep ranges."""
@@ -774,6 +782,15 @@ def build_timeline_overlays(
                 float(inst["durationSec"]),
                 max(0.05, timeline_dur - float(inst["fromSec"])),
             )
+            # A list_cycle must not balloon far past its authored window.
+            if kind == "list_cycle":
+                cap = float(sl["durationSec"]) + _LIST_CYCLE_MAX_EXTEND_SEC
+                if float(inst["durationSec"]) > cap:
+                    inst["durationSec"] = cap
+                    steps_at = inst.get("stepAtSec") or []
+                    if steps_at:
+                        hi = max(0.25, cap - 0.35)
+                        inst["stepAtSec"] = [min(float(t), hi) for t in steps_at]
         instances.append(inst)
     return finalize_overlays(instances, timeline_dur=timeline_dur, dwell=dwell)
 
