@@ -111,7 +111,6 @@ export function renderOverlayBody(
           text={ov.text || ""}
           size="lg"
           align={align}
-          underline={theme.emphasis.underline !== false}
           cursor={wantsCursor(ov)}
           maxWidthCqw={maxWidthCqw}
           boxHeightPx={box.maxHeightPx}
@@ -194,7 +193,6 @@ export function renderOverlayBody(
           text={ov.text || ""}
           size="lg"
           align={align}
-          underline={theme.emphasis.underline !== false}
           maxWidthCqw={maxWidthCqw}
           boxHeightPx={box.maxHeightPx}
           theme={theme}

@@ -8,7 +8,7 @@
  */
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { blinkStep, popIn, underlineSweep, wordStaggerDelay } from "./motion";
+import { blinkStep, popIn, wordStaggerDelay } from "./motion";
 import { cqh, cqw, fitHeadline, resolveBandCqh, type SizeName } from "./sizing";
 import type { OverlayTheme } from "./theme";
 
@@ -18,7 +18,6 @@ export type PunchWordProps = {
   accent?: string;
   size?: SizeName;
   align?: "left" | "center" | "right";
-  underline?: boolean;
   cursor?: boolean;
   maxWidthCqw?: number;
   /** Vertical budget from the zone box, so a long line can't wall off the frame. */
@@ -32,7 +31,6 @@ export const PunchWord: React.FC<PunchWordProps> = ({
   accent,
   size = "lg",
   align = "left",
-  underline = false,
   cursor = false,
   maxWidthCqw = 48,
   boxHeightPx,
@@ -132,23 +130,6 @@ export const PunchWord: React.FC<PunchWordProps> = ({
           />
         ) : null}
       </span>
-
-      {underline ? (
-        <span
-          style={{
-            display: "block",
-            height: Math.max(3, fontSize * 0.06),
-            width: "38%",
-            minWidth: fontSize * 0.9,
-            background: theme.ink,
-            transformOrigin: "left center",
-            transform: `scaleX(${underlineSweep(frame, fps, {
-              durMs: theme.durSlow,
-              delayMs: tailDelay + 120,
-            })})`,
-          }}
-        />
-      ) : null}
     </div>
   );
 };
