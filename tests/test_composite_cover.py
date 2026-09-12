@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from agentic_editor.cover import build_timeline_from_edl_and_cover
 from agentic_editor.cover.composite import (
     effective_camera_play,
@@ -152,3 +154,54 @@ def test_overlay_density_extras_default_on_composite_only():
     project = {"sources": {"cam": "raw/cam.mkv"}, "composite": {"enabled": True}}
     assert overlay_explain_fill_enabled(project) is True
     assert overlay_stale_screen_fill_enabled(project) is True
+
+
+def test_cmd_cover_keeps_screen_with_cam_on_composite_episode(tmp_path, monkeypatch):
+    """Regression: `ae cover`'s apply step used to check raw `"screen" not in
+    sources` to decide whether to strip screen_with_cam/cam_pip events (a guard
+    meant for mockup episodes, which have neither a screen source nor
+    composite). That check didn't know about composite mode, so it silently
+    dropped every screen_with_cam event on composite-only episodes right after
+    `ae cover-suggest` correctly produced them — leaving `edit/timeline.json`
+    with 0 overlays' worth of screen framing on an episode that's entirely
+    composite cam+screen. Must go through has_screen_cover(), same as
+    cmd_cover_suggest."""
+    import argparse
+
+    from agentic_editor import cli
+    from agentic_editor import paths
+
+    ep = tmp_path / "ep"
+    (ep / "edit").mkdir(parents=True)
+    (ep / "raw").mkdir()
+    (ep / "project.yaml").write_text(
+        "id: comp-cli-test\nsources:\n  cam: raw/cam.mkv\nstyle: tutorial\n"
+        "composite:\n  enabled: true\n  baked_pip: true\n  camera_play:\n    enabled: false\n",
+        encoding="utf-8",
+    )
+    (ep / "edit" / "edl.json").write_text(
+        json.dumps(
+            {
+                "sources": {"cam": "../raw/cam.mkv"},
+                "ranges": [{"source": "cam", "start": 0.0, "end": 30.0}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (ep / "edit" / "cover.json").write_text(
+        json.dumps({"events": [{"type": "screen_with_cam", "start": 5.0, "end": 20.0}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENTIC_EDITOR_HOME", str(tmp_path.parent))
+    monkeypatch.setattr(paths, "framework_home", lambda: tmp_path.parent)
+    monkeypatch.setattr(cli, "resolve_episode", lambda _: ep)
+
+    rc = cli.cmd_cover(argparse.Namespace(episode=str(ep)))
+    assert rc == 0
+
+    timeline = json.loads((ep / "edit" / "timeline.json").read_text(encoding="utf-8"))
+    full = [c for c in timeline["clips"] if c["layout"] == "full"]
+    pip = [c for c in timeline["clips"] if c["layout"] == "pip_corner"]
+    screen_clips = [c for c in full if c["sourceIn"] >= 5.0 and c["sourceOut"] <= 20.0]
+    assert len(screen_clips) == 1, "screen_with_cam event was stripped by the source guard"
+    assert len(pip) == 0

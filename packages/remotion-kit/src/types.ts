@@ -89,7 +89,18 @@ export type OverlayKind =
   | "illustration"
   // A-Roll Text Motion System — optional "we do: [rotating]" pattern
   // (text -> prefix, steps[] -> items). Renders as ListCycle.
-  | "list_cycle";
+  | "list_cycle"
+  // Hook beat: steps[] big words pop in around the speaker, then all exit
+  // together on the exitStartSec cue. Renders as NameDrop — outside the
+  // shared fade grammar (OverlayLayer skips its exit-fade, OverlayVeil skips
+  // its scrim). Exit style via `nameDropExit` ("fall" default, or "sand" —
+  // per-letter scatter+blur+zoom dissolve).
+  | "name_drop"
+  // Built-on-cue explainer graphic in a panel above the talking head (host's
+  // shoulders stay visible — no picture-takeover). `note` picks the variant:
+  // "scene:timeline" | "scene:depmap" | "scene:failover". steps[] are the
+  // reveal labels, stepAtSec their cues. Renders as SceneDiagram.
+  | "scene_diagram";
 
 export type SfxKind = "typing" | "shutter" | "click";
 
@@ -148,6 +159,14 @@ export type TimelineOverlay = {
   accent?: string;
   /** Surround placement around the speaker; face oval stays clear. */
   zone?: OverlayZone;
+  /** `emphasis`/`callout` (PunchWord) entrance recipe. Default `pop` (house
+   * look, rises a few px with overshoot) when absent. `drop` falls from
+   * above with a landing overshoot — opt-in per overlay, not a style-wide
+   * default. */
+  motion?: "pop" | "drop";
+  /** `name_drop` only — exit style. Default `fall` (gravity+spin, back-compat)
+   * when absent. `sand` disintegrates each letter outward with blur+zoom. */
+  nameDropExit?: "fall" | "sand";
   /** `callout` only — annotation target, 0–1 of the frame. Absent → the
    * CalloutArrow anchors to the zone edge and points at the centre third.
    * Suppressed on full-cam (nothing to annotate). */

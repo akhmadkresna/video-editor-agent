@@ -108,6 +108,30 @@ def test_quality_flags_timid_scales():
     assert any("max_hold_sec" in w for w in warnings)
 
 
+def test_quality_prefers_timeline_camera_play_over_stale_cover():
+    """Regression: `timeline.camera_play` is the already-computed effective
+    value (EDL/cover merged with composite.camera_play from project.yaml).
+    A stale `cover.json` snapshot — e.g. left over from an earlier flat
+    composite config — used to unconditionally win a shallow merge here,
+    so a correctly-configured episode still got "timid scales" / "long
+    max_hold_sec" warnings that didn't reflect what actually rendered."""
+    tl = _base_timeline(
+        camera_play={
+            "scales": {"wide": 1.0, "medium": 1.16, "close": 1.32},
+            "max_hold_sec": 9,
+        }
+    )
+    stale_cover = {
+        "camera_play": {
+            "scales": {"wide": 1.0, "medium": 1.0, "close": 1.0},
+            "max_hold_sec": 86400,
+        }
+    }
+    _errors, warnings = audit_timeline_quality(tl, cover=stale_cover)
+    assert not any("is timid" in w for w in warnings)
+    assert not any("max_hold_sec" in w for w in warnings)
+
+
 def test_quality_flags_overwide_float_crop_only_when_smart():
     tl = _base_timeline()
     tl["clips"][1]["windowCrop"] = {"x": 0.05, "y": 0.05, "w": 0.9, "h": 0.9}

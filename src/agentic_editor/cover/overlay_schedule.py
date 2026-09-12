@@ -138,16 +138,23 @@ def resolve_structure_collisions(
         new_end = max(a0 + min_sec, b0 - 0.12)
         if new_end < a1:
             a["durationSec"] = max(min_sec, new_end - a0)
+            new_dur = float(a["durationSec"])
             if a.get("kind") == "diagram":
-                apply_diagram_hold(a, timeline_dur=a0 + float(a["durationSec"]) + 0.01, dwell=d)
+                apply_diagram_hold(a, timeline_dur=a0 + new_dur + 0.01, dwell=d)
                 # If hold no longer fits, accept shorter hold rather than overlapping.
                 steps_at = a.get("stepAtSec") or []
                 if steps_at:
                     last = float(steps_at[-1])
                     a["exitStartSec"] = min(
-                        float(a["durationSec"]) - 0.25,
-                        max(last + 0.8, float(a["durationSec"]) - float(d["exit_sec"])),
+                        new_dur - 0.25,
+                        max(last + 0.8, new_dur - float(d["exit_sec"])),
                     )
+            elif a.get("exitStartSec") is not None:
+                # A trimmed non-diagram kept an exitStartSec computed against
+                # its old (longer) duration. Left unclamped it can exceed the
+                # new duration, and OverlayVeil then interpolates over an
+                # inverted [exitAt, end] range and throws mid-render.
+                a["exitStartSec"] = max(0.15, min(float(a["exitStartSec"]), new_dur - 0.1))
     return items
 
 

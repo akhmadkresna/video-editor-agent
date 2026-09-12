@@ -18,6 +18,8 @@ import { ChapterMarker, chapterNumberFrom } from "./ChapterMarker";
 import { FlowSteps } from "./FlowSteps";
 import { IllustrationTag } from "./IllustrationTag";
 import { ListCycle } from "./ListCycle";
+import { NameDrop } from "./NameDrop";
+import { SceneDiagram, sceneVariantFromNote } from "./SceneDiagram";
 import { PunchWord } from "./PunchWord";
 import { StatCallout } from "./StatCallout";
 import { iconNameFromNote } from "./icons";
@@ -25,7 +27,13 @@ import { cqh, valueSizeCqh } from "./sizing";
 import type { OverlayTheme } from "./theme";
 
 /** Kinds that place themselves absolutely rather than sitting in a zone box. */
-export const SELF_PLACED_KINDS = new Set(["chapter", "divider", "lower_third"]);
+export const SELF_PLACED_KINDS = new Set([
+  "chapter",
+  "divider",
+  "lower_third",
+  "name_drop",
+  "scene_diagram",
+]);
 
 /** Kinds still served by the legacy glass renderers (out of scope, spec §3). */
 export const LEGACY_GLASS_KINDS = new Set(["code", "illustration"]);
@@ -124,6 +132,7 @@ export function renderOverlayBody(
           cursor={wantsCursor(ov)}
           maxWidthCqw={maxWidthCqw}
           boxHeightPx={box.maxHeightPx}
+          motion={ov.motion}
           theme={theme}
         />
       );
@@ -205,6 +214,7 @@ export function renderOverlayBody(
           align={align}
           maxWidthCqw={maxWidthCqw}
           boxHeightPx={box.maxHeightPx}
+          motion={ov.motion}
           theme={theme}
         />
       );
@@ -245,6 +255,31 @@ export function renderOverlayBody(
           <FlowSteps steps={ov.steps || []} stepAtSec={ov.stepAtSec} theme={theme} />
         </div>
       );
+
+    case "name_drop":
+      return (
+        <NameDrop
+          words={ov.steps && ov.steps.length ? ov.steps : (ov.text ? [ov.text] : [])}
+          durationSec={ov.durationSec}
+          dropAtSec={ov.exitStartSec}
+          exit={ov.nameDropExit}
+          theme={theme}
+        />
+      );
+
+    case "scene_diagram": {
+      const variant = sceneVariantFromNote(ov.note) ?? "timeline";
+      return (
+        <SceneDiagram
+          variant={variant}
+          steps={ov.steps || []}
+          stepAtSec={ov.stepAtSec}
+          title={ov.title}
+          durationSec={ov.durationSec}
+          theme={theme}
+        />
+      );
+    }
 
     case "chapter":
     case "divider":

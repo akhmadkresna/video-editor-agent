@@ -146,6 +146,80 @@ def test_overlay_zone_passthrough_on_remap():
     assert ov[0]["zone"] == "right_third"
 
 
+def test_overlay_motion_passthrough_on_remap():
+    edl = {
+        "sources": {"cam": "/tmp/cam.mp4"},
+        "ranges": [{"source": "cam", "start": 0.0, "end": 20.0}],
+    }
+    cover = {
+        "overlays": [
+            {
+                "kind": "emphasis",
+                "start": 2.0,
+                "end": 5.0,
+                "text": "Dari Nol",
+                "motion": "drop",
+            },
+            {
+                "kind": "emphasis",
+                "start": 8.0,
+                "end": 10.0,
+                "text": "v17 -> v19",
+                # absent motion -> default pop-in, no field emitted
+            },
+            {
+                "kind": "emphasis",
+                "start": 12.0,
+                "end": 14.0,
+                "text": "bogus",
+                "motion": "spin",  # not a real recipe, must be dropped
+            },
+        ],
+    }
+    ov = build_timeline_overlays(edl, cover)
+    assert len(ov) == 3
+    assert ov[0]["motion"] == "drop"
+    assert "motion" not in ov[1]
+    assert "motion" not in ov[2]
+
+
+def test_name_drop_exit_passthrough_on_remap():
+    edl = {
+        "sources": {"cam": "/tmp/cam.mp4"},
+        "ranges": [{"source": "cam", "start": 0.0, "end": 20.0}],
+    }
+    cover = {
+        "overlays": [
+            {
+                "kind": "name_drop",
+                "start": 2.0,
+                "end": 6.0,
+                "steps": ["Dari", "Nol"],
+                "nameDropExit": "sand",
+            },
+            {
+                "kind": "name_drop",
+                "start": 8.0,
+                "end": 11.0,
+                "steps": ["v17", "v19"],
+                # absent -> default "fall" in the component, no field emitted
+            },
+            {
+                "kind": "name_drop",
+                "start": 13.0,
+                "end": 15.0,
+                "steps": ["bogus"],
+                "nameDropExit": "explode",  # not a real style, must be dropped
+            },
+        ],
+    }
+    ov = build_timeline_overlays(edl, cover)
+    assert len(ov) == 3
+    assert ov[0]["nameDropExit"] == "sand"
+    assert "nameDropExit" not in ov[1]
+    assert "nameDropExit" not in ov[2]
+
+
 def test_list_cycle_duration_capped_past_authored_window():
     # steps are spoken over a long stretch; without the cap the hold-after
     # extension would push the list_cycle out to ~last_step + 2.6s.

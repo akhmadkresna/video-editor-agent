@@ -32,15 +32,28 @@ export const OverlayVeil: React.FC<{
 
   for (const ov of overlays) {
     // `code` draws its own terminal surface and never wanted a veil.
-    if (ov.kind === "code") continue;
+    // `name_drop` is big type over the shot with its own fall-out — a scrim
+    // would darken the picture through the whole beat and pump on its exit.
+    // `scene_diagram` carries its own opaque panel.
+    if (
+      ov.kind === "code" ||
+      ov.kind === "name_drop" ||
+      ov.kind === "scene_diagram"
+    )
+      continue;
     const from = ov.fromSec * fps;
     const end = from + ov.durationSec * fps;
     if (frame < from || frame > end) continue;
 
-    const exitAt =
+    const exitAt = Math.min(
       ov.exitStartSec != null
         ? from + ov.exitStartSec * fps
-        : Math.max(from, end - exitFrames);
+        : Math.max(from, end - exitFrames),
+      // Never let the exit ramp start at/after `end` — a trimmed overlay can
+      // carry an exitStartSec longer than its final duration, and interpolate
+      // over an inverted [exitAt, end] range throws mid-render.
+      end - 1,
+    );
 
     const env = Math.min(
       interpolate(frame, [from, from + rampFrames], [0, 1], {

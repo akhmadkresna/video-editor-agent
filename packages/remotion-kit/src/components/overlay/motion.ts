@@ -25,6 +25,17 @@ export function msToFrames(ms: number, fps: number): number {
 const clamp01 = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 /**
+ * Deterministic pseudo-random in [0, 1) from an integer seed. NOT
+ * `Math.random()` — that reseeds per process, so parallel Remotion frame
+ * workers would render a different scatter per frame (flicker). Classic
+ * GLSL-style sine hash: same seed in, same value out, forever.
+ */
+export function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/**
  * `ov-pop-in` — the signature entrance for every hero/punch element.
  * scale .72 → 1.04 → 1 (overshoot kept), opacity over the first 30%,
  * translateY 6 → 0.
@@ -75,6 +86,32 @@ export function bounceIn(
     translateY: interpolate(f, [0, 0.6 * d, d], [18, -4, 0], clamp01),
     scale: interpolate(f, [0, 0.6 * d, d], [0.9, 1.02, 1], clamp01),
     opacity: interpolate(f, [0, 0.4 * d], [0, 1], clamp01),
+  };
+}
+
+/**
+ * `ov-drop-in` — gravity fall entrance: word starts above its landing spot
+ * and drops down, a small overshoot past 0 on landing (like `popIn`'s
+ * overshoot, but vertical). Opt-in per-overlay alternative to the default
+ * `popIn` rise for `emphasis`/`callout` (see `PunchWord`'s `motion` prop) —
+ * not used anywhere by default, keeping the house pop-in look intact.
+ */
+export function dropIn(
+  frame: number,
+  fps: number,
+  opts: { durMs: number; delayMs?: number; fromPx?: number },
+): { scale: number; opacity: number; translateY: number } {
+  const f = frame - msToFrames(opts.delayMs ?? 0, fps);
+  const d = Math.max(1, msToFrames(opts.durMs, fps));
+  const fromPx = opts.fromPx ?? -48;
+  const overshootPx = -fromPx * 0.12;
+  return {
+    scale: interpolate(f, [0, 0.7 * d, d], [0.92, 1.03, 1], clamp01),
+    opacity: interpolate(f, [0, 0.3 * d], [0, 1], clamp01),
+    translateY: interpolate(f, [0, 0.7 * d, d], [fromPx, overshootPx, 0], {
+      ...clamp01,
+      easing: EASE_OUT,
+    }),
   };
 }
 

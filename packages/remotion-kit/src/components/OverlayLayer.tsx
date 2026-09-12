@@ -57,6 +57,17 @@ const OneOverlay: React.FC<{ ov: TimelineOverlay; theme: OverlayTheme }> = ({ ov
   const body = renderOverlayBody(ov, theme, { width, height });
   if (!body) return null;
 
+  // `name_drop` animates its own exit (the words fall out of frame); it must
+  // NOT also be dimmed by the shared exit-fade or it vanishes before it lands.
+  if (ov.kind === "name_drop") {
+    return (
+      <AbsoluteFill>
+        {grid}
+        {body}
+      </AbsoluteFill>
+    );
+  }
+
   // Self-placing kinds carry their own absolute insets; an arrow spans the
   // whole frame by definition. Everything else sits in its zone box.
   const selfPlaced =

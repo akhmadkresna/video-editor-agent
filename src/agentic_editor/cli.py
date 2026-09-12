@@ -249,10 +249,14 @@ def cmd_cover(args: argparse.Namespace) -> int:
     cover = json.loads(cover_path.read_text(encoding="utf-8"))
     style_name = str(cfg.get("style") or "tutorial")
 
-    # `screen_with_cam` / `cam_pip` events need a `screen` source. On a
-    # mockup episode (no screen) a leftover scaffold event renders a blank
-    # screen layout with only the cam PIP — drop them.
-    if "screen" not in sources:
+    # `screen_with_cam` / `cam_pip` events need a `screen` source — a real
+    # dual-source `sources.screen`, or a composite single-file (baked PIP)
+    # via `composite.enabled: true`. On a mockup episode (neither) a
+    # leftover scaffold event renders a blank screen layout with only the
+    # cam PIP — drop them.
+    from agentic_editor.cover.composite import has_screen_cover
+
+    if not has_screen_cover(cfg):
         _evs = cover.get("events") or []
         _keep = [
             e for e in _evs

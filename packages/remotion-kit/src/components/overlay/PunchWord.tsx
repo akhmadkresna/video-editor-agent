@@ -8,7 +8,7 @@
  */
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { blinkStep, popIn, wordStaggerDelay } from "./motion";
+import { blinkStep, dropIn, popIn, wordStaggerDelay } from "./motion";
 import { cqh, cqw, fitHeadline, resolveBandCqh, type SizeName } from "./sizing";
 import type { OverlayTheme } from "./theme";
 
@@ -23,6 +23,10 @@ export type PunchWordProps = {
   /** Vertical budget from the zone box, so a long line can't wall off the frame. */
   boxHeightPx?: number;
   maxLines?: number;
+  /** Entrance recipe. `pop` (default, house look) rises a few px with
+   * overshoot. `drop` falls from above with a landing overshoot — opt-in via
+   * `TimelineOverlay.motion`, never the default. */
+  motion?: "pop" | "drop";
   theme: OverlayTheme;
 };
 
@@ -35,6 +39,7 @@ export const PunchWord: React.FC<PunchWordProps> = ({
   maxWidthCqw = 48,
   boxHeightPx,
   maxLines = 3,
+  motion = "pop",
   theme,
 }) => {
   const frame = useCurrentFrame();
@@ -64,11 +69,18 @@ export const PunchWord: React.FC<PunchWordProps> = ({
   const risePx = 6 * (fontSize / 64);
 
   const renderWord = (w: string, i: number, italic = false) => {
-    const { scale, opacity, translateY } = popIn(frame, fps, {
-      durMs: theme.durBase,
-      delayMs: wordStaggerDelay(i, stagger),
-      risePx,
-    });
+    const { scale, opacity, translateY } =
+      motion === "drop"
+        ? dropIn(frame, fps, {
+            durMs: theme.durBase,
+            delayMs: wordStaggerDelay(i, stagger),
+            fromPx: -risePx * 8,
+          })
+        : popIn(frame, fps, {
+            durMs: theme.durBase,
+            delayMs: wordStaggerDelay(i, stagger),
+            risePx,
+          });
     return (
       <span
         key={`${i}-${w}`}
