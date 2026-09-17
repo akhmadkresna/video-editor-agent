@@ -8,7 +8,7 @@ no screen recording.**
 This is **not** an evidence explainer like `ai-bakar-uang` /
 `ai-adopsi-gap`, and **not** a live walkthrough. It is a **pure
 explainer**: "here's the skill, here's how it works, here's my take."
-Every "screen" is a Remotion-drawn mockup — see
+Every "screen" is a generated HyperFrames mockup card — see
 [`mockup-system.md`](mockup-system.md). Uses the new `style: mockup` pack.
 
 This folder is the **series bible + template lock** only. Per-episode copy

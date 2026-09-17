@@ -43,10 +43,10 @@ actual cut. Always confirm the plan before `--apply`.
 
 ## Promote to framework
 
-If you invent a reusable fix (caption style, Remotion component, ASR quirk):
+If you invent a reusable fix (caption style, composition helper, ASR quirk):
 
 1. Append a note to `edit/promotions.md`.
 2. Patch files under `$AGENTIC_EDITOR_HOME` (multi-root workspace preferred).
 3. Re-run preview on **this** episode.
 
-Do not leave one-off Remotion forks inside `edit/` unless truly episode-specific.
+Do not leave one-off HyperFrames forks inside `edit/` unless truly episode-specific.

@@ -52,7 +52,7 @@ If a phrase is ambiguous, ask one short question instead of guessing.
 ae doctor → ae ingest . → ae edl-suggest . → ae storyboard .  (summarise, WAIT)
           → ae edl-suggest . --apply → ae cut .   (edit/preview.mp4)
           → ae cover .            (if project.yaml has a screen source)
-          → ae compose . --studio (review in Remotion Studio)
+          → ae compose . --studio (review in HyperFrames preview)
 ```
 
 `/autocut` and `/shownotes` are saved-prompt shortcuts for the first two rows of

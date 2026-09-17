@@ -1,5 +1,12 @@
 # Handoff: replace A-roll overlay style with Overlay — A-Roll Text Motion System
 
+> **Historical:** written against `packages/remotion-kit`, since removed and
+> replaced by `packages/hyperframes-kit` +
+> `src/agentic_editor/compose/hf_template.py`'s `_emit_overlay`/
+> `_overlay_body_html` (see `MIGRATION_NOTES.md`). The token values, kind
+> treatments and dwell timings below are still the current design; the
+> Remotion file paths / component names are not.
+
 **Scope:** replace the entire A-roll text-overlay rendering + tokens in
 `packages/remotion-kit` with the design system below. This is a swap, not a
 new preset — delete the old look once the new one renders correctly.

@@ -31,10 +31,11 @@ click) must not land in this pack. CI + `ae doctor` enforce:
 
 `sfx.<kind>.max_sec` (per-style, `style_load.DEFAULT_SFX` for the shared
 default) must stay ≥ the mapped file's real duration, with margin — the
-Remotion `<Sequence durationInFrames>` around each cue (`SfxLayer.tsx`) hard-
-crops the `<Audio>` at that window, so a too-short `max_sec` truncates the
-sound mid-decay instead of just padding trailing silence. `paper_page.wav`
-is no longer referenced by default (kept on disk, still license-listed) but
-would need `max_sec` ≥ ~0.47 if re-enabled.
+generated composition's `<audio data-duration>` window around each cue
+(`hf_template.py`'s `_emit_sfx`) hard-crops playback at that window, so a
+too-short `max_sec` truncates the sound mid-decay instead of just padding
+trailing silence. `paper_page.wav` is no longer referenced by default (kept
+on disk, still license-listed) but would need `max_sec` ≥ ~0.47 if
+re-enabled.
 
 See `agentic_editor.cover.sfx_validate` and `tests/test_sfx_pack.py`.

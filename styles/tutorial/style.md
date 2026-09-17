@@ -13,10 +13,10 @@ poster collage. Do not invent episode-local forks; promote changes here.
 
 Kinds: `title` · `stat` · `lower_third` · `tag` · `divider` · `quote` · `code` ·
 `illustration` · `chapter` · `emphasis` · `diagram` · `callout` · `chip` — all
-13 share this one treatment now (the first 8 dispatch to
-`packages/remotion-kit/src/components/glass/GlassOverlays.tsx`; the last 5 to
-`OverlayLayer.tsx`'s own `OneOverlay` — different components per kind's
-structure, same palette). Tokens in `glass/tokens.ts`. `code` stays a real
+13 share this one treatment, dispatched from a single `_overlay_body_html`
+table in
+[`hf_template.py`](../../src/agentic_editor/compose/hf_template.py).
+Tokens in that file's `_CSS`. `code` stays a real
 terminal window — a screen convention, not part of the panel-removal, so it
 was never affected. Author cover.json `overlays[]` the same way as before
 (`start`/`end` cam-source seconds, word-snapped); optional `zone` =
@@ -67,7 +67,7 @@ voice_enhance:
   compensate_delay: true
   sample_rate: 48000
   sources: [cam]
-# Locked A-roll overlay presentation (Remotion), Open Overlay v7+ middle-ground —
+# Locked A-roll overlay presentation (HyperFrames), Open Overlay v7+ middle-ground —
 # white ink, no panel, surround zones, moderate hierarchy, density capped.
 overlays:
   # A-Roll Text Motion System. Common tokens (fonts / sizeBands / type /
@@ -224,7 +224,7 @@ cover:
   off_hold_sec: 1.5
   pad_before_sec: 0.5
   pad_after_sec: 1.5
-# Locked screen-explainer presentation (Remotion). Do not invent episode-local forks.
+# Locked screen-explainer presentation (HyperFrames). Do not invent episode-local forks.
 screen_explainer:
   preset: cozy
   canvas:
@@ -273,5 +273,5 @@ fit, never distort or smart-crop. Do not fork overlay colors/fonts per episode �
 promote changes into this style pack.
 
 **Draft review:** use `ae draft . --seconds 120 --render` (fromSec-safe slice + quality gates).
-Do **not** hand-trim `remotion-props.json` by `start`/`end` — overlays use `fromSec`/`durationSec`
+Do **not** hand-trim `edit/timeline.json` by `start`/`end` — overlays use `fromSec`/`durationSec`
 and will silently disappear (no opening chip).

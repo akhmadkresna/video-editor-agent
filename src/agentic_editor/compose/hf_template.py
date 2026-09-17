@@ -438,6 +438,30 @@ def _emit_mockup(doc: _Doc, mock: dict[str, Any], idx: int) -> None:
         )
 
 
+# ─────────────────────────── sfx ───────────────────────────
+
+
+def _emit_sfx(doc: _Doc, sfx: dict[str, Any], idx: int, asset_map: dict[str, str]) -> None:
+    """One-shot SFX cue (shutter/click/paper/tick/typing), staged by
+    `compose.stage_sfx_for_hyperframes` into `assets/sfx/`. Static gain via
+    `data-volume` -- these are short one-shots, not faded, so a GSAP volume
+    tween would be needless (see variables-and-media.md: a tween's values
+    replace the static baseline entirely, so don't add one with nothing to
+    animate).
+    """
+    start = _num(sfx.get("fromSec"))
+    dur = max(0.05, _num(sfx.get("durationSec"), 0.2))
+    src = str(sfx.get("src") or "")
+    src = asset_map.get(src, src)
+    volume = _clamp(_num(sfx.get("volume"), 0.4), 0.0, 3.98)
+    sid = doc.uid(f"sfx-{idx}")
+    doc.body.append(
+        f'<audio id="{sid}" class="clip" src="{_esc(src)}" '
+        f'data-start="{start:.3f}" data-duration="{dur:.3f}" '
+        f'data-volume="{volume:.3f}" data-track-index="80"></audio>'
+    )
+
+
 # ─────────────────────────── privacy bars ───────────────────────────
 
 
@@ -567,6 +591,8 @@ def render_timeline_html(
         _emit_cutaway(doc, cut, i, asset_map)
     for i, ov in enumerate(timeline.get("overlays") or []):
         _emit_overlay(doc, ov, i)
+    for i, sfx in enumerate(timeline.get("sfx") or []):
+        _emit_sfx(doc, sfx, i, asset_map)
     for i, priv in enumerate(timeline.get("privacy") or []):
         _emit_privacy(doc, priv, i)
 

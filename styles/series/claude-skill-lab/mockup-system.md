@@ -4,6 +4,18 @@ Locked 2026-09-04. This is the build spec for the drawn-screen model.
 Companion to [`README.md`](README.md) (series bible) and
 [`research.md`](research.md) (topic slate).
 
+> **Engine note:** written against the original Remotion-kit implementation
+> plan (`packages/remotion-kit/src/components/mockup/`). The engine is now
+> HyperFrames; the *currently implemented* surface is the smaller set in
+> `hf_template.py`'s `_emit_mockup` (`ClaudeChat`/`DiffPanel`/`AppWindow`/
+> `SkillsPanel`/`RepoView`, camera keyframes in place of a `MockCam`
+> component, no `ArtCanvas`/`Toast`/`FileChip`/`Typewriter`) — see
+> `MIGRATION_NOTES.md` at the repo root and
+> [`docs/catalog/features/mockup-style.md`](../../docs/catalog/features/mockup-style.md)
+> for what actually ships today. The rest of this doc stays as the original
+> design intent / component wishlist for future work, not a description of
+> current code.
+
 ---
 
 ## Model

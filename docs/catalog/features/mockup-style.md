@@ -1,6 +1,6 @@
 # Mockup production type
 
-Style pack for **talking-head + a Remotion-drawn screen** — no screen
+Style pack for **talking-head + a generated (drawn) screen** — no screen
 recording at all. Built for the *Claude Skill Lab* series
 (`series: claude-skill-lab`).
 
@@ -62,15 +62,19 @@ ae mockup-suggest . --apply       # validates → edit/mockup.json
 ae cover . && ae compose .        # remaps scenes + adds a pip_corner cam clip
 ```
 
-## Components (remotion-kit)
+## Components (hyperframes-kit)
 
-`components/mockup/`: `MockStage` (Mist desktop + window) · `MockCam`
-(virtual camera — hold-pose keyframes, caret/cursor follow) · `ClaudeChat`
-(types into the input bar, then sends) · `DiffPanel` · `Cursor` ·
-`AppWindow` (pptx/xlsx/docx mock or a host still) · `SkillsPanel` ·
-`RepoView` (browser frame + real SKILL.md, auto-scroll). Preview them via
-the `MockupLab` Remotion composition. Mist tokens + `mock_cam` config
-live in [`styles/mockup/style.md`](../../styles/mockup/style.md);
+`_emit_mockup` in
+[`hf_template.py`](../../src/agentic_editor/compose/hf_template.py) renders
+the `.mock-window` card (chrome + title bar) and dispatches each
+`layers[].component` to its markup: `ClaudeChat` (chat turns) · `DiffPanel`
+(before/after panes) · `AppWindow` (pptx/xlsx/docx mock or a host still) ·
+`SkillsPanel` · `RepoView` (real SKILL.md markdown, monospace). `camera[]`
+keyframes (`establish`/`read`/`focus`) drive a `.mock-body` scale tween in
+place of a separate virtual-camera component. `Cursor` (a moving-dot pointer)
+is dropped in the HyperFrames rebuild — see `MIGRATION_NOTES.md`. Preview a
+scene via `ae compose . --studio` on a short draft covering it. Mist tokens +
+`mock_cam` config live in [`styles/mockup/style.md`](../../styles/mockup/style.md);
 `load_mockup()` merges them over `DEFAULT_MOCK`.
 
 ## Skill → GitHub source
@@ -84,7 +88,7 @@ placeholder.
 
 ## Budget
 
-Keep drawn scenes to **≲ 40 % of runtime** — full-frame React Remotion is
+Keep drawn scenes to **≲ 40 % of runtime** — full-frame HyperFrames capture is
 render-heavy. Not enforced; a convention.
 
 ## Keywords

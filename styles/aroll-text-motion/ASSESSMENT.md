@@ -1,5 +1,11 @@
 # Assessment — A-Roll Text Motion System handoff vs. the live repo
 
+> **Historical:** written against `packages/remotion-kit`, since removed and
+> replaced by `packages/hyperframes-kit` + `src/agentic_editor/compose/hf_template.py`
+> (see `MIGRATION_NOTES.md`). The design system this assessed (tokens, kind
+> treatments, dwell timings) is still current; the file paths / component
+> names below describe the retired Remotion implementation, not today's code.
+
 Reviewed `overlay-aroll-design.md` + the design-system source (received
 2026-09-04, vendored to `_ds/`) against `packages/remotion-kit` +
 `src/agentic_editor/cover`. Verdict: **green — small, clean system, very

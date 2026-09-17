@@ -456,7 +456,7 @@ export const TimelineClipSchema = z.object({
   framing: FramingSchema.default("medium"),
   scale: z.number().default(1),
   motion: FramingMotionSchema.default("snap"),
-  /** When true, Remotion plays the clip silent. Audio always comes from cam. */
+  /** When true, the composition plays the clip silent. Audio always comes from cam. */
   muted: z.boolean().optional(),
   /** Normalized smart-window crop (0–1 of source frame). */
   windowCrop: WindowCropNormSchema.optional(),

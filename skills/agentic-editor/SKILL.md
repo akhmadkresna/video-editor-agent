@@ -3,7 +3,7 @@ name: agentic-editor
 description: >
   Local agentic YouTube editor. Ingest cam/screen footage, ASR (whisper.cpp on Mac,
   faster-whisper on Windows), radio-edit via EDL, storyboard plan review, dual-source
-  cover, Remotion compose. Use when editing talking-head or tutorial videos, building
+  cover, HyperFrames compose. Use when editing talking-head or tutorial videos, building
   EDLs, reviewing edit plans ("storyboard"), or promoting fixes into the framework.
 ---
 
@@ -12,7 +12,7 @@ description: >
 ## Setup (once per machine)
 
 ```bash
-export AGENTIC_EDITOR_HOME=/path/to/remotion   # this framework repo
+export AGENTIC_EDITOR_HOME=/path/to/agentic-editor   # this framework repo
 cd "$AGENTIC_EDITOR_HOME" && uv sync && pnpm install
 uv run ae doctor
 # symlink this skill:
@@ -33,9 +33,12 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
 6. Local ASR only: `auto` → whisper.cpp (darwin) / faster-whisper (else).
    Default language is **Indonesian** (`asr.language: id`); override per episode for other languages.
 7. Promote reusable changes into `$AGENTIC_EDITOR_HOME`, not episode copies.
-8. Remotion Studio: **only** via `ae compose . --studio` (stages `public/ae-media` + `--props`).
-   Never start `remotion studio` bare — that shows a black empty timeline. Absolute `/Users/...`
-   media paths will not load in the browser.
+8. HyperFrames preview: **only** via `ae compose . --studio` (materializes
+   `edit/timeline.json` into `edit/hyperframes-project/index.html`, stages media into
+   `edit/hyperframes-project/assets/`, then runs `npx hyperframes preview`).
+   Never start `npx hyperframes preview` bare on `packages/hyperframes-kit/` — that
+   shows the empty scaffold. Absolute `/Users/...` media paths will not load in the
+   browser sandbox.
 9. **Audio always from cam.** Screen is visual-only (muted). Prefer `screen_with_cam` for UI demos.
     Cam VO is DeepFilterNet-enhanced by default (`voice_enhance`, atten-lim 12 dB, delay compensated).
     Cache: `edit/audio/cam.voice.wav`. Raw is never rewritten. Opt out: `voice_enhance.enabled: false`.
@@ -51,11 +54,12 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     with deterministic shrink-to-fit; motion is the DS's own recipes (pop-in with
     overshoot, word stagger, count-up, drip / traveling dot / marching pointer /
     float — a beat should never go fully static once its entrance settles).
-    Components live in `packages/remotion-kit/src/components/overlay/`; preview any
-    kind in isolation with the **`OverlayLab`** Remotion composition (and
-    `OverlayLabSocial` for the letterbox pack). Screen stage = cool-mist canvas.
+    Dispatch lives in `src/agentic_editor/compose/hf_template.py`'s
+    `_overlay_body_html`; preview any kind in context via `ae compose . --studio`
+    against a small draft (`ae draft . --seconds 30 --render` covering the kind).
+    Screen stage = cool-mist canvas.
     No full/karaoke captions. Do not invent episode-local colors/fonts — change
-    `styles/tutorial/style.md` (+ `style_load.py` / remotion-kit theme) instead.
+    `styles/tutorial/style.md` (+ `style_load.py` / `hf_template.py`'s `_CSS`) instead.
     Spec: `styles/aroll-text-motion/overlay-aroll-design.md`.
 10b. **Evidence episodes (`style: evidence`):** start with **`ae brief`** (script + research)
     then **`ae evidence-gather`** (real screenshots into `raw/evidence/`). Never AI-generate
@@ -64,10 +68,11 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     `evidence_with_cam`; MG may use `callout`. Promote knobs into `styles/evidence/style.md`.
     Docs: `docs/catalog/features/evidence-style.md`.
 10c. **Mockup episodes (`style: mockup`) — Claude Skill Lab.** No screen
-    recording: the "screen" is a Remotion-drawn mockup (`MockStage` + a
-    surface: `ClaudeChat` / `DiffPanel` / `AppWindow` / `SkillsPanel` /
-    `RepoView`), with a virtual camera (`MockCam`) and the cam PIP always
-    composited on top. `RepoView` shows the **real** SKILL.md — `ae
+    recording: the "screen" is a generated `.mock-window` card (see
+    `_emit_mockup` in `hf_template.py`) holding a surface layer: `ClaudeChat` /
+    `DiffPanel` / `AppWindow` / `SkillsPanel` / `RepoView`, with `camera[]`
+    keyframes (`establish`/`read`/`focus`) driving the zoom and the cam PIP
+    always composited on top. `RepoView` shows the **real** SKILL.md — `ae
     mockup-suggest` resolves the repo from
     `styles/series/claude-skill-lab/skills.yaml` and fetches it (cache:
     `edit/.mockup-cache/`).
@@ -79,8 +84,8 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     `ae mockup-suggest . --apply` (validates → `edit/mockup.json`) → `ae
     cover .` → `ae compose .`. Scenes stay in `edit/mockup.json`, never
     `cover.json`, so cover-/overlay-suggest can't clobber them. Preview the
-    components alone via the `MockupLab` Remotion composition. Keep drawn
-    scenes to ≲ 40% of runtime (full-frame Remotion is render-heavy). Full
+    components alone via `ae compose . --studio` on a short draft. Keep drawn
+    scenes to ≲ 40% of runtime (full-frame HyperFrames capture is render-heavy). Full
     spec: `styles/series/claude-skill-lab/mockup-system.md`.
 11. **MG overlays:** after EDL (and preferably cover) is confirmed, run `ae overlay-suggest .`,
     propose the plan, **wait for confirm**, then write `cover.json` `overlays[]` **and** any
@@ -94,7 +99,7 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Gaps ~50s chapter / ~10s emphasis; density ~1 sting / 32s keep; same-label min gap ~45s
     (keeps “Roadmap” etc. from spam). Quiet keep stretches >55s get gap-fill. Emphasis
     `bottomCqh` default **28** (was too low vs PIP).
-    Motion is Remotion-side on these overlays (count, line-draw, accent pop, diagram rail)
+    Motion is composition-side on these overlays (count, line-draw, accent pop, diagram rail)
     — do not invent extra cover fields for it. **Do not** use picture-takeover
     `cover.cutaways[]` / `ae cutaway-suggest` on tutorial talking-head.
 12. **Series YouTube thumbnails:**
@@ -313,7 +318,7 @@ Framing presets simulate a 2–3 camera setup from one cam. Propose a camera-pla
 
 **Screen explainer (locked in `styles/tutorial`):** cozy + cool mist + soft round (`borderRadiusPx: 24`) + `crop.mode: none`. Host supplies clean full-frame screen; do not run smart window detect. Optional static `crop.inset` only for tiny capture-edge trash. PIP anchors to the **frame** lower-right.
 
-### Overlay motion (Remotion, no extra cover fields)
+### Overlay motion (HyperFrames, no extra cover fields)
 
 Tutorial talking-head keeps the host on camera. Do **not** author `cover.cutaways[]`
 or run `ae cutaway-suggest` — picture-takeover MG reads as fake B-roll and fights

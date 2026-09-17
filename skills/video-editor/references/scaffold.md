@@ -58,7 +58,7 @@ Never create alternate roots such as:
 
 - `footage/`, `input/`, `output/`, `renders/`, `src/`, `assets/video/`
 - a nested `project/` inside the episode
-- copying Remotion kit / framework code into the episode
+- copying HyperFrames kit / framework code into the episode
 
 If a previous Telegram turn already made a wrong tree: stop, tell the user,
 and offer `ae new G:\AI\episodes\<slug>` (or `--force` only after they confirm).

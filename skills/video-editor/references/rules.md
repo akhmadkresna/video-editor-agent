@@ -25,18 +25,19 @@ user asks for in the moment.
 7. **Audio always from cam.** Screen capture is visual-only (muted). Cam VO is
    DeepFilterNet-enhanced by default; the cache is `edit/audio/cam.voice.wav`.
    Do not add ffmpeg denoise / gate chains.
-8. **Remotion Studio only via `ae compose . --studio`.** A bare `remotion studio`
-   shows a black empty timeline. Media must be `public/ae-media/...` relative,
+8. **HyperFrames preview only via `ae compose . --studio`.** A bare
+   `npx hyperframes preview` on `packages/hyperframes-kit/` shows the empty
+   scaffold. Media must be `edit/hyperframes-project/assets/...` relative,
    never absolute paths.
-9. **Promote, don't fork.** If you find a reusable fix (a style knob, a Remotion
-   component, an ASR quirk), append a note to `edit/promotions.md` and change the
-   framework under `AGENTIC_EDITOR_HOME` — do not copy framework code into the
-   episode.
+9. **Promote, don't fork.** If you find a reusable fix (a style knob, a
+   composition helper in `hf_template.py`, an ASR quirk), append a note to
+   `edit/promotions.md` and change the framework under `AGENTIC_EDITOR_HOME` —
+   do not copy framework code into the episode.
 10. **Talking-head stays talking-head.** Do not add picture-takeover cutaways
     (`cover.cutaways[]` / `ae cutaway-suggest`) on `style: tutorial` /
     `style: evidence` episodes; motion lives on MG overlays instead.
 11. **`style: mockup` is the exception (Claude Skill Lab).** This one pack
-    has no screen recording — the "screen" is a Remotion-drawn mockup, and
+    has no screen recording — the "screen" is a generated mockup card, and
     full-frame drawn scenes are the medium, not a cutaway. Rule 10 does not
     apply here. `ae cutaway-suggest` stays off; `ae mockup-suggest` is its
     replacement. Every drawn scene still carries the cam PIP (the pipeline

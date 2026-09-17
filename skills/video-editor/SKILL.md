@@ -8,7 +8,7 @@ platforms: [macos, linux, windows]
 metadata:
   hermes:
     category: media
-    tags: [video, editing, youtube, transcription, radio-edit, storyboard, ffmpeg, remotion, scaffold]
+    tags: [video, editing, youtube, transcription, radio-edit, storyboard, ffmpeg, hyperframes, scaffold]
     requires_tools: [bash]
 ---
 
@@ -22,7 +22,7 @@ orchestrate and explain, you do **not** hand-author cut ranges.
 ## When to Use
 
 - The user wants raw camera footage cut down: silences, thinking pauses, retakes.
-- The user asks for a **storyboard** / visual edit plan, a preview, a Remotion Studio
+- The user asks for a **storyboard** / visual edit plan, a preview, a HyperFrames
   review, screen-share cover, or YouTube title / description / chapters for an episode.
 - Trigger with `/video-editor <what you want>`, or any request naming an episode
   folder plus footage.
@@ -115,8 +115,8 @@ Non-negotiable editing rules: `references/rules.md`.
 
 ## Pitfalls
 
-- **`AGENTIC_EDITOR_HOME` unset** → `ae` cannot resolve templates / Remotion kit.
-  Set it before anything else.
+- **`AGENTIC_EDITOR_HOME` unset** → `ae` cannot resolve templates / the
+  `hyperframes-kit` scaffold. Set it before anything else.
 - **Freestyle `mkdir` / hand scaffold from Telegram** → wrong tree; `ae ingest`
   fails. Always `ae new`. See `references/scaffold.md`.
 - **Editing `edit/edl.json` by hand** → mid-word cuts. Always go through
@@ -127,8 +127,9 @@ Non-negotiable editing rules: `references/rules.md`.
   `ae ingest --force` when the user says `raw/` changed.
 - **Writing under `raw/`** → forbidden. `raw/` is read-only; all output is in
   `edit/`.
-- **Running `remotion studio` directly** → black empty timeline. Only
-  `ae compose . --studio`.
+- **Running `npx hyperframes preview` directly** on `packages/hyperframes-kit/` →
+  empty scaffold. Only `ae compose . --studio` (generates the per-episode
+  project first).
 - **Applying the plan without the user** → violates the confirm gate. Wait for an
   explicit "apply".
 

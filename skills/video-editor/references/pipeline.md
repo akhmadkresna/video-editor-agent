@@ -9,18 +9,18 @@ an **episode** folder (`project.yaml` + `raw/` + `edit/`); `.` = the episode.
 
 | Command | Does | Needs | Writes |
 |---|---|---|---|
-| `ae doctor` | Check ffmpeg/ffprobe, ASR backend, Remotion kit | — | — |
+| `ae doctor` | Check ffmpeg/ffprobe, ASR backend, HyperFrames kit | — | — |
 | `ae new <path>` | Scaffold an episode (only valid way to create the tree) | — | `project.yaml`, `raw/`, `edit/`, agent config |
 | `ae ingest .` | Probe + ASR (whisper.cpp on macOS, faster-whisper else) | `raw/cam.mp4` | `edit/takes_packed.md`, cached transcript |
 | `ae edl-suggest .` | Gap-class radio-edit proposal | transcript | `edit/edl.suggest.json` |
-| `ae storyboard .` | Visual HTML review of EDL + MG (text preview; add `--render-mg` for exact Remotion stills) | `edit/edl.json` + `edit/cover.json` | `edit/storyboard/index.html` |
-| `ae mg-review .` | Full MG gallery — one production Remotion still per overlay/evidence hold | after `ae cover .` | `edit/mg-review/review.html` |
+| `ae storyboard .` | Visual HTML review of EDL + MG (text preview; add `--render-mg` for exact HyperFrames stills) | `edit/edl.json` + `edit/cover.json` | `edit/storyboard/index.html` |
+| `ae mg-review .` | Full MG gallery — one production HyperFrames still per overlay/evidence hold | after `ae cover .` | `edit/mg-review/review.html` |
 | `ae edl-suggest . --apply` | Promote proposal to runtime EDL (**after user confirm**) | `edit/edl.suggest.json` | `edit/edl.json` |
 | `ae cut .` | Render EDL → preview; enhances cam VO (DeepFilterNet) first; 30 ms fades | `edit/edl.json` | `edit/preview.mp4`, `edit/audio/cam.voice.wav` |
 | `ae cover-suggest .` | Propose `screen_with_cam` ranges from deixis + screen activity | transcript, `screen` source | `edit/cover.suggest.json` |
 | `ae cover .` | Merge EDL + `edit/cover.json` → timeline | `edit/edl.json`, `edit/cover.json` | `edit/timeline.json` |
-| `ae compose . --studio` | Stage media into `public/ae-media`, launch Remotion Studio | `edit/timeline.json` | — |
-| `ae compose .` | Headless Remotion render | `edit/timeline.json` | `edit/final.mp4` |
+| `ae compose . --studio` | Stage media into `edit/hyperframes-project/assets/`, launch HyperFrames preview | `edit/timeline.json` | — |
+| `ae compose .` | Headless HyperFrames render | `edit/timeline.json` | `edit/final.mp4` |
 | `ae qa .` | Extract cut-boundary frames | `edit/preview.mp4` | `edit/verify/` |
 | `ae mezzanine .` | CRF16 1080p proxies for heavy raw (muxes enhanced audio) | sources | `edit/mezzanine/` |
 | `ae promote-check .` | Show `edit/promotions.md` | — | — |

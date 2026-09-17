@@ -7,7 +7,7 @@
 # inherit everything else here.
 #
 # Derived from overlay-aroll-design.md §2 (tokens) + §4 (new OverlayStyle
-# keys). Mirrors packages/remotion-kit/src/types.ts DEFAULT_OVERLAY_STYLE
+# keys). Mirrors hf_template.py's _CSS / _overlay_body_html defaults
 # and src/agentic_editor/cover/style_load.py DEFAULT_OVERLAYS.
 #
 # Guardrails (design system, non-negotiable): white text only, no hue; no

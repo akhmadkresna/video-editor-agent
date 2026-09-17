@@ -60,8 +60,13 @@ adding more hand-rolled CSS.
 
 ## Dropped / simplified pieces
 
-- `SfxLayer` — SFX is muxed by the Python pipeline (`ae cover`/mezzanine audio
-  staging) rather than scheduled inside the composition; no HF-side layer needed.
+- `SfxLayer` — `compose.stage_sfx_for_hyperframes` already staged
+  `timeline.sfx[]` cues into the per-episode project's `assets/sfx/`, but
+  `hf_template.py` wasn't actually emitting them into the composition
+  (a gap from the initial scaffold, not an intentional drop) — fixed here
+  with `_emit_sfx`: one `<audio class="clip">` one-shot per cue, gain via
+  the static `data-volume` attribute (no tween — these are short one-shots,
+  not faded).
 - `MissingTimelineBanner` — Remotion showed this when `--props` was absent; HF
   compositions are generated straight from a present `timeline.json` per episode
   (`prepare_compose`/`prepare_draft`), so there's no "missing props" runtime state

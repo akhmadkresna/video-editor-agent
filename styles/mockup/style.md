@@ -1,6 +1,7 @@
 # Mockup style pack
 
-Talking-head + **drawn screen** (Remotion mock, no screen recording). Built
+Talking-head + **drawn screen** (a generated HyperFrames mockup card, no screen
+recording). Built
 for Claude Skill Lab. Two shot states only: full cam ⇄ mockup + PIP. Full
 spec: `styles/series/claude-skill-lab/mockup-system.md`.
 
@@ -8,9 +9,9 @@ Inherits the `tutorial` A-roll overlay grammar (open-overlay, white ink, no
 panel, surround zones, density 1+1). Drops `screen` source, `cover-suggest`,
 `cutaways`. Adds the `mockup` scene grammar + "Mist" theme + `mock_cam`.
 
-The Remotion side reads these from `presentation.mockup` in the timeline
-props; `DEFAULT_MOCK_STYLE` in `packages/remotion-kit/src/types.ts` is the
-authoritative fallback until a Python `load_mockup()` lands.
+`hf_template.py`'s `_emit_mockup` reads these from `presentation.mockup` in
+`timeline.json`; `agentic_editor.cover.mockup.DEFAULT_MOCK` (Python) is the
+authoritative fallback, merged by `load_mockup()`.
 
 ```yaml
 profile: mockup
@@ -98,17 +99,19 @@ screen_explainer:
 | Mode | When | Visual | Audio |
 |------|------|--------|-------|
 | Full cam | Default / between mock scenes | Cam + `camera_play` framing | Cam |
-| Mockup + PIP | A `mockups[]` scene covers the frame | `MockStage` (Mist) under `MockCam`, cam PIP at stage lower-right | Cam only |
+| Mockup + PIP | A `mockups[]` scene covers the frame | `.mock-window` (Mist) with a `camera[]`-driven zoom, cam PIP at stage lower-right | Cam only |
 
 Drawn scenes come from `ae mockup-suggest .` → `edit/mockup.json`
-(`mockups[]` on `cover.json`). Rendered by `<MockupLayer>` in
-`Composition.tsx`. MG overlays + cam PIP composite on top, outside `MockCam`.
+(`mockups[]` on `cover.json`). Rendered by `_emit_mockup` in
+[`hf_template.py`](../../src/agentic_editor/compose/hf_template.py). MG
+overlays + cam PIP composite on top, outside the mockup card.
 
-## Components (remotion-kit)
+## Components (hyperframes-kit)
 
-`components/mockup/`: `MockStage` · `MockCam` · `ClaudeChat` · `DiffPanel`
-(built) · `Cursor` · `AppWindow` · `SkillsPanel` (pending). Shared
-`Typewriter`, deterministic focus rects in `regions.ts`. Preview:
-`MockupLab` composition (`remotion studio`).
+`_emit_mockup`'s `layer_html` dispatch: `ClaudeChat` · `DiffPanel` ·
+`AppWindow` · `SkillsPanel` · `RepoView`. `camera[]` keyframes
+(`establish`/`read`/`focus`) replace a separate virtual-camera component.
+`Cursor` (a moving-dot pointer) is dropped in the HyperFrames rebuild — see
+`MIGRATION_NOTES.md`. Preview: `ae compose . --studio` on a short draft.
 
 Do not fork the look per episode — promote changes here.
