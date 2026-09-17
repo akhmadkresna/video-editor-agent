@@ -71,12 +71,6 @@ def _write_episode(tmp: Path) -> Path:
                 "kicker": "Chapter 01",
                 "text": "Hook",
             },
-            {
-                "kind": "chip",
-                "start": 48.0,
-                "end": 50.0,
-                "text": "Odoo",
-            },
         ],
         "sfx": [],
     }
@@ -127,7 +121,7 @@ def test_suggest_one_shots_no_typing_by_default(
     assert "punch" in notes or "cut_snap" in notes or "framing_snap" in notes
     assert "screen_enter" in notes or "deixis" in notes
     assert "mg_diagram" in notes or "mg_chapter" in notes
-    assert "mg_emphasis" in notes or "mg_chip" in notes
+    assert "mg_emphasis" in notes
 
 
 def test_suggest_mg_appear_mapping(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

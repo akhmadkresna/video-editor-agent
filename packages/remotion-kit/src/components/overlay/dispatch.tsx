@@ -1,7 +1,7 @@
 /**
  * Overlay kind → A-Roll Text Motion System component.
  *
- * One dispatch for all 14 kinds, replacing the two divergent paths this
+ * One dispatch for all 13 kinds, replacing the two divergent paths this
  * codebase used to have (`OneOverlay` for 5 kinds with its own fonts/springs,
  * `GlassOverlay` for 8 more that never even received the style config).
  *
@@ -22,7 +22,6 @@ import { NameDrop } from "./NameDrop";
 import { SceneDiagram, sceneVariantFromNote } from "./SceneDiagram";
 import { PunchWord } from "./PunchWord";
 import { StatCallout } from "./StatCallout";
-import { iconNameFromNote } from "./icons";
 import { cqh, valueSizeCqh } from "./sizing";
 import type { OverlayTheme } from "./theme";
 
@@ -77,12 +76,11 @@ export function boxOptsForKind(
         maxWidthCqw: 68,
         topCqh: theme.diagram.topCqh,
       };
-    case "chip":
     case "tag":
       return {
         maxWidthCqw: 42,
-        topCqh: theme.chip.topCqh,
-        insetCqw: theme.chip.leftCqw,
+        topCqh: theme.tag.topCqh,
+        insetCqw: theme.tag.leftCqw,
       };
     default:
       return { maxWidthCqw: 42 };
@@ -292,12 +290,10 @@ export function renderOverlayBody(
         />
       );
 
-    case "chip":
     case "tag":
       return (
         <IllustrationTag
           label={ov.text || ov.title || ""}
-          icon={ov.kind === "chip" ? iconNameFromNote(ov.note) : null}
           corner={zoneCorner(zone) === "top-right" ? "top-right" : "top-left"}
           durationSec={ov.durationSec}
           theme={theme}

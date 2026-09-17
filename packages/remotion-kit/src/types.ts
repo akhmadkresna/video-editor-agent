@@ -63,7 +63,6 @@ export type OverlayKind =
   | "chapter"
   | "emphasis"
   | "diagram"
-  | "chip"
   | "callout"
   // "Glass" house style (2026-08) — frosted overlay-on-continuous-A-roll,
   // not a picture-takeover. See components/glass/. Content mapping (reuses
@@ -663,13 +662,11 @@ export type OverlayStyle = {
     sourceSizeCqh?: number;
     maxWidthCqw?: number;
   };
-  chip?: {
+  tag?: {
     leftCqw?: number;
     rightCqw?: number;
     topCqh?: number;
     sizeCqh?: number;
-    /** Lucide glyph size relative to the label (em). */
-    iconEm?: number;
     /** ±7px sine drift after entrance when dwell > 3s. */
     float?: boolean;
   };
@@ -732,7 +729,7 @@ export const DEFAULT_OVERLAY_STYLE: OverlayStyle = {
     sourceSizeCqh: 2.8,
     maxWidthCqw: 48,
   },
-  chip: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4, iconEm: 1.15, float: true },
+  tag: { leftCqw: 4.5, topCqh: 10, sizeCqh: 3.4, float: true },
   safe: {
     faceClear: true,
     zones: ["left_third", "right_third", "lower_raised", "top_sparse"],

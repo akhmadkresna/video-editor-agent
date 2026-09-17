@@ -19,7 +19,7 @@ const SOCIAL_OVERLAY_STYLE: OverlayStyle = {
   emphasis: { sizeCqh: 5.2, leftCqw: 5, topCqh: 12, maxWidthCqw: 90, underline: true },
   callout: { leftCqw: 5, topCqh: 10, valueSizeCqh: 5.6, sourceSizeCqh: 1.6, maxWidthCqw: 90 },
   diagram: { leftCqw: 5, topCqh: 8, maxWidthCqw: 90, stepSizeCqh: 2.2, connector: "traveling_dot" },
-  chip: { leftCqw: 5, topCqh: 14, sizeCqh: 2.0, iconEm: 1.15, float: true },
+  tag: { leftCqw: 5, topCqh: 14, sizeCqh: 2.0, float: true },
 };
 
 /**

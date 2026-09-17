@@ -45,8 +45,8 @@ def _base_timeline(**kwargs):
         ],
         "overlays": [
             {
-                "id": "chip-open",
-                "kind": "chip",
+                "id": "opening",
+                "kind": "chapter",
                 "fromSec": 0.08,
                 "durationSec": 2.76,
                 "text": "Odoo Studio",
@@ -63,13 +63,13 @@ def _base_timeline(**kwargs):
 
 
 def test_slice_keeps_fromsec_overlays():
-    """Regression: hand trim on start/end dropped the opening chip."""
+    """Regression: hand trim on start/end dropped the opening overlay."""
     sliced = slice_timeline(_base_timeline(), 120.0)
     assert sliced["durationSec"] == 120.0
     assert sliced["durationInFrames"] == 3600
     ovs = sliced["overlays"]
     assert len(ovs) == 1
-    assert ovs[0]["id"] == "chip-open"
+    assert ovs[0]["id"] == "opening"
     assert ovs[0]["fromSec"] == 0.08
     assert len(sliced["effects"]) == 1
     assert len(sliced["clips"]) == 2
@@ -94,7 +94,7 @@ def test_slice_clips_overlay_past_limit():
 
 def test_quality_flags_missing_overlays():
     tl = _base_timeline(overlays=[])
-    cover = {"overlays": [{"id": "chip-open", "kind": "chip", "start": 1.0, "end": 4.0}]}
+    cover = {"overlays": [{"id": "opening", "kind": "chapter", "start": 1.0, "end": 4.0}]}
     errors, _warnings = audit_timeline_quality(tl, cover=cover)
     assert any("timeline.overlays is empty" in e for e in errors)
 
@@ -166,8 +166,8 @@ def test_quality_flags_dropped_overlay_ids():
     tl = _base_timeline(
         overlays=[
             {
-                "id": "chip-open",
-                "kind": "chip",
+                "id": "opening",
+                "kind": "chapter",
                 "fromSec": 0.08,
                 "durationSec": 2.76,
                 "text": "Odoo Studio",
@@ -176,7 +176,7 @@ def test_quality_flags_dropped_overlay_ids():
     )
     cover = {
         "overlays": [
-            {"id": "chip-open", "kind": "chip", "start": 1.0, "end": 4.0, "text": "ok"},
+            {"id": "opening", "kind": "chapter", "start": 1.0, "end": 4.0, "text": "ok"},
             {"id": "gone", "kind": "emphasis", "start": 99.0, "end": 100.0, "text": "x"},
         ]
     }
@@ -190,8 +190,8 @@ def test_draft_audit_ignores_overlays_past_limit():
         durationSec=200.0,
         overlays=[
             {
-                "id": "chip-open",
-                "kind": "chip",
+                "id": "opening",
+                "kind": "chapter",
                 "fromSec": 0.08,
                 "durationSec": 2.76,
                 "text": "Odoo Studio",
@@ -215,7 +215,7 @@ def test_draft_audit_ignores_overlays_past_limit():
     }
     cover = {
         "overlays": [
-            {"id": "chip-open", "kind": "chip", "start": 1.0, "end": 4.0, "text": "ok"},
+            {"id": "opening", "kind": "chapter", "start": 1.0, "end": 4.0, "text": "ok"},
             {"id": "late-chapter", "kind": "chapter", "start": 900.0, "end": 905.0, "text": "Later"},
         ]
     }

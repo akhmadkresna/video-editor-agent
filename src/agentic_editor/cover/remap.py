@@ -68,7 +68,6 @@ _LEGACY_OVERLAY_KINDS = (
     "chapter",
     "emphasis",
     "diagram",
-    "chip",
     "callout",
     "name_drop",
     "scene_diagram",

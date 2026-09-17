@@ -53,15 +53,13 @@ export const LAB_OVERLAYS: TimelineOverlay[] = [
   },
   { id: "chapter-right", kind: "chapter", kicker: "Bab 07", text: "Jujurnya", zone: "right_third", ...at() },
   { id: "divider-num", kind: "divider", kicker: "Bab 12", title: "Verdict", zone: "left_third", ...at() },
-  { id: "chip-icon", kind: "chip", text: "avoid-ai-writing", note: "icon:zap", zone: "top_sparse", ...at() },
-  { id: "chip-badicon", kind: "chip", text: "ikon tidak ada", note: "icon:not-a-real-icon", zone: "top_sparse", ...at() },
   { id: "tag-short", kind: "tag", text: "singkat", zone: "top_sparse", fromSec: slot * SLOT, durationSec: 2.5, exitStartSec: 1.6 },
   { id: "lower-third", kind: "lower_third", text: "Kresna", title: "Port Cities", zone: "lower_raised", ...at() },
   { id: "list-cycle", kind: "list_cycle", text: "Bukan cuma", steps: ["caption", "artikel", "email", "thread"], zone: "left_third", ...at() },
   { id: "grid-on", kind: "emphasis", text: "dengan grid", note: "grid:3", zone: "left_third", ...at() },
   // Two in one zone + one in another — veil must stay flat, not stack.
   { id: "veil-a", kind: "emphasis", text: "dua di zona sama", zone: "left_third", ...at() },
-  { id: "veil-b", kind: "chip", text: "kedua", zone: "left_third", fromSec: (slot - 1) * SLOT + 0.8, durationSec: 3.0, exitStartSec: 2.1 },
+  { id: "veil-b", kind: "tag", text: "kedua", zone: "left_third", fromSec: (slot - 1) * SLOT + 0.8, durationSec: 3.0, exitStartSec: 2.1 },
   { id: "veil-c", kind: "chapter", kicker: "Bab 09", text: "zona lain", zone: "right_third", fromSec: (slot - 1) * SLOT + 0.8, durationSec: 3.0, exitStartSec: 2.1 },
 ];
 

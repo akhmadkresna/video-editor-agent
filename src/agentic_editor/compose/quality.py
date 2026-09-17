@@ -139,7 +139,7 @@ def audit_timeline_quality(
                 f"{len(dropped)} cover overlay(s) missing from timeline after remap "
                 f"(e.g. {sample}) — outside EDL keeps or zero intersection"
             )
-        # Opening chip / early MG should usually appear in the first few seconds
+        # Early MG (opening chapter/etc.) should usually appear in the first few seconds
         early = [
             o
             for o in overlays
@@ -153,7 +153,7 @@ def audit_timeline_quality(
         if cover_early and not early and float(timeline.get("durationSec") or 0) >= 5:
             warnings.append(
                 "cover has early overlays but none land in first 5s of timeline — "
-                "check remap / chip-open framing"
+                "check remap / opening overlay framing"
             )
 
     full_cam = [

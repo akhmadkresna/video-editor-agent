@@ -35,7 +35,7 @@ TYPING_HINTS = (
 )
 
 # Default MG → SFX kind (overridable via style sfx.mg). The original
-# chapter/diagram/emphasis/chip kinds keep shutter/click; the kinds that
+# chapter/diagram/emphasis kinds keep shutter/click; the kinds that
 # used to carry a paper card (title/stat/lower_third/divider/quote/
 # illustration/code) still default to "paper" on appear — a page-turn read
 # well as an appear cue even after the card itself was dropped for the
@@ -45,7 +45,6 @@ DEFAULT_MG_KINDS = {
     "chapter": "shutter",
     "diagram": "shutter",
     "emphasis": "click",
-    "chip": "click",
     "title": "paper",
     "stat": "paper",
     "lower_third": "paper",
@@ -59,7 +58,6 @@ MG_PRIORITY = {
     "chapter": 4,
     "diagram": 4,
     "emphasis": 3,
-    "chip": 2,
     "title": 4,
     "stat": 3,
     "lower_third": 3,

@@ -9,7 +9,6 @@ export function defaultZoneForKind(kind: OverlayKind): OverlayZone {
     case "callout":
     case "emphasis":
       return "lower_raised";
-    case "chip":
     case "tag":
     case "chapter":
     case "divider":

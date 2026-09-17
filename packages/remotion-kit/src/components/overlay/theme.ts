@@ -79,7 +79,7 @@ export type OverlayTheme = {
   emphasis: NonNullable<OverlayStyle["emphasis"]>;
   diagram: NonNullable<OverlayStyle["diagram"]>;
   callout: NonNullable<OverlayStyle["callout"]>;
-  chip: NonNullable<OverlayStyle["chip"]>;
+  tag: NonNullable<OverlayStyle["tag"]>;
   grid: { enabled: boolean; density: number; opacity: number };
   zones: OverlayZone[];
 };
@@ -137,7 +137,7 @@ export function resolveTheme(style?: OverlayStyle): OverlayTheme {
     // DEFAULT_OVERLAY_STYLE — keep an explicit floor so FlowSteps always sizes.
     diagram: { stepSizeCqh: 3.6, ...D.diagram, ...s.diagram },
     callout: { ...D.callout, ...s.callout },
-    chip: { ...D.chip, ...s.chip },
+    tag: { ...D.tag, ...s.tag },
     grid: {
       enabled: grid.enabled ?? D.grid?.enabled ?? false,
       density: grid.density ?? D.grid?.density ?? 3,

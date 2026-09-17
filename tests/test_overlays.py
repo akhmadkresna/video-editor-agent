@@ -74,7 +74,7 @@ def test_overlay_cut_out_of_edl_dropped():
     }
     cover = {
         "overlays": [
-            {"kind": "chip", "start": 20.0, "end": 23.0, "text": "gone"},
+            {"kind": "chapter", "start": 20.0, "end": 23.0, "text": "gone"},
         ]
     }
     assert build_timeline_overlays(edl, cover) == []

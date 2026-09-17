@@ -32,7 +32,6 @@ _DEFAULT_ZONE_FOR_KIND: dict[str, str] = {
     "stat": "lower_raised",
     "callout": "lower_raised",
     "emphasis": "lower_raised",
-    "chip": "top_sparse",
     "tag": "top_sparse",
     "chapter": "top_sparse",
     "divider": "top_sparse",
@@ -517,7 +516,7 @@ def _render_mg_overlay_panel(overlay: dict[str, Any]) -> str:
         if title:
             body_parts.append(f'<div class="mg-kicker">{title}</div>')
         body_parts.append(_mg_steps_html(steps))
-    elif kind in ("chapter", "emphasis", "diagram", "chip"):
+    elif kind in ("chapter", "emphasis", "diagram"):
         if kicker:
             body_parts.append(f'<div class="mg-kicker">{kicker}</div>')
         headline = title or text or value

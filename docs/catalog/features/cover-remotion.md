@@ -24,10 +24,10 @@
   anything else). Tone (teal/amber/neutral) is expressed via border style (dashed = estimate, solid
   = sourced), not color. Superseded "Design Canvas" v6 (opaque off-white paper cards with a dog-ear
   fold and an indigo `#4d4de8` selection accent) — same layout/type/motion per kind, just un-paneled
-  and recolored to white. All 13 kinds share this one look now:
+  and recolored to white. All 12 kinds share this one look now:
   `title`/`stat`/`lower_third`/`tag`/`divider`/`quote`/`code`/`illustration` (see
   `packages/remotion-kit/src/components/glass/GlassOverlays.tsx` + `tokens.ts`) and
-  `chapter`/`emphasis`/`diagram`/`callout`/`chip` (see `OverlayLayer.tsx`'s own `OneOverlay` —
+  `chapter`/`emphasis`/`diagram`/`callout` (see `OverlayLayer.tsx`'s own `OneOverlay` —
   different component per kind's structure, same palette; these five used to keep an accent-cyan
   kicker/rule/number and have now dropped it to match). Single shared implementation, applies to
   every episode/series automatically, not per-episode config. `quote` reuses `title`'s exact
@@ -55,15 +55,15 @@
 
 `GlassOverlays.tsx`-dispatched kinds: `title` · `stat` · `lower_third` ·
 `tag` · `divider` · `quote` · `code` · `illustration`. `OneOverlay`-dispatched
-kinds: `chapter` · `emphasis` · `diagram` · `chip`. Same white-ink/no-panel
+kinds: `chapter` · `emphasis` · `diagram`. Same white-ink/no-panel
 treatment either way — the split is just which component renders the kind's
 structure, not a style choice. See skill hard rule 11.
 
 **Default gate (camera / zoom play):** suggest reads `cover.json` screen windows + `camera_play`. Chapter/diagram prefer `screen_with_cam` (already wide/hold). On full-cam they emit companion `framing` medium/wide so MG does not fight close multicam crops (`faceClear`, left_third). Emphasis may use close.
 
-**Density / relevance:** structure (chip/chapter/diagram + long-screen section quotas) is reserved first; emphasis is best-fit from an ID payoff lexicon, scored by screen-enter proximity. Min gaps (~90s chapters, ~25s emphasis). Caps ~1 sting / 70s keep.
+**Density / relevance:** structure (chapter/diagram + long-screen section quotas) is reserved first; emphasis is best-fit from an ID payoff lexicon, scored by screen-enter proximity. Min gaps (~90s chapters, ~25s emphasis). Caps ~1 sting / 70s keep.
 
-**Dwell (readable MG):** style `overlays.dwell` — chip ~4s, chapter ~5s, diagram ~7.5s, emphasis ≥2.4s (min 1.8s). Remap floors `durationSec` by kind; Remotion `OverlayLayer` fades in/out (no hard pop-off).
+**Dwell (readable MG):** style `overlays.dwell` — chapter ~5s, diagram ~7.5s, emphasis ≥2.4s (min 1.8s). Remap floors `durationSec` by kind; Remotion `OverlayLayer` fades in/out (no hard pop-off).
 
 **Audio rule (hard):** every non-`cam` clip is muted in Remotion. Screen never contributes audio.
 

@@ -13,7 +13,7 @@ from agentic_editor.paths import framework_home
 # Locked A-roll MG (2026-08+, "Open Overlay" v7) = white ink straight on the
 # a-roll, no panel, no accent color — readability from the veil scrim behind
 # the text. One look, shared by every kind (title/stat/lower_third/tag/
-# divider/quote/code/illustration/chapter/emphasis/diagram/callout/chip) and
+# divider/quote/code/illustration/chapter/emphasis/diagram/callout) and
 # every style pack. See packages/remotion-kit/src/components/glass/tokens.ts.
 # Mirrors packages/remotion-kit/src/types.ts DEFAULT_OVERLAY_STYLE and
 # packages/remotion-kit/src/components/glass/tokens.ts. Source of record:
@@ -26,7 +26,6 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
     "inkFaint": "rgba(255,255,255,0.4)",
     # Readable on-screen time (OverlayLayer fades out; do not hard-cut early)
     "dwell": {
-        "chip_sec": 4.0,
         "chapter_sec": 5.5,
         "diagram_sec": 10.0,
         "emphasis_sec": 2.4,
@@ -109,11 +108,10 @@ DEFAULT_OVERLAYS: dict[str, Any] = {
         "sourceSizeCqh": 2.8,
         "maxWidthCqw": 48,
     },
-    "chip": {
+    "tag": {
         "leftCqw": 4.5,
         "topCqh": 10,
         "sizeCqh": 3.4,
-        "iconEm": 1.15,
         "float": True,
     },
     "safe": {
@@ -233,7 +231,6 @@ DEFAULT_SFX: dict[str, Any] = {
         "chapter": "click",
         "diagram": "click",
         "emphasis": "click",
-        "chip": "click",
     },
 }
 

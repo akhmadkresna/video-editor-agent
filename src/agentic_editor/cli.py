@@ -427,8 +427,7 @@ def cmd_overlay_suggest(args: argparse.Namespace) -> int:
         f"({counts.get('total', len(overlays))} overlays: "
         f"chapter={counts.get('chapter', 0)}, "
         f"emphasis={counts.get('emphasis', 0)}, "
-        f"diagram={counts.get('diagram', 0)}, "
-        f"chip={counts.get('chip', 0)}; "
+        f"diagram={counts.get('diagram', 0)}; "
         f"framing_companions={counts.get('framing_companions', len(framing_events))}; "
         f"screen={counts.get('on_screen', 0)} cam={counts.get('on_cam', 0)})"
     )
@@ -1067,7 +1066,7 @@ def build_parser() -> argparse.ArgumentParser:
     osug = sub.add_parser(
         "overlay-suggest",
         help=(
-            "Suggest sparse A-roll MG overlays (chapter/emphasis/diagram/chip) "
+            "Suggest sparse A-roll MG overlays (chapter/emphasis/diagram) "
             "from EDL + ASR, gated by cover mode + camera_play framing"
         ),
     )

@@ -7,7 +7,7 @@ long-form `tutorial` style: tutorial captions stay off; social uses karaoke.
 
 True **16:9 stage** centered in the portrait frame with black bars:
 
-1. **Top black** (~0–34%) — MG stings (chapter / callout / emphasis / chip)
+1. **Top black** (~0–34%) — MG stings (chapter / callout / emphasis)
 2. **Landscape stage** (~34–66%) — screen 16:9 + cam PIP bottom-left + blinking CTA on the stage
 3. **Bottom black** (~66–100%) — karaoke captions
 
@@ -37,7 +37,6 @@ overlays:
   treatment: bold
   ink: "#ffffff"
   dwell:
-    chip_sec: 3.2
     chapter_sec: 4.0
     diagram_sec: 6.5
     emphasis_sec: 2.2
@@ -67,10 +66,6 @@ overlays:
     topCqh: 8
     maxWidthCqw: 90
     stepSizeCqh: 2.2
-  chip:
-    leftCqw: 5
-    topCqh: 14
-    sizeCqh: 2.0
   safe:
     faceClear: true
     zones: [top, middle, lower_safe]

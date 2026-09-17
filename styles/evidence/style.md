@@ -17,7 +17,6 @@ overlays:
   treatment: bold
   ink: "#ffffff"
   dwell:
-    chip_sec: 4.0
     chapter_sec: 5.5
     diagram_sec: 12.0          # longer for free-stack / estimator flows
     emphasis_sec: 2.4
@@ -50,10 +49,6 @@ overlays:
     valueSizeCqh: 18
     sourceSizeCqh: 2.8
     maxWidthCqw: 48
-  chip:
-    leftCqw: 4.5
-    topCqh: 10
-    sizeCqh: 3.4
   safe:
     faceClear: true
     zones: [left_third, right_third, lower_raised, top_sparse]
@@ -95,7 +90,6 @@ sfx:
     chapter: click
     diagram: click
     emphasis: click
-    chip: click
     callout: click
     # Kinds that used to carry a paper card — a page-turn still reads well
     # as their appear cue even after the card was dropped (v7, no panel);

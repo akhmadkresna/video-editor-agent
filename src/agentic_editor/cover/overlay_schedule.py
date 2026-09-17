@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-STRUCTURE = frozenset({"chapter", "diagram", "chip"})
+STRUCTURE = frozenset({"chapter", "diagram"})
 
 DEFAULT_DWELL: dict[str, float] = {
-    "chip_sec": 4.0,
     "chapter_sec": 5.5,
     "diagram_sec": 10.0,
     "emphasis_sec": 2.4,
@@ -28,7 +27,6 @@ def dwell_for(kind: str, dwell: dict[str, Any] | None = None) -> float:
     d = {**DEFAULT_DWELL, **(dwell or {})}
     return float(
         {
-            "chip": d["chip_sec"],
             "chapter": d["chapter_sec"],
             "diagram": d["diagram_sec"],
             "emphasis": d["emphasis_sec"],
