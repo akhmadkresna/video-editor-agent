@@ -18,7 +18,6 @@ def test_overlays_locked_aroll_text_motion_no_accent():
     assert "accentName" not in ov
     assert ov["fonts"]["sans"] == "Plus Jakarta Sans"
     assert ov["fonts"]["mono"] == "IBM Plex Mono"
-    assert ov["dwell"]["chip_sec"] >= 3.5
     assert ov["dwell"]["emphasis_sec"] >= 2.0
     assert ov["emphasis"]["sizeCqh"] >= 20
     assert "right_third" in ov["safe"]["zones"]

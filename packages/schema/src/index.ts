@@ -109,7 +109,6 @@ export const OverlayKindSchema = z.enum([
   "chapter",
   "emphasis",
   "diagram",
-  "chip",
   "callout",
 ]);
 

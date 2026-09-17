@@ -249,10 +249,14 @@ def cmd_cover(args: argparse.Namespace) -> int:
     cover = json.loads(cover_path.read_text(encoding="utf-8"))
     style_name = str(cfg.get("style") or "tutorial")
 
-    # `screen_with_cam` / `cam_pip` events need a `screen` source. On a
-    # mockup episode (no screen) a leftover scaffold event renders a blank
-    # screen layout with only the cam PIP — drop them.
-    if "screen" not in sources:
+    # `screen_with_cam` / `cam_pip` events need a `screen` source — a real
+    # dual-source `sources.screen`, or a composite single-file (baked PIP)
+    # via `composite.enabled: true`. On a mockup episode (neither) a
+    # leftover scaffold event renders a blank screen layout with only the
+    # cam PIP — drop them.
+    from agentic_editor.cover.composite import has_screen_cover
+
+    if not has_screen_cover(cfg):
         _evs = cover.get("events") or []
         _keep = [
             e for e in _evs
@@ -423,8 +427,7 @@ def cmd_overlay_suggest(args: argparse.Namespace) -> int:
         f"({counts.get('total', len(overlays))} overlays: "
         f"chapter={counts.get('chapter', 0)}, "
         f"emphasis={counts.get('emphasis', 0)}, "
-        f"diagram={counts.get('diagram', 0)}, "
-        f"chip={counts.get('chip', 0)}; "
+        f"diagram={counts.get('diagram', 0)}; "
         f"framing_companions={counts.get('framing_companions', len(framing_events))}; "
         f"screen={counts.get('on_screen', 0)} cam={counts.get('on_cam', 0)})"
     )
@@ -1063,7 +1066,7 @@ def build_parser() -> argparse.ArgumentParser:
     osug = sub.add_parser(
         "overlay-suggest",
         help=(
-            "Suggest sparse A-roll MG overlays (chapter/emphasis/diagram/chip) "
+            "Suggest sparse A-roll MG overlays (chapter/emphasis/diagram) "
             "from EDL + ASR, gated by cover mode + camera_play framing"
         ),
     )

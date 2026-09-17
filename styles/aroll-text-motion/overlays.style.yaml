@@ -12,7 +12,7 @@
 #
 # Guardrails (design system, non-negotiable): white text only, no hue; no
 # panels/cards/plates/backdrop-filter; max surface = fillWhite12 flat tint
-# (FlowSteps unreached chip only); face oval clear; 1 primary + 1 secondary.
+# (FlowSteps unreached step only); face oval clear; 1 primary + 1 secondary.
 
 overlays:
   preset: aroll_text_motion        # legacy string field, no code branches on it
@@ -73,7 +73,6 @@ overlays:
 
   # On-screen time per kind (timing only — unchanged from the prior pack).
   dwell:
-    chip_sec: 4.0
     chapter_sec: 5.5
     diagram_sec: 10.0
     emphasis_sec: 2.4
@@ -110,11 +109,10 @@ overlays:
     valueSizeCqh: 18
     sourceSizeCqh: 2.8
     maxWidthCqw: 48
-  chip:
+  tag:
     leftCqw: 4.5
     topCqh: 10
     sizeCqh: 3.4
-    iconEm: 1.15
     float: true
 
   safe:

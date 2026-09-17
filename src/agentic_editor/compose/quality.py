@@ -47,10 +47,17 @@ def audit_timeline_quality(
     clips = [c for c in (timeline.get("clips") or []) if isinstance(c, dict)]
     effects = [e for e in (timeline.get("effects") or []) if isinstance(e, dict)]
     overlays = [o for o in (timeline.get("overlays") or []) if isinstance(o, dict)]
+    # `timeline.camera_play` is already the effective, computed value (EDL/
+    # cover merged with composite.camera_play from project.yaml — see
+    # `build_timeline_from_edl_and_cover`). Only fall back to cover.json's
+    # own raw field when the timeline omitted it entirely — an unconditional
+    # merge here used to let a stale cover.json camera_play block (e.g. a
+    # leftover flat snapshot) silently outrank the correct computed value,
+    # so this audit warned about scales/max_hold that weren't actually used
+    # by the render.
     camera_play = timeline.get("camera_play") or {}
-    if cover and isinstance(cover.get("camera_play"), dict):
-        # Prefer explicit cover scales when timeline omitted them.
-        camera_play = {**camera_play, **(cover.get("camera_play") or {})}
+    if not camera_play and cover and isinstance(cover.get("camera_play"), dict):
+        camera_play = cover.get("camera_play") or {}
 
     scales = camera_play.get("scales") or {}
     try:
@@ -132,7 +139,7 @@ def audit_timeline_quality(
                 f"{len(dropped)} cover overlay(s) missing from timeline after remap "
                 f"(e.g. {sample}) — outside EDL keeps or zero intersection"
             )
-        # Opening chip / early MG should usually appear in the first few seconds
+        # Early MG (opening chapter/etc.) should usually appear in the first few seconds
         early = [
             o
             for o in overlays
@@ -146,7 +153,7 @@ def audit_timeline_quality(
         if cover_early and not early and float(timeline.get("durationSec") or 0) >= 5:
             warnings.append(
                 "cover has early overlays but none land in first 5s of timeline — "
-                "check remap / chip-open framing"
+                "check remap / opening overlay framing"
             )
 
     full_cam = [

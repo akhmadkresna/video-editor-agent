@@ -724,7 +724,6 @@ _MG_REVIEW_KINDS = (
     "chapter",
     "emphasis",
     "diagram",
-    "chip",
     "list_cycle",
 )
 
@@ -737,7 +736,6 @@ _MG_REVIEW_SETTLE_SEC = {
     "quote": 0.85,
     "chapter": 0.70,
     "diagram": 1.20,
-    "chip": 0.70,
     "callout": 0.90,
     "illustration": 0.50,
     "divider": 0.70,
@@ -951,7 +949,6 @@ def _mg_motion_hint(kind: str) -> str:
         "stat": "count-up 300ms + punch",
         "chapter": "slide Y + kicker pop + line draw",
         "diagram": "rail grow + step pop",
-        "chip": "slide X + accent dot",
         "callout": "slide + value count",
         "illustration": "fade + contrast scale pair",
         "divider": "punch + rule",

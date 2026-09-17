@@ -62,19 +62,18 @@ def test_punch_and_roadmap_boost_emphasis_score():
 
 def test_dwell_holds_from_style_are_readable():
     holds = get_dwell_holds("tutorial")
-    assert holds["chip"] >= 3.5
     assert holds["chapter"] >= 4.5
     assert holds["diagram"] >= 6.0
     assert holds["emphasis"] >= 2.0
     assert holds["min"] >= 1.5
-    s, e = ensure_overlay_dwell(10.0, 10.8, kind="chip")
-    assert e - s >= holds["chip"] - 0.01
-    s2, e2 = ensure_overlay_dwell(20.0, 20.5, kind="emphasis")
+    s, e = ensure_overlay_dwell(10.0, 10.8, kind="chapter", holds=holds)
+    assert e - s >= holds["chapter"] - 0.01
+    s2, e2 = ensure_overlay_dwell(20.0, 20.5, kind="emphasis", holds=holds)
     assert e2 - s2 >= holds["emphasis"] - 0.01
 
 
 def test_dwell_moves_to_keep_that_fits():
-    """Short overlapping keep → place chip in nearby keep that fits min_hold."""
+    """Short overlapping keep → place overlay in nearby keep that fits min_hold."""
     ranges = [
         {"source": "cam", "start": 10.0, "end": 11.0},
         {"source": "cam", "start": 12.0, "end": 20.0},
@@ -82,9 +81,9 @@ def test_dwell_moves_to_keep_that_fits():
     s, e = ensure_overlay_dwell(
         10.2,
         10.5,
-        kind="chip",
+        kind="chapter",
         edl_ranges=ranges,
-        holds={"chip": 4.0, "min": 1.8},
+        holds={"chapter": 4.0, "min": 1.8},
     )
     assert s >= 12.0 - 1e-6
     assert e - s >= 4.0 - 0.01
@@ -255,7 +254,7 @@ def test_suggest_emits_framing_for_cam_chapter(tmp_path: Path):
 
     out = suggest_overlays(episode)
     assert out["overlays"]
-    face_heavy = [o for o in out["overlays"] if o["kind"] in {"chapter", "diagram", "chip"}]
+    face_heavy = [o for o in out["overlays"] if o["kind"] in {"chapter", "diagram"}]
     assert face_heavy
     assert all(o.get("cover_mode") == "full_cam" for o in face_heavy)
     assert out["framing_events"]
@@ -377,7 +376,7 @@ def test_structure_before_emphasis_and_curated_copy(tmp_path: Path):
 
     out = suggest_overlays(episode)
     kinds = [o["kind"] for o in out["overlays"]]
-    assert kinds.count("chapter") + kinds.count("chip") + kinds.count("diagram") >= 2
+    assert kinds.count("chapter") + kinds.count("diagram") >= 2
     emph = [o for o in out["overlays"] if o["kind"] == "emphasis"]
     texts = {o["text"] for o in emph}
     # curated payoffs preferred over raw model/penting
@@ -467,5 +466,5 @@ def test_pick_sting_kind_rotates_glass_and_legacy():
     assert z0 in {"lower_raised", "left_third", "right_third"}
     z1 = pick_overlay_zone("emphasis", used_zones=[z0], index=1)
     assert z1 != z0 or z1 in {"lower_raised", "left_third", "right_third"}
-    chip = pick_overlay_zone("chip", used_zones=[], index=0)
-    assert chip in {"top_sparse", "left_third", "right_third"}
+    chapter_zone = pick_overlay_zone("chapter", used_zones=[], index=0)
+    assert chapter_zone in {"top_sparse", "left_third", "right_third"}

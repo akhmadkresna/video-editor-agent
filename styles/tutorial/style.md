@@ -12,8 +12,8 @@ Motion recipes: punch, stagger-rise, slide-in, count — snappy support, not
 poster collage. Do not invent episode-local forks; promote changes here.
 
 Kinds: `title` · `stat` · `lower_third` · `tag` · `divider` · `quote` · `code` ·
-`illustration` · `chapter` · `emphasis` · `diagram` · `callout` · `chip` — all
-13 share this one treatment, dispatched from a single `_overlay_body_html`
+`illustration` · `chapter` · `emphasis` · `diagram` · `callout` — all
+12 share this one treatment, dispatched from a single `_overlay_body_html`
 table in
 [`hf_template.py`](../../src/agentic_editor/compose/hf_template.py).
 Tokens in that file's `_CSS`. `code` stays a real
@@ -45,11 +45,11 @@ the white text-selection highlight only.
 **Motion (middle-ground recipes):** title/divider/emphasis **punch** in (scale
 0.94→1, fade) over ~220ms, then hard/near-hard cut on exit. Titles/quotes may
 **stagger-rise** words (60–90ms). Stat numbers **count** up ~300ms with punch
-ease; label fades in after. Chips/lower third **slide in** ~12px + fade over
+ease; label fades in after. Tags/lower third **slide in** ~12px + fade over
 ~180ms. Hold until the beat is read (~1.5–2.5s single sting, ~3s denser) —
 don't hold static MG once nothing is moving.
 
-The `chapter` / `emphasis` / `diagram` / `chip` / `callout` kinds (config
+The `chapter` / `emphasis` / `diagram` / `callout` kinds (config
 below) render through `OverlayLayer`'s own `OneOverlay`, not
 `GlassOverlays.tsx` — a different component per kind's structure, but the
 same white-ink/no-panel/scrim treatment as the 8 kinds above. Either group
@@ -78,7 +78,6 @@ overlays:
   treatment: bold
   ink: "#ffffff"
   dwell:
-    chip_sec: 4.0
     chapter_sec: 5.5
     diagram_sec: 10.0
     emphasis_sec: 2.4
@@ -107,10 +106,6 @@ overlays:
     topCqh: 10
     maxWidthCqw: 40
     stepSizeCqh: 3.6
-  chip:
-    leftCqw: 4.5
-    topCqh: 10
-    sizeCqh: 3.4
   safe:
     faceClear: true            # face oval clear; surround margins OK
     zones: [left_third, right_third, lower_raised, top_sparse]
@@ -155,7 +150,6 @@ sfx:
     chapter: shutter
     diagram: shutter
     emphasis: click
-    chip: click
 # Fake multicam defaults (ae cover / example_cover). Close must read as cam B.
 camera_play:
   snap_on_cuts: true
@@ -263,7 +257,7 @@ Agents must load these defaults when `project.yaml` has `style: tutorial` (frame
 
 | Layer | Locked look |
 |-------|-------------|
-| A-roll MG — all 13 kinds (title / stat / lower_third / tag / divider / quote / code / illustration / chapter / emphasis / diagram / callout / chip) | `open_overlay` middle-ground — white ink, no panel, surround zones (face oval clear), moderate size hierarchy, density 1+1, zone-aware veil. `code` alone stays a real terminal window. |
+| A-roll MG — all 12 kinds (title / stat / lower_third / tag / divider / quote / code / illustration / chapter / emphasis / diagram / callout) | `open_overlay` middle-ground — white ink, no panel, surround zones (face oval clear), moderate size hierarchy, density 1+1, zone-aware veil. `code` alone stays a real terminal window. |
 | Screen + PIP stage | Cool-mist canvas `#d9e2ec` + cozy float (soft round, no smart crop) |
 
 Run `ae cover-suggest .` after the EDL is confirmed when a `screen` source exists.
@@ -274,4 +268,4 @@ promote changes into this style pack.
 
 **Draft review:** use `ae draft . --seconds 120 --render` (fromSec-safe slice + quality gates).
 Do **not** hand-trim `edit/timeline.json` by `start`/`end` — overlays use `fromSec`/`durationSec`
-and will silently disappear (no opening chip).
+and will silently disappear (no opening overlay).

@@ -29,11 +29,11 @@
   is expressed via border style (dashed = estimate, solid = sourced), not color. Superseded
   "Design Canvas" v6 (opaque off-white paper cards with a dog-ear fold and an indigo `#4d4de8`
   selection accent) — same layout/type/motion per kind, just un-paneled and recolored to white.
-  All 13 kinds (plus `list_cycle`) share this one look, dispatched from a single
+  All 12 kinds (plus `list_cycle`) share this one look, dispatched from a single
   `_overlay_body_html` table in
   [`hf_template.py`](../../src/agentic_editor/compose/hf_template.py):
   `title`/`stat`/`lower_third`/`tag`/`divider`/`quote`/`code`/`illustration`/
-  `chapter`/`emphasis`/`diagram`/`callout`/`chip`/`list_cycle` — one dispatch table
+  `chapter`/`emphasis`/`diagram`/`callout`/`list_cycle` — one dispatch table
   instead of Remotion's two-component split (`GlassOverlays.tsx` vs. `OneOverlay`),
   since HyperFrames has no equivalent component-tree indirection to preserve; same
   palette either way. Single shared implementation, applies to every episode/series
@@ -42,6 +42,8 @@
   highlighting an inline word/phrase, not the whole sentence. `code` alone stays a
   real monospace terminal-style block (a screen convention, never part of the panel
   family, so untouched by the panel removal). No full/karaoke captions either way.
+  The `chip` kind was removed end-to-end (see "Remove the chip overlay kind");
+  `tag` keeps the shared badge renderer.
 - Screen stage (`screen_explainer`): preset **cozy** (screen width 78%), canvas **cool mist** `#d9e2ec`
 - PIP: no border, stage lower-right (not nested in the screen window)
 - Crop: `none` — supply clean full-frame screen footage; float uses soft round (`borderRadiusPx: 24`) + `objectFit: cover`
@@ -60,16 +62,16 @@
 | Remap | `ae cover` / compose → `timeline.overlays[]` (output `fromSec`) |
 | Render | `hf_template.py`'s `_emit_overlay`/`_overlay_body_html` → generated `.overlay-card` markup (A-Roll Text Motion System); preview via `ae compose . --studio` |
 
-All 13 kinds (`title` · `stat` · `lower_third` · `tag` · `divider` · `quote` ·
-`code` · `illustration` · `chapter` · `emphasis` · `diagram` · `callout` · `chip`,
+All 12 kinds (`title` · `stat` · `lower_third` · `tag` · `divider` · `quote` ·
+`code` · `illustration` · `chapter` · `emphasis` · `diagram` · `callout`,
 plus `list_cycle`) share the same white-ink/no-panel treatment — the dispatch is
 just which markup shape a kind needs, not a style choice. See skill hard rule 11.
 
 **Default gate (camera / zoom play):** suggest reads `cover.json` screen windows + `camera_play`. Chapter/diagram prefer `screen_with_cam` (already wide/hold). On full-cam they emit companion `framing` medium/wide so MG does not fight close multicam crops (`faceClear`, left_third). Emphasis may use close.
 
-**Density / relevance:** structure (chip/chapter/diagram + long-screen section quotas) is reserved first; emphasis is best-fit from an ID payoff lexicon, scored by screen-enter proximity. Min gaps (~90s chapters, ~25s emphasis). Caps ~1 sting / 70s keep.
+**Density / relevance:** structure (chapter/diagram + long-screen section quotas) is reserved first; emphasis is best-fit from an ID payoff lexicon, scored by screen-enter proximity. Min gaps (~90s chapters, ~25s emphasis). Caps ~1 sting / 70s keep.
 
-**Dwell (readable MG):** style `overlays.dwell` — chip ~4s, chapter ~5s, diagram ~7.5s, emphasis ≥2.4s (min 1.8s). Remap floors `durationSec` by kind; the generated overlay markup fades in/out (no hard pop-off) — see `_emit_overlay`'s `fade`/`exit_at` GSAP tweens.
+**Dwell (readable MG):** style `overlays.dwell` — chapter ~5s, diagram ~7.5s, emphasis ≥2.4s (min 1.8s). Remap floors `durationSec` by kind; the generated overlay markup fades in/out (no hard pop-off) — see `_emit_overlay`'s `fade`/`exit_at` GSAP tweens.
 
 **Audio rule (hard):** every non-`cam` clip is muted (`<video muted>` in the generated composition, `_emit_clip`'s `muted_source` check). Screen never contributes audio.
 

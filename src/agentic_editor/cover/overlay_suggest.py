@@ -1,11 +1,11 @@
-"""Suggest dense A-roll MG overlays (chapter / emphasis / diagram / chip).
+"""Suggest dense A-roll MG overlays (chapter / emphasis / diagram).
 
 Default logic couples overlays to cover mode + camera_play framing so MG
 does not fight close talking-head zooms. Safe: face oval clear; surround
 zones rotate (left_third / right_third / lower_raised / top_sparse).
 
 Density / relevance (framework defaults):
-  1. Reserve structure budget (chip/chapter/diagram) before emphasis fill
+  1. Reserve structure budget (chapter/diagram) before emphasis fill
   2. Section quotas on long screen windows + min gaps
   3. ID payoff lexicon + short-phrase cleaner (not raw EDL notes / filler ASR)
   4. Score emphasis by screen-enter + punch_in proximity + payoff hits
@@ -56,7 +56,6 @@ PUNCH_EVENT_TYPES = frozenset({"punch_in", "punch"})
 EMPHASIS_PAD = 0.12
 EMPHASIS_MIN_HOLD = 2.4
 CHAPTER_HOLD = 5.0
-CHIP_HOLD = 4.0
 DIAGRAM_HOLD = 7.5
 
 # Spacing / density — ~15 min keep should land ≥30 overlays
@@ -73,7 +72,7 @@ GAP_FILL_KEEP_SEC = 28.0  # quiet keep-timeline stretches get a sting
 # and mint speech-content emphasis so density still hits target_total.
 SPEECH_EMPHASIS_STRIDE_SEC = 24.0
 
-STRUCTURE_KINDS = frozenset({"chip", "chapter", "diagram"})
+STRUCTURE_KINDS = frozenset({"chapter", "diagram"})
 STING_KINDS = frozenset(
     {
         "emphasis",
@@ -105,7 +104,6 @@ FLOW_STEP_RE = re.compile(
 OVERLAY_MIN_SEC = 1.8
 
 FACE_HEAVY_KINDS = frozenset({"chapter", "diagram"})
-CHIP_PREFERS_MEDIUM = True
 
 # Surround zones around the speaker (face oval stays clear). Rotated so MG
 # is not stuck on the left rail only.
@@ -114,7 +112,6 @@ KIND_ZONE_PREFERS: dict[str, tuple[str, ...]] = {
     "emphasis": ("lower_raised", "left_third", "right_third"),
     "callout": ("lower_raised", "left_third", "right_third"),
     "chapter": ("top_sparse", "left_third", "right_third"),
-    "chip": ("top_sparse", "left_third", "right_third"),
     "diagram": ("left_third", "right_third"),
 }
 
@@ -222,7 +219,7 @@ PAYOFF_PHRASES: list[tuple[str, str]] = [
     ("config", "Config"),
 ]
 
-# Map messy EDL notes → short chapter/chip labels (series-specific; never match bare "hook")
+# Map messy EDL notes → short chapter labels (series-specific; never match bare "hook")
 NOTE_LABEL_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\broadmap\b", re.I), "Roadmap"),
     (
@@ -381,15 +378,13 @@ def caps_for_duration(keep_sec: float) -> dict[str, int]:
         target = max(target, 30)
     chapter = min(14, max(4, int(round(6 * factor))))
     diagram = min(5, max(1, int(round(2 * factor))))
-    chip = min(4, 1 + (1 if keep_sec >= 900 else 0) + (1 if keep_sec >= 1500 else 0))
-    structure = chapter + diagram + chip
+    structure = chapter + diagram
     # Leave room for speech/gap fill to hit target_total
     emphasis = max(12, min(40, target - structure + 8))
     return {
         "chapter": chapter,
         "emphasis": emphasis,
         "diagram": diagram,
-        "chip": chip,
         "structure_reserve": structure,
         "target_total": max(target, structure + emphasis),
     }
@@ -515,7 +510,7 @@ def companion_framing_event(
     on_screen: bool,
     ov_id: str,
 ) -> dict[str, Any] | None:
-    """Full-cam chapter/diagram/chip get medium/wide framing companions."""
+    """Full-cam chapter/diagram get medium/wide framing companions."""
     if on_screen:
         return None
     if kind in FACE_HEAVY_KINDS:
@@ -527,15 +522,6 @@ def companion_framing_event(
             "end": round(end, 3),
             "framing": framing,
             "motion": motion,
-            "note": f"overlay:{ov_id}",
-        }
-    if kind == "chip" and CHIP_PREFERS_MEDIUM:
-        return {
-            "type": "framing",
-            "start": round(start, 3),
-            "end": round(end, 3),
-            "framing": "medium",
-            "motion": "hold",
             "note": f"overlay:{ov_id}",
         }
     return None
@@ -613,7 +599,6 @@ def get_dwell_holds(style_name: str = "tutorial") -> dict[str, float]:
     dwell = ov.get("dwell") if isinstance(ov.get("dwell"), dict) else {}
     return {
         "emphasis": float(dwell.get("emphasis_sec", EMPHASIS_MIN_HOLD)),
-        "chip": float(dwell.get("chip_sec", CHIP_HOLD)),
         "chapter": float(dwell.get("chapter_sec", CHAPTER_HOLD)),
         "diagram": float(dwell.get("diagram_sec", DIAGRAM_HOLD)),
         "min": float(dwell.get("min_sec", OVERLAY_MIN_SEC)),
@@ -631,7 +616,6 @@ def ensure_overlay_dwell(
     """Force readable on-screen time; place window inside a keep that fits."""
     h = holds or {
         "emphasis": EMPHASIS_MIN_HOLD,
-        "chip": CHIP_HOLD,
         "chapter": CHAPTER_HOLD,
         "diagram": DIAGRAM_HOLD,
         "min": OVERLAY_MIN_SEC,
@@ -1208,13 +1192,12 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
     """
     Draft overlay creatives in *source (cam) time*, gated by cover + framing.
 
-    Structure first (chip/chapter/diagram + section quotas), then best-fit emphasis.
+    Structure first (chapter/diagram + section quotas), then best-fit emphasis.
     """
     episode = episode.resolve()
     cfg = load_project(episode)
     style_name = str(cfg.get("style") or "tutorial")
     holds = get_dwell_holds(style_name)
-    chip_hold = holds["chip"]
     chapter_hold = holds["chapter"]
     diagram_hold = holds["diagram"]
     emphasis_hold = holds["emphasis"]
@@ -1285,7 +1268,6 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         "dwell": holds,
         "rules": {
             "chapter_diagram": "prefer screen_with_cam; else emit framing medium/wide",
-            "chip": "prefer medium framing on full cam",
             "emphasis": "close OK; scored by payoff + screen-enter + punch_in",
             "punch_mg": "punch_in without nearby MG gets an emphasis sting",
             "structure_first": True,
@@ -1334,8 +1316,6 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
                 return False
             if kind == "diagram" and kind_count("diagram") >= caps["diagram"]:
                 return False
-            if kind == "chip" and kind_count("chip") >= caps["chip"]:
-                return False
             if kind == "chapter" and not min_gap_ok(
                 s, chapter_spans, min_gap=CHAPTER_MIN_GAP
             ):
@@ -1344,7 +1324,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             # Emphasis only after structure; respect remaining total + emphasis cap
             # force_punch: punch-in energy without MG always wins a sting slot
             struct_n = sum(
-                1 for o in overlays if o["kind"] in {"chip", "chapter", "diagram"}
+                1 for o in overlays if o["kind"] in {"chapter", "diagram"}
             )
             emph_n = sting_count()
             if not force_punch:
@@ -1393,35 +1373,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         return True
 
     # ---------- STRUCTURE PHASE ----------
-    # 1) Opening chip
-    if ranges and caps["chip"] > 0:
-        r0 = ranges[0]
-        rs, r_end = float(r0["start"]), float(r0["end"])
-        end = min(r_end, rs + chip_hold)
-        if words:
-            rs, end = snap_window_to_words(rs, end, words)
-        title = short_label(
-            str(cfg.get("id") or episode.name).replace("-", " ").replace("_", " "),
-            fallback="Episode",
-        )
-        # Prefer brand-ish chip from id tokens
-        if "studio" in title.lower() or "odoo" in title.lower():
-            chip_text = "Odoo Studio"
-        else:
-            chip_text = title
-        try_add(
-            {
-                "id": "chip-open",
-                "kind": "chip",
-                "start": rs,
-                "end": max(rs + 0.8, end),
-                "text": chip_text,
-                "note": "opening chip",
-            },
-            structural=True,
-        )
-
-    # 2) Chapters from speech cues / screen enters (primary — not EDL notes)
+    # 1) Chapters from speech cues / screen enters (primary — not EDL notes)
     chapter_i = 0
     for sec in find_section_candidates(
         words, ranges, screen_wins, min_gap=CHAPTER_MIN_GAP
@@ -1479,7 +1431,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             structural=True,
         )
 
-    # 3) Section quota — long screen windows get entry chapter/chip
+    # 3) Section quota — long screen windows get entry chapter
     for wi, (w0, w1) in enumerate(screen_wins):
         if (w1 - w0) < SECTION_QUOTA_SOURCE_SEC:
             continue
@@ -1498,7 +1450,6 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         rs, end = w0, head_end
         if words:
             rs, end = snap_window_to_words(rs, end, words)
-        # Prefer chapter if budget; else chip
         if kind_count("chapter") < caps["chapter"] and min_gap_ok(
             rs, chapter_spans, min_gap=CHAPTER_MIN_GAP
         ):
@@ -1512,18 +1463,6 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
                     "kicker": f"Bab {chapter_i:02d}",
                     "text": label,
                     "note": f"section quota screen@{w0:.0f}",
-                },
-                structural=True,
-            )
-        elif kind_count("chip") < caps["chip"]:
-            try_add(
-                {
-                    "id": f"chip-sec-{wi+1:02d}",
-                    "kind": "chip",
-                    "start": rs,
-                    "end": max(rs + 0.8, min(end, rs + chip_hold)),
-                    "text": label,
-                    "note": f"section quota chip screen@{w0:.0f}",
                 },
                 structural=True,
             )
@@ -1637,7 +1576,7 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
             diagram_i -= 1
 
     structure_n = sum(
-        1 for o in overlays if o["kind"] in {"chip", "chapter", "diagram"}
+        1 for o in overlays if o["kind"] in {"chapter", "diagram"}
     )
 
     # ---------- EMPHASIS PHASE (best-fit + punch coupling) ----------
@@ -1860,7 +1799,6 @@ def suggest_overlays(episode: Path) -> dict[str, Any]:
         "callout": sum(1 for o in overlays if o["kind"] == "callout"),
         "divider": sum(1 for o in overlays if o["kind"] == "divider"),
         "diagram": sum(1 for o in overlays if o["kind"] == "diagram"),
-        "chip": sum(1 for o in overlays if o["kind"] == "chip"),
         "total": len(overlays),
         "framing_companions": len(framing_events),
         "on_screen": sum(1 for o in overlays if o.get("cover_mode") == "screen_with_cam"),

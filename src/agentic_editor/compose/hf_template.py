@@ -282,7 +282,7 @@ def _choose_treatment(kind: str, raw_text: str, steps: list[str], code_history: 
         return "camera-follow" if _word_count(raw_text) >= 6 else "word-cascade"
     if kind == "chapter":
         return "background-emphasis"
-    if kind in ("chip", "tag"):
+    if kind == "tag":
         return "badge-pop"
     return ""
 
@@ -386,8 +386,6 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
         return (f'<div class="ov-body">{title}</div><div class="ov-diagram">{items}</div>', "ov-diagram")
     if kind == "callout":
         return (f'<div class="ov-callout-value">{value}</div><div class="ov-meta">{source_label}</div>', "ov-callout")
-    if kind == "chip":
-        return (f'<span class="ov-badge ov-badge-float"><span class="ov-badge-dot"></span>{text}</span>', "")
     if kind == "list_cycle":
         items = "".join(f'<li class="ov-list-item" data-step="{i}">{_esc(s)}</li>' for i, s in enumerate(steps))
         return (f'<div class="ov-body">{text}</div><ul class="ov-list-cycle">{items}</ul>', "ov-list")
@@ -1047,11 +1045,10 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
 .ov-chips { display: flex; gap: .4em; margin-top: .5em; flex-wrap: wrap; }
 .ov-chip { display: inline-block; border: 2px solid rgba(255,255,255,.28); border-radius: 999px; padding: .2em .9em; font-size: 2.2cqh; }
 
-/* Catalog-modeled "chip"/"tag" badge (caption-camera-follow's accent
-   language: a filled glass pill with a soft dot, not a bare outline). */
+/* Catalog-modeled "tag" badge (caption-camera-follow's accent language: a
+   filled glass pill with a soft dot, not a bare outline). */
 .ov-badge { display: inline-flex; align-items: center; gap: .5em; background: rgba(20,20,26,.55); backdrop-filter: blur(6px); border-radius: 999px; padding: .32em .95em .32em .7em; font-size: 2.2cqh; font-weight: 700; letter-spacing: .01em; box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.12); }
 .ov-badge-dot { width: .55em; height: .55em; border-radius: 50%; background: #ffd84d; box-shadow: 0 0 10px rgba(255,216,77,.8); flex: none; }
-.ov-badge-float { position: absolute; top: 8%; left: 4.5%; }
 
 .ov-quote-mark { font-family: "Playfair Display", serif; font-size: 8cqh; opacity: .5; line-height: .5; }
 .ov-quote { font-family: "Playfair Display", serif; font-style: italic; font-weight: 800; }

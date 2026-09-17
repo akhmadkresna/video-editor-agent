@@ -9,7 +9,7 @@ Dry UI / camera one-shots under cam VO. **No whoosh, riser, or swoosh.**
 | Kind | File(s) | Used when |
 |------|---------|-----------|
 | `shutter` | `shutter.wav` | punch / framing snap / cut snap / MG chapter+diagram |
-| `click` | `click_01`…`04.wav` | Screen-enter, click deixis / MG emphasis+chip |
+| `click` | `click_01`…`04.wav` | Screen-enter, click deixis / MG emphasis |
 | `paper` | `soft_tick.wav` | MG title/stat/quote/divider/illustration/code appear — crisp, not the old `paper_page.wav` rustle (too heavy/mechanical when it fires 10-15x/episode) |
 | `tick` | `soft_tick.wav` | MG tag appear |
 | `typing` | `typing-thock.wav` | **Opt-in only** (`sfx.typing.enabled: true`) |

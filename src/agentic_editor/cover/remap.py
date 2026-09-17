@@ -64,7 +64,15 @@ def remap_source_window(
 #: Original left-rail kinds (pre-migration OverlayLayer's OneOverlay) — same
 #: white-ink, no-panel look as the kinds below, see
 #: the pre-migration Remotion OverlayLayer.tsx (see MIGRATION_NOTES.md).
-_LEGACY_OVERLAY_KINDS = ("chapter", "emphasis", "diagram", "chip", "callout")
+#: "chip" was removed end-to-end (see "Remove the chip overlay kind").
+_LEGACY_OVERLAY_KINDS = (
+    "chapter",
+    "emphasis",
+    "diagram",
+    "callout",
+    "name_drop",
+    "scene_diagram",
+)
 #: Kinds dispatched through the A-Roll Text Motion System
 #: (hf_template.py's _overlay_body_html) — white ink,
 #: no panel, same palette as the kinds above, just a different primitive per
@@ -144,6 +152,14 @@ def collect_overlay_defs(cover: dict[str, Any] | None) -> list[dict[str, Any]]:
             "top_sparse",
         ):
             entry["zone"] = zone
+        motion = str(item.get("motion") or "").strip().lower()
+        if motion in ("pop", "drop"):
+            entry["motion"] = motion
+        name_drop_exit = str(
+            item.get("nameDropExit") or item.get("name_drop_exit") or ""
+        ).strip().lower()
+        if name_drop_exit in ("fall", "sand"):
+            entry["nameDropExit"] = name_drop_exit
         # CalloutArrow target: [x, y] as 0-1 of frame. A `callout` carrying one
         # draws an arrow at that point; without it the beat falls back to a
         # PunchWord rather than rendering nothing.
@@ -763,6 +779,10 @@ def build_timeline_overlays(
             inst["accent"] = ov["accent"]
         if ov.get("zone"):
             inst["zone"] = ov["zone"]
+        if ov.get("motion"):
+            inst["motion"] = ov["motion"]
+        if ov.get("nameDropExit"):
+            inst["nameDropExit"] = ov["nameDropExit"]
         # CalloutArrow's target, [x, y] as 0-1 of frame. Without this the field
         # is dropped here and the arrow renderer is unreachable — the handoff's
         # "no remap.py change needed" is wrong on this one point.
@@ -773,7 +793,7 @@ def build_timeline_overlays(
             and all(isinstance(v, (int, float)) and 0.0 <= float(v) <= 1.0 for v in at)
         ):
             inst["at"] = [float(at[0]), float(at[1])]
-        if kind in ("diagram", "list_cycle") and ov.get("steps"):
+        if kind in ("diagram", "list_cycle", "scene_diagram") and ov.get("steps"):
             _attach_diagram_step_motion(
                 inst, ov, edl=edl, words=words, dwell=dwell
             )
@@ -782,9 +802,12 @@ def build_timeline_overlays(
                 float(inst["durationSec"]),
                 max(0.05, timeline_dur - float(inst["fromSec"])),
             )
-            # A list_cycle must not balloon far past its authored window.
-            if kind == "list_cycle":
-                cap = float(sl["durationSec"]) + _LIST_CYCLE_MAX_EXTEND_SEC
+            # A list_cycle / scene_diagram must not balloon past its window.
+            if kind in ("list_cycle", "scene_diagram"):
+                extend = (
+                    _LIST_CYCLE_MAX_EXTEND_SEC if kind == "list_cycle" else 1.5
+                )
+                cap = float(sl["durationSec"]) + extend
                 if float(inst["durationSec"]) > cap:
                     inst["durationSec"] = cap
                     steps_at = inst.get("stepAtSec") or []

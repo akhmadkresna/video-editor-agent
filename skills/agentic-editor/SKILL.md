@@ -93,7 +93,7 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     Never invent timings mid-word. **Default:** overlay plan is gated by cover mode +
     camera_play — chapter/diagram prefer `screen_with_cam` (wide/hold); on full-cam they
     emit medium/wide framing companions so MG does not fight close zooms (`faceClear` /
-    left_third). Emphasis may sit on close. Structure (chip/chapter/diagram + section
+    left_third). Emphasis may sit on close. Structure (chapter/diagram + section
     quotas) is reserved first; emphasis is best-fit from an ID payoff lexicon scored by
     screen-enter + punch proximity (punchy cam without nearby MG gets seeded emphasis).
     Gaps ~50s chapter / ~10s emphasis; density ~1 sting / 32s keep; same-label min gap ~45s
@@ -137,7 +137,7 @@ Framework code is invoked via `ae` / `$AGENTIC_EDITOR_HOME`. Use a multi-root
     `social.force_screen_with_cam`); do not hand-author full-cam social ranges.
     Cam audio still comes from the PIP clip, and framing/punch events are inert
     on the stage — leave `events: []` unless an episode has no screen source.
-    Top-anchored MG (chapter/chip/diagram) sits in the left band below the
+    Top-anchored MG (chapter/diagram) sits in the left band below the
     screen; keep it clear of the right-side PIP. Click/shutter only; no whoosh.
 
 ## Process
@@ -210,7 +210,7 @@ directly (it's scene data, not cut ranges), re-run `ae cover .`.
 6a. **Evidence** (if `style: evidence` and stills already in `raw/evidence/`):
    - Prefer the brief→gather path above; manual drops still OK
    - Run `ae evidence-suggest .` → review → confirm → `--apply`
-6b. **Overlays (A-roll MG)** — chapter / emphasis / diagram / chip / callout:
+6b. **Overlays (A-roll MG)** — chapter / emphasis / diagram / callout:
    - Run `ae overlay-suggest .` → `edit/overlays.suggest.json` (includes `framing_events`)
     - Propose dense Bold-mist plan synced to cover + zoom/punch → **wait for confirm**
    - Write `cover.json` `overlays[]` + merge companion `framing` into `events[]`
@@ -277,8 +277,7 @@ Paths in EDL are relative to `edit/`.
       "kicker": "Flow",
       "title": "Toko Material",
       "steps": ["res.partner fields", "Seed kategori", "Gambar produk", "Kartu stok"]
-    },
-    { "kind": "chip", "start": 0.0, "end": 2.8, "text": "Odoo Studio" }
+    }
   ]
 }
 ```
@@ -295,7 +294,6 @@ structure collisions on the left rail are trimmed.
 | Kind | Prefer cover | Framing on full-cam |
 |------|----------------|---------------------|
 | `chapter` / `diagram` | `screen_with_cam` (wide/hold already) | companion `framing` **medium** / **wide** |
-| `chip` | either | companion **medium** |
 | `emphasis` | either | close OK — no companion |
 
 Safe zones stay `left_third` + `faceClear`. Suggest also scales density with keep length (~1 sting / 90s) and writes companion events as `framing_events` (merged into `cover.events` on `--apply`).
@@ -329,7 +327,6 @@ the A-roll. Put the extra motion on existing overlays instead:
 | `chapter` | kicker pop + accent line draws under the title |
 | `emphasis` | last-word pop; numbers count up; underline draws; strike only on `tidak` / `no` / `off` / `deny` |
 | `diagram` | rail + token in the gutter **right of the index** (never through glyphs); each step pops + short connector |
-| `chip` | accent dot scale-pop |
 | `callout` | value counts (Rp / dotted thousands) + underline |
 
 Same locked look: white ink, no panel, no accent color — see rule 10. No whoosh.
