@@ -1,8 +1,8 @@
-"""Deliverable mezzanines for Remotion — keep raw masters intact, shrink Studio I/O.
+"""Deliverable mezzanines for HyperFrames — keep raw masters intact, shrink preview I/O.
 
 Native cam (e.g. 2560×1440@60) is often multi‑GB. YouTube delivery here is typically
 1920×1080@30. A CRF‑16 H.264 mezzanine at project size is visually lossless for that
-target and much smaller — Remotion should stage those, never rewrite ``raw/``.
+target and much smaller — HyperFrames should stage those, never rewrite ``raw/``.
 """
 
 from __future__ import annotations
@@ -273,7 +273,7 @@ def resolve_compose_sources(
             mb = probe["size"] / (1024 * 1024)
             if verbose:
                 print(
-                    f"! {name} is heavy for Remotion "
+                    f"! {name} is heavy for HyperFrames "
                     f"({probe['width']}x{probe['height']}@{probe['fps']:.0f}, "
                     f"{mb:.0f} MB). Deliverable is {width}x{height}@{fps}. "
                     f"Run: ae mezzanine .   # CRF{DEFAULT_CRF}, no raw rewrite"

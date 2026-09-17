@@ -75,7 +75,7 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     node = shutil.which("node")
     pnpm = shutil.which("pnpm")
     print(f"node:    {'OK  ' + node if node else 'MISSING'}")
-    print(f"pnpm:    {'OK  ' + pnpm if pnpm else 'MISSING (needed for Remotion)'}")
+    print(f"pnpm:    {'OK  ' + pnpm if pnpm else 'MISSING (needed for the HyperFrames workspace package)'}")
 
     auto = resolve_backend("auto")
     print(f"\nASR auto backend on this machine: {auto}")
@@ -97,10 +97,10 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     else:
         print(f"models/: (create {models} and download ggml-large-v3.bin for whisper.cpp)")
 
-    kit = home / "packages" / "remotion-kit" / "package.json"
-    print(f"remotion-kit: {'OK' if kit.is_file() else 'MISSING'}")
-    public = home / "packages" / "remotion-kit" / "public"
-    print(f"remotion public/: {'OK  ' + str(public) if public.is_dir() else 'will create on compose'}")
+    kit = home / "packages" / "hyperframes-kit" / "package.json"
+    print(f"hyperframes-kit: {'OK' if kit.is_file() else 'MISSING'}")
+    npx = shutil.which("npx")
+    print(f"npx:     {'OK  ' + npx if npx else 'MISSING (needed to run the hyperframes CLI)'}")
 
     from agentic_editor.cover.sfx_validate import (
         format_sfx_pack_errors,
@@ -118,14 +118,14 @@ def cmd_doctor(_: argparse.Namespace) -> int:
         n_ok = sum(1 for r in sfx_reports if r.ok)
         print(f"sfx pack ({sfx_dir}): OK  {n_ok} wav(s), peak≥−12 dBFS, lead silence≤50ms")
 
-    print("\nCompose rules (avoid black Studio / silent bad drafts):")
-    print("  Always:  ae compose <episode> --studio   # copy→public/ae-media + passes --props")
+    print("\nCompose rules (avoid black preview / silent bad drafts):")
+    print("  Always:  ae compose <episode> --studio   # generates edit/hyperframes-project/ + previews")
     print("  Draft:   ae draft <episode> --seconds 120 --render  # fromSec-safe + quality gates")
     print("  Heavy raw: ae mezzanine <episode>        # 1080p30 CRF16 → edit/mezzanine (raw safe)")
     print("  Voice:     ae cut / ae mezzanine         # DeepFilterNet cam VO (opt out: voice_enhance.enabled: false)")
-    print("  Never:   pnpm remotion studio   # alone → empty ~3s black timeline")
-    print("  Never:   hand-trim remotion-props by start/end  # drops overlays (use ae draft)")
-    print("  Media must be public-relative (ae-media/cam.mov), never /Users/... absolute paths")
+    print("  Never:   npx hyperframes preview  (alone, outside a generated project) → empty scaffold")
+    print("  Never:   hand-trim timeline.json by start/end  # drops overlays (use ae draft)")
+    print("  Media must be project-relative (assets/cam.mov), never /Users/... absolute paths")
     print("  Staging always copies (never hardlinks) so draft proxies cannot clobber raw/")
 
     print("\nInstall tips:")
@@ -933,12 +933,12 @@ def cmd_promote_check(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ae",
-        description="Agentic Editor — local ASR, radio-edit, Remotion compose",
+        description="Agentic Editor — local ASR, radio-edit, HyperFrames compose",
     )
     p.add_argument("--version", action="version", version=f"ae {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    d = sub.add_parser("doctor", help="Check ffmpeg, ASR backends, Remotion kit")
+    d = sub.add_parser("doctor", help="Check ffmpeg, ASR backends, HyperFrames kit")
     d.set_defaults(func=cmd_doctor)
 
     n = sub.add_parser("new", help="Scaffold an episode folder")
@@ -1006,7 +1006,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--render-mg",
         action="store_true",
         help=(
-            "Render exact Remotion stills per MG overlay (via prepare_compose + "
+            "Snapshot every MG overlay via HyperFrames (via prepare_compose + "
             "mg-review) and embed them on each clip card"
         ),
     )
@@ -1197,7 +1197,7 @@ def build_parser() -> argparse.ArgumentParser:
     mez.add_argument("--quiet", action="store_true")
     mez.set_defaults(func=cmd_mezzanine)
 
-    com = sub.add_parser("compose", help="Remotion studio / render from timeline")
+    com = sub.add_parser("compose", help="HyperFrames preview / render from timeline")
     com.add_argument("episode", nargs="?", default=".")
     com.add_argument("--studio", action="store_true")
     com.add_argument("--prepare-only", action="store_true")
@@ -1205,24 +1205,19 @@ def build_parser() -> argparse.ArgumentParser:
     com.add_argument(
         "--nvenc",
         action="store_true",
-        help=(
-            "Use NVIDIA NVENC for Remotion *encode* only (not Chrome frame render). "
-            "On Windows stages remotion.exe + Gyan ffmpeg into .ae-cache/"
-        ),
+        help="Pass --gpu to `hyperframes render` for GPU-accelerated FFmpeg encoding",
     )
     com.add_argument(
         "--gl",
         choices=("angle", "egl", "swiftshader", "vulkan", "angle-egl"),
         default=None,
-        help="Chrome GL backend for faster frame render (Windows: try angle)",
+        help="Unused — no HyperFrames CLI equivalent (kept for back-compat)",
     )
     com.add_argument(
         "--concurrency",
         type=int,
         default=None,
-        help=(
-            "Remotion frame workers (default 4)."
-        ),
+        help="Unused — no HyperFrames CLI equivalent (kept for back-compat)",
     )
     com.add_argument(
         "--jpeg-quality",
@@ -1276,7 +1271,7 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument(
         "--render",
         action="store_true",
-        help="Also Remotion-render edit/drafts/draft-open-<N>s.mp4",
+        help="Also render edit/drafts/draft-open-<N>s.mp4 via HyperFrames",
     )
     dr.add_argument(
         "--jpeg-quality",
@@ -1288,10 +1283,7 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument(
         "--nvenc",
         action="store_true",
-        help=(
-            "NVENC encode only (Windows: stages remotion.exe + Gyan ffmpeg). "
-            "Frame render still uses Chrome; prefer --gl angle for speed"
-        ),
+        help="Pass --gpu to `hyperframes render` for GPU-accelerated FFmpeg encoding",
     )
     dr.add_argument(
         "--gl",

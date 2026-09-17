@@ -1,7 +1,7 @@
 """Drawn-screen ("mockup") scenes for `style: mockup` (Claude Skill Lab).
 
-The pipeline half of the feature whose Remotion half lives in
-``packages/remotion-kit/src/components/mockup/``. Three jobs:
+The pipeline half of the feature whose HyperFrames half lives in
+``agentic_editor.compose.hf_template`` (mockup markup). Three jobs:
 
 * ``load_mockup``          — Mist tokens + MockCam config → ``presentation.mockup``
 * ``build_timeline_mockups`` — remap ``cover["mockups"]`` (cam source seconds)
@@ -32,7 +32,7 @@ import yaml
 from agentic_editor.cover.style_load import _deep_merge, _load_style_yaml
 from agentic_editor.paths import framework_home
 
-# ── Mist defaults ── mirror packages/remotion-kit/src/types.ts DEFAULT_MOCK_STYLE.
+# ── Mist defaults ── mirror the pre-migration DEFAULT_MOCK_STYLE (see MIGRATION_NOTES.md).
 DEFAULT_MOCK: dict[str, Any] = {
     "stageBg": "#eceff1",
     "window": "#fdfefe",

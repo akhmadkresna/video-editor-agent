@@ -1,39 +1,36 @@
-"""Compose staging + mezzanine selection — protect raw masters."""
+"""Compose staging + mezzanine selection — protect raw masters.
+
+The Remotion-era NVENC binary-staging tests (`stage_nvenc_remotion_binaries`,
+`remotion_render_accel_args --binaries-directory` logic) were removed along
+with that machinery: HyperFrames' `render --gpu` flag turns on GPU-accelerated
+FFmpeg encoding without any equivalent binaries-directory resolution — see
+MIGRATION_NOTES.md.
+"""
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-import pytest
-
-from agentic_editor.compose import (
-    remotion_render_accel_args,
-    stage_nvenc_remotion_binaries,
-    stage_sources_for_remotion,
-)
+from agentic_editor.compose import stage_sources_for_hyperframes
 from agentic_editor.compose.mezzanine import (
     oversized_for_deliverable,
     resolve_compose_sources,
 )
 
 
-def test_stage_copies_not_hardlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    kit = tmp_path / "kit"
-    (kit / "public").mkdir(parents=True)
-    monkeypatch.setattr(
-        "agentic_editor.compose.remotion_kit_dir", lambda: kit
-    )
+def test_stage_copies_not_hardlinks(tmp_path: Path) -> None:
+    project_dir = tmp_path / "hyperframes-project"
+    project_dir.mkdir(parents=True)
 
     src = tmp_path / "raw" / "cam.mp4"
     src.parent.mkdir(parents=True)
     payload = b"fake-master-bytes-do-not-clobber"
     src.write_bytes(payload)
 
-    staged = stage_sources_for_remotion({"cam": str(src)}, verbose=False)
-    assert staged["cam"] == "ae-media/cam.mp4"
+    staged = stage_sources_for_hyperframes(project_dir, {"cam": str(src)}, verbose=False)
+    assert staged["cam"] == "assets/cam.mp4"
 
-    dest = kit / "public" / "ae-media" / "cam.mp4"
+    dest = project_dir / "assets" / "cam.mp4"
     assert dest.is_file()
     assert dest.read_bytes() == payload
 
@@ -83,117 +80,3 @@ def test_deliverable_size_not_oversized() -> None:
     assert not oversized_for_deliverable(
         probe, width=1920, height=1080, fps=30
     )
-
-
-def test_stage_nvenc_binaries_includes_remotion(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Remotion --binaries-directory needs remotion.exe + NVENC ffmpeg together."""
-    home = tmp_path / "fw"
-    home.mkdir()
-    monkeypatch.setattr("agentic_editor.compose.framework_home", lambda: home)
-
-    compositor = tmp_path / "compositor"
-    compositor.mkdir()
-    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
-    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
-    ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
-    (compositor / remotion_name).write_bytes(b"compositor-bin")
-    (compositor / "helper.dll").write_bytes(b"dll")
-    (compositor / ffmpeg_name).write_bytes(b"bundled-no-nvenc")
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_remotion_compositor_dir",
-        lambda: compositor,
-    )
-    # Compositor lacks NVENC; external ffmpeg has NVENC + libfdk_aac
-    monkeypatch.setattr(
-        "agentic_editor.compose._ffmpeg_has_encoder",
-        lambda bin_dir, enc: (
-            (enc == "h264_nvenc" and bin_dir != compositor)
-            or (enc == "libfdk_aac" and bin_dir != compositor)
-        ),
-    )
-
-    ffmpeg_bin = tmp_path / "custom-bin"
-    ffmpeg_bin.mkdir()
-    (ffmpeg_bin / ffmpeg_name).write_bytes(b"nvenc-ffmpeg")
-    (ffmpeg_bin / ffprobe_name).write_bytes(b"nvenc-ffprobe")
-
-    staged = stage_nvenc_remotion_binaries(ffmpeg_bin, verbose=False)
-    assert staged is not None
-    assert (staged / remotion_name).read_bytes() == b"compositor-bin"
-    assert (staged / "helper.dll").read_bytes() == b"dll"
-    assert (staged / ffmpeg_name).read_bytes() == b"nvenc-ffmpeg"
-    assert (staged / ffprobe_name).read_bytes() == b"nvenc-ffprobe"
-
-
-def test_stage_prefers_compositor_when_it_has_nvenc(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    compositor = tmp_path / "compositor"
-    compositor.mkdir()
-    remotion_name = "remotion.exe" if os.name == "nt" else "remotion"
-    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
-    (compositor / remotion_name).write_bytes(b"r")
-    (compositor / ffmpeg_name).write_bytes(b"ff")
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_remotion_compositor_dir",
-        lambda: compositor,
-    )
-    monkeypatch.setattr(
-        "agentic_editor.compose._ffmpeg_has_encoder",
-        lambda bin_dir, enc: enc in ("h264_nvenc", "libfdk_aac"),
-    )
-    gyan = tmp_path / "gyan"
-    gyan.mkdir()
-    (gyan / ffmpeg_name).write_bytes(b"gyan")
-    staged = stage_nvenc_remotion_binaries(gyan, verbose=False)
-    assert staged == compositor.resolve()
-
-
-def test_nvenc_accel_args_skip_binaries_dir_for_compositor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    compositor = tmp_path / "compositor"
-    compositor.mkdir()
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_nvenc_ffmpeg_bin_dir",
-        lambda: compositor,
-    )
-    monkeypatch.setattr(
-        "agentic_editor.compose.stage_nvenc_remotion_binaries",
-        lambda *_a, **_k: compositor,
-    )
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_remotion_compositor_dir",
-        lambda: compositor,
-    )
-    args = remotion_render_accel_args(nvenc=True, gl="angle", verbose=False)
-    assert "--hardware-acceleration" in args
-    assert "--binaries-directory" not in args
-    assert "--gl" in args
-
-
-def test_nvenc_accel_args_use_staged_dir_not_raw_ffmpeg(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    staged = tmp_path / "staged"
-    staged.mkdir()
-    compositor = tmp_path / "compositor"
-    compositor.mkdir()
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_nvenc_ffmpeg_bin_dir",
-        lambda: tmp_path / "gyan",
-    )
-    monkeypatch.setattr(
-        "agentic_editor.compose.stage_nvenc_remotion_binaries",
-        lambda *_a, **_k: staged,
-    )
-    monkeypatch.setattr(
-        "agentic_editor.compose.find_remotion_compositor_dir",
-        lambda: compositor,
-    )
-    args = remotion_render_accel_args(nvenc=True, gl="angle", verbose=False)
-    assert "--binaries-directory" in args
-    idx = args.index("--binaries-directory")
-    assert args[idx + 1] == str(staged)

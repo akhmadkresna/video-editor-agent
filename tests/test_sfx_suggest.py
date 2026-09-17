@@ -174,7 +174,7 @@ def test_remap_sfx_through_edl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     edl = json.loads((ep / "edit" / "edl.json").read_text(encoding="utf-8"))
     tl = build_timeline_sfx(edl, cover, style_name="tutorial")
     assert tl
-    assert all(s["src"].startswith("ae-media/sfx/") for s in tl)
+    assert all(s["src"].startswith("assets/sfx/") for s in tl)
     shutter = next(s for s in tl if s["kind"] == "shutter")
     assert abs(shutter["fromSec"] - 5.0) < 0.05
     typing = next(s for s in tl if s["kind"] == "typing")

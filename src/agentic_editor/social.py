@@ -8,7 +8,6 @@ final render.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -16,26 +15,40 @@ from pathlib import Path
 from typing import Any
 
 from agentic_editor.compose import (
-    _remotion_cli,
-    remotion_kit_dir,
-    remotion_render_accel_args,
-    stage_sfx_for_remotion,
-    stage_sources_for_remotion,
+    _hf_cli,
+    hyperframes_kit_dir,
+    stage_sfx_for_hyperframes,
+    stage_sources_for_hyperframes,
     validate_timeline_for_studio,
 )
+from agentic_editor.compose.hf_template import write_hf_composition
 from agentic_editor.compose.mezzanine import resolve_compose_sources
 from agentic_editor.cover import build_timeline_from_edl_and_cover, write_timeline
 from agentic_editor.cover.remap import remap_source_window
 from agentic_editor.cover.style_load import (
+    _load_style_yaml,
     load_overlays,
     load_screen_explainer,
     load_social,
-    _load_style_yaml,
 )
 from agentic_editor.editor.edl import load_edl
 from agentic_editor.project import load_project, resolve_source
 
 _TOKEN_EDGE = re.compile(r"(^[^\w]+|[^\w]+$)", re.UNICODE)
+_SOCIAL_SCAFFOLD_FILES = ("hyperframes.json", "meta.json", "package.json")
+
+
+def social_hf_project_dir(episode: Path) -> Path:
+    return episode / "edit" / "social" / "hyperframes-project"
+
+
+def _copy_social_scaffold(project_dir: Path) -> None:
+    kit = hyperframes_kit_dir()
+    project_dir.mkdir(parents=True, exist_ok=True)
+    for name in _SOCIAL_SCAFFOLD_FILES:
+        src = kit / name
+        if src.is_file():
+            shutil.copy2(src, project_dir / name)
 
 
 def _load_words(episode: Path) -> list[dict[str, Any]]:
@@ -210,8 +223,11 @@ def prepare_social(episode: Path, *, verbose: bool = True) -> Path:
         if verbose:
             print("• social stage: screen + cam PIP on every keep (no portrait full-cam)")
 
+    project_dir = social_hf_project_dir(episode)
+    _copy_social_scaffold(project_dir)
+
     compose_sources = resolve_compose_sources(episode, abs_sources, cfg, verbose=verbose)
-    staged = stage_sources_for_remotion(compose_sources, verbose=verbose)
+    staged = stage_sources_for_hyperframes(project_dir, compose_sources, verbose=verbose)
     runtime_edl = dict(edl)
     runtime_edl["sources"] = staged
 
@@ -251,7 +267,8 @@ def prepare_social(episode: Path, *, verbose: bool = True) -> Path:
         cta.update(episode_cta)
     timeline["presentation"]["cta"] = cta
     timeline["sources"] = staged
-    timeline["sfx"] = stage_sfx_for_remotion(
+    timeline["sfx"] = stage_sfx_for_hyperframes(
+        project_dir,
         list(timeline.get("sfx") or []),
         style_name="social",
         verbose=verbose,
@@ -262,24 +279,23 @@ def prepare_social(episode: Path, *, verbose: bool = True) -> Path:
     social.mkdir(parents=True, exist_ok=True)
     timeline_path = social / "timeline.json"
     write_timeline(timeline_path, timeline)
-    props = social / "remotion-props.json"
-    props.write_text(json.dumps({"timeline": timeline}, indent=2) + "\n", encoding="utf-8")
-    errors = validate_timeline_for_studio(timeline, props)
+    write_hf_composition(project_dir, timeline, composition_id="social")
+    errors = validate_timeline_for_studio(timeline, project_dir)
     if errors:
         raise RuntimeError("social compose preflight failed:\n  - " + "\n  - ".join(errors))
     if verbose:
         print(
-            f"• social props → {props.relative_to(episode)} "
+            f"• social project → {project_dir.relative_to(episode)} "
             f"({timeline['durationSec']:.1f}s, {len(timeline['captions'])} karaoke lines)"
         )
-    return props
+    return timeline_path
 
 
 def run_social_studio(episode: Path) -> None:
-    props = prepare_social(episode)
-    kit = remotion_kit_dir()
-    cmd = [*_remotion_cli(kit), "studio", "src/index.ts", "--props", str(props)]
-    subprocess.run(cmd, cwd=str(kit), check=True)
+    prepare_social(episode)
+    project_dir = social_hf_project_dir(episode)
+    cmd = [*_hf_cli(), "preview"]
+    subprocess.run(cmd, cwd=str(project_dir), check=True)
 
 
 def render_social(
@@ -289,25 +305,15 @@ def render_social(
     nvenc: bool = False,
     gl: str | None = None,
 ) -> Path:
-    props = prepare_social(episode)
-    kit = remotion_kit_dir()
+    prepare_social(episode)
+    project_dir = social_hf_project_dir(episode)
     out = output or (episode / "edit" / "social" / "final.mp4")
     out.parent.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    env["AE_TIMELINE_PROPS"] = str(props)
-    env["AE_EPISODE"] = str(episode.resolve())
-    cmd = [
-        *_remotion_cli(kit),
-        "render",
-        "src/index.ts",
-        "AgenticTimeline",
-        str(out),
-        "--props",
-        str(props),
-        *remotion_render_accel_args(nvenc=nvenc, gl=gl),
-    ]
-    print(f"$ cd {kit} && {' '.join(cmd)}")
-    subprocess.run(cmd, cwd=str(kit), env=env, check=True)
+    cmd = [*_hf_cli(), "render", "--quality", "delivery", "--output", str(out)]
+    if nvenc:
+        cmd.append("--gpu")
+    print(f"$ cd {project_dir} && {' '.join(cmd)}")
+    subprocess.run(cmd, cwd=str(project_dir), check=True)
     return out
 
 

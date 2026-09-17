@@ -253,12 +253,12 @@ def audit_timeline_quality(
             if src.startswith("/") or (len(src) > 2 and src[1] == ":"):
                 errors.append(
                     f"cutaway {c.get('id')} asset is absolute disk path "
-                    f"({src}) — stage via ae compose into ae-media/"
+                    f"({src}) — stage via ae compose into assets/"
                 )
-            elif not src.startswith("ae-media/") and not src.startswith("http"):
+            elif not src.startswith("assets/") and not src.startswith("http"):
                 warnings.append(
-                    f"cutaway {c.get('id')} asset src={src} is not ae-media/… "
-                    "(may fail in Studio)"
+                    f"cutaway {c.get('id')} asset src={src} is not assets/… "
+                    "(may fail in preview)"
                 )
 
     return errors, warnings

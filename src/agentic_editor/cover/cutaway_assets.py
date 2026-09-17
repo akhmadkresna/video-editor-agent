@@ -1,4 +1,4 @@
-"""Stage cutaway image assets into Remotion public/ae-media/cutaways/."""
+"""Stage cutaway image assets into a HyperFrames project's assets/cutaways/."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ def resolve_cutaway_asset_path(episode: Path, src: str) -> Path | None:
     raw = str(src or "").strip().replace("\\", "/")
     if not raw:
         return None
-    # Already staged public-relative — caller keeps as-is.
-    if raw.startswith("ae-media/"):
+    # Already staged project-relative — caller keeps as-is.
+    if raw.startswith("assets/"):
         return None
     p = Path(raw)
     if p.is_absolute():
@@ -88,17 +88,17 @@ def collect_cutaway_asset_refs(cover: dict[str, Any] | None) -> list[dict[str, A
     return refs
 
 
-def stage_cutaway_assets_for_remotion(
+def stage_cutaway_assets_for_hyperframes(
     episode: Path,
     cover: dict[str, Any] | None,
     *,
-    remotion_public: Path,
+    hf_project_assets: Path,
     verbose: bool = False,
 ) -> dict[str, Any] | None:
-    """Copy cutaway stills into public/ae-media/cutaways/ and rewrite cover paths.
+    """Copy cutaway stills into <project>/assets/cutaways/ and rewrite cover paths.
 
     Returns an updated cover dict when any path changed; otherwise None.
-    Already-public ``ae-media/...`` paths are left untouched.
+    Already-staged ``assets/...`` paths are left untouched.
     """
     if not cover:
         return None
@@ -106,7 +106,7 @@ def stage_cutaway_assets_for_remotion(
     if not refs:
         return None
 
-    dest_root = remotion_public / "ae-media" / "cutaways"
+    dest_root = hf_project_assets / "cutaways"
     dest_root.mkdir(parents=True, exist_ok=True)
     changed = False
     new_cover = dict(cover)
@@ -123,7 +123,7 @@ def stage_cutaway_assets_for_remotion(
     for ref in refs:
         asset = ref["asset"]
         src = str(asset.get("src") or "")
-        if src.startswith("ae-media/"):
+        if src.startswith("assets/"):
             continue
         resolved = resolve_cutaway_asset_path(episode, src)
         if resolved is None:
@@ -141,8 +141,8 @@ def stage_cutaway_assets_for_remotion(
         if not dest.is_file() or dest.stat().st_size != resolved.stat().st_size:
             shutil.copy2(resolved, dest)
             if verbose:
-                print(f"• staged cutaway asset → public/ae-media/cutaways/{dest_name}")
-        public_rel = f"ae-media/cutaways/{dest_name}"
+                print(f"• staged cutaway asset → assets/cutaways/{dest_name}")
+        public_rel = f"assets/cutaways/{dest_name}"
 
         def _rewrite_src(obj: dict[str, Any]) -> dict[str, Any]:
             if obj.get("src") != src:

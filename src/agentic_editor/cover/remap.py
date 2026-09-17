@@ -61,12 +61,12 @@ def remap_source_window(
     return out
 
 
-#: Original left-rail kinds (Remotion OverlayLayer's OneOverlay) — same
+#: Original left-rail kinds (pre-migration OverlayLayer's OneOverlay) — same
 #: white-ink, no-panel look as the kinds below, see
-#: packages/remotion-kit/src/components/OverlayLayer.tsx.
+#: the pre-migration Remotion OverlayLayer.tsx (see MIGRATION_NOTES.md).
 _LEGACY_OVERLAY_KINDS = ("chapter", "emphasis", "diagram", "chip", "callout")
 #: Kinds dispatched through the A-Roll Text Motion System
-#: (packages/remotion-kit/src/components/overlay/dispatch.tsx) — white ink,
+#: (hf_template.py's _overlay_body_html) — white ink,
 #: no panel, same palette as the kinds above, just a different primitive per
 #: kind's structure. `code`/`illustration` stay on the legacy GlassOverlays.tsx
 #: renderer (explicitly out of scope for the port).
@@ -432,7 +432,7 @@ def build_timeline_cutaways(
     """Remap cover.cutaways[] to output time; cues become scene-local seconds.
 
     Scene beats are authored in cam source seconds (word-snapped, like
-    overlays) and converted to offsets from the scene start so a Remotion
+    overlays) and converted to offsets from the scene start so a rendered
     scene never needs to know about the EDL.
     """
     timeline_dur = edl_keep_duration_sec(edl)
@@ -546,7 +546,7 @@ def build_timeline_cutaways(
                 cues[out_key] = local(float(raw_cues[src_key]))
             except (TypeError, ValueError):
                 continue
-        # Also mirror generic → legacy for existing Remotion skins.
+        # Also mirror generic → legacy for existing style skins.
         for gen, legacy in (
             ("openSec", "ledgerInSec"),
             ("classifySec", "inOutSec"),
@@ -861,7 +861,7 @@ def build_timeline_sfx(
             "kind": kind,
             "fromSec": round(float(sl["fromSec"]), 3),
             "durationSec": round(max(0.05, dur), 3),
-            "src": f"ae-media/sfx/{src_name}",
+            "src": f"assets/sfx/{src_name}",
             "volume": float(item.get("volume") if item.get("volume") is not None else vols.get(kind, 0.4)),
             "tile": kind == "typing",
         }

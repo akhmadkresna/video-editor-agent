@@ -1,6 +1,6 @@
 """Cutaway family ids — labels for Sequence names / QA, not renderers.
 
-Every brief renders through one Remotion engine (`InterfaceStage`). Board
+Every brief renders through one HyperFrames cutaway template. Board
 layout is inferred from the data (catalog / ledger / access / shot). Family
 ids stay so suggest can rotate names and contact sheets can group shots.
 
@@ -49,7 +49,7 @@ SCENE_TO_FAMILY: dict[str, str] = {
     "minimal": "minimal",
 }
 
-# Remotion still keys components by scene for dissolve naming; prefer family.
+# Legacy `scene` still keys the old per-scene naming; prefer `family`.
 FAMILY_TO_SCENE: dict[str, str] = {
     "document": "receipt_tape",
     "flow": "ledger_flow",

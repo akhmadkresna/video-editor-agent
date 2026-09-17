@@ -9,7 +9,7 @@ from agentic_editor.compose.cutaway_qa import pick_cutaway_qa_frames
 from agentic_editor.compose.quality import audit_timeline_quality
 from agentic_editor.cover.cutaway_assets import (
     collect_cutaway_asset_refs,
-    stage_cutaway_assets_for_remotion,
+    stage_cutaway_assets_for_hyperframes,
 )
 from agentic_editor.cover.cutaway_families import resolve_family, validate_brief_against_family
 from agentic_editor.cover.cutaway_fixtures import FIXTURES
@@ -253,14 +253,14 @@ def test_stage_cutaway_assets(tmp_path: Path):
             }
         ]
     }
-    public = tmp_path / "public"
-    updated = stage_cutaway_assets_for_remotion(
-        episode, cover, remotion_public=public, verbose=False
+    assets = tmp_path / "hyperframes-project" / "assets"
+    updated = stage_cutaway_assets_for_hyperframes(
+        episode, cover, hf_project_assets=assets, verbose=False
     )
     assert updated is not None
     proof_src = updated["cutaways"][0]["proof"]["src"]
-    assert proof_src.startswith("ae-media/cutaways/")
-    assert (public / proof_src.replace("/", "\\") if False else public.joinpath(*proof_src.split("/"))).is_file()
+    assert proof_src.startswith("assets/cutaways/")
+    assert (assets.parent / proof_src).is_file()
     refs = collect_cutaway_asset_refs(updated)
     assert refs
 

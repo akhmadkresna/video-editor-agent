@@ -18,7 +18,7 @@ from agentic_editor.cover.suggest import load_cam_words
 from agentic_editor.editor.qa import extract_frame
 from agentic_editor.project import load_project, resolve_source
 
-# Mirrors packages/remotion-kit/src/components/overlayZones.ts zoneBoxStyle —
+# Mirrors packages/hyperframes-kit's overlay zone CSS (hf_template.py _OVERLAY_ZONE_CLASS) —
 # same cqw/cqh percentages the real A-roll renderer uses, so an on-frame chip
 # here lands roughly where the actual overlay will land on the real render.
 _ZONE_BOX_STYLE: dict[str, str] = {
@@ -305,7 +305,7 @@ def cover_mg_items_for_range(
 
 def render_frame_overlay_chips_html(items: list[dict[str, Any]]) -> str:
     """Small chips positioned ON the frame at each overlay's real zone —
-    a cheap, no-Remotion-needed approximation of where MG will actually
+    a cheap, no-render-needed approximation of where MG will actually
     land, so a card shows "what + roughly where" at a glance.
 
     A card spans real time, so two overlays with the same zone but
@@ -585,7 +585,7 @@ def render_mg_stack_html(
             if preview is not None and preview.is_file():
                 preview_rel = _html_rel_path(dashboard, preview)
 
-        if preview_rel and render_mode == "remotion":
+        if preview_rel and render_mode == "hyperframes":
             kind = html.escape(
                 str(item.get("kind") or item.get("type") or item.get("category") or "mg")
             )
@@ -598,7 +598,7 @@ def render_mg_stack_html(
                 f'<div class="mg-panel mg-render mg-{kind}">'
                 f'<div class="mg-head"><span class="mg-kind">{kind}</span>'
                 f'<span class="mg-time">{timing}</span>'
-                f'<span class="mg-render-badge">Remotion</span></div>'
+                f'<span class="mg-render-badge">HyperFrames</span></div>'
                 f'<img class="mg-render-still" src="{html.escape(preview_rel)}" alt="">'
                 f"{note_html}"
                 "</div>"
@@ -610,8 +610,8 @@ def render_mg_stack_html(
     if not panels:
         return ""
     label = (
-        "MG render (Remotion still)"
-        if render_mode == "remotion"
+        "MG render (HyperFrames snapshot)"
+        if render_mode == "hyperframes"
         else "MG plan (text preview)"
     )
     return (
@@ -858,16 +858,16 @@ def _mg_review_banner_html(
     episode: Path,
 ) -> str:
     review_html = episode / "edit" / "mg-review" / "review.html"
-    if mg_render_mode == "remotion" and still_count:
+    if mg_render_mode == "hyperframes" and still_count:
         return (
             f'<p class="mg-banner mg-banner-ok"><strong>MG renders:</strong> '
-            f"{still_count} Remotion still(s) embedded — exact A-Roll Text Motion System on A-roll. "
+            f"{still_count} HyperFrames snapshot(s) embedded — the A-Roll Text Motion System on A-roll. "
             f'Full gallery: <a href="../mg-review/review.html">edit/mg-review/review.html</a></p>'
         )
     if render_mg:
         return (
             '<p class="mg-banner mg-banner-warn"><strong>MG renders:</strong> '
-            "Remotion still export failed or was skipped — showing text previews only. "
+            "HyperFrames snapshot export failed or was skipped — showing text previews only. "
             "Re-run with <code>ae storyboard . --render-mg --force-mg</code></p>"
         )
     if review_html.is_file():
@@ -878,7 +878,7 @@ def _mg_review_banner_html(
         )
     return (
         '<p class="mg-banner"><strong>MG feedback:</strong> run '
-        "<code>ae storyboard . --render-mg</code> for exact Remotion stills on each clip, "
+        "<code>ae storyboard . --render-mg</code> for real HyperFrames snapshots on each clip, "
         "or <code>ae mg-review .</code> for the full overlay gallery</p>"
     )
 
@@ -908,7 +908,7 @@ def generate_storyboard(
                 episode, force=force_mg, gl=gl, verbose=True
             )
             if still_index:
-                mg_render_mode = "remotion"
+                mg_render_mode = "hyperframes"
         except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
             print(f"! MG still render failed — falling back to text previews: {exc}")
     elif cover and (episode / "edit" / "mg-review" / "stills").is_dir():
@@ -920,7 +920,7 @@ def generate_storyboard(
 
             if mg_review_stills_fresh(episode):
                 still_index = cached
-                mg_render_mode = "remotion"
+                mg_render_mode = "hyperframes"
 
     mockup_scenes = _resolve_mockup_scenes(episode)
     mock_tokens = load_mockup(str(cfg.get("style") or "mockup")) if mockup_scenes else {}
@@ -1042,7 +1042,7 @@ color:#64748b;background:#080a0d;border:1px dashed #334155;border-radius:4px}}
 aspect-ratio:16/9;object-fit:cover;background:#080a0d}}
 .mg-render-badge{{font-size:10px;font-weight:700;text-transform:uppercase;color:#6ee7b7;
 letter-spacing:.06em}}
-.mg-mode-remotion .mg-panel{{border-left-color:#6ee7b7}}
+.mg-mode-hyperframes .mg-panel{{border-left-color:#6ee7b7}}
 .mg-banner{{margin-top:10px;padding:10px 12px;border-radius:8px;background:#101826;
 border:1px solid #293242;font-size:14px}}
 .mg-banner a{{color:#7dd3fc}}

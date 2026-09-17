@@ -14,9 +14,9 @@ from agentic_editor.paths import framework_home
 # a-roll, no panel, no accent color — readability from the veil scrim behind
 # the text. One look, shared by every kind (title/stat/lower_third/tag/
 # divider/quote/code/illustration/chapter/emphasis/diagram/callout/chip) and
-# every style pack. See packages/remotion-kit/src/components/glass/tokens.ts.
-# Mirrors packages/remotion-kit/src/types.ts DEFAULT_OVERLAY_STYLE and
-# packages/remotion-kit/src/components/glass/tokens.ts. Source of record:
+# every style pack. See hf_template.py's overlay CSS (_CSS block).
+# Mirrors the pre-migration DEFAULT_OVERLAY_STYLE (see MIGRATION_NOTES.md) and
+# hf_template.py's overlay CSS. Source of record:
 # styles/aroll-text-motion/overlays.style.yaml.
 DEFAULT_OVERLAYS: dict[str, Any] = {
     "preset": "aroll_text_motion",
@@ -218,7 +218,7 @@ DEFAULT_SFX: dict[str, Any] = {
     "click": {"max_sec": 0.22},
     # paper = MG appear (glass kinds); tick = small "tag" chip appear.
     # Both point at soft_tick.wav (pack.yaml) — 0.22 keeps a safety margin
-    # over its measured 0.15s so the Remotion Sequence crop never truncates it.
+    # over its measured 0.15s so the composited caption window never truncates it.
     "paper": {"max_sec": 0.22},
     "tick": {"max_sec": 0.15},
     # One-shot at MG appear (cover.overlays). shutter.wav is a genuine

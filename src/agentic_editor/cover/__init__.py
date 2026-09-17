@@ -1,4 +1,4 @@
-"""Cover / timeline JSON — dual-source + fake multicam framing + Remotion."""
+"""Cover / timeline JSON — dual-source + fake multicam framing + HyperFrames."""
 
 from __future__ import annotations
 
@@ -239,7 +239,7 @@ def build_timeline_from_edl_and_cover(
     words: list[dict[str, Any]] | None = None,
     episode: Path | None = None,
 ) -> dict[str, Any]:
-    """Merge radio-edit EDL with cover + camera_play into a Remotion timeline."""
+    """Merge radio-edit EDL with cover + camera_play into a HyperFrames timeline."""
     from agentic_editor.cover.style_load import (
         DEFAULT_OVERLAYS,
         DEFAULT_SCREEN_EXPLAINER,
@@ -297,7 +297,7 @@ def build_timeline_from_edl_and_cover(
     float_presentation = str(
         (se.get("screen") or {}).get("presentation") or "float_centered"
     )
-    # Remotion clip.layout is a fixed enum; letterbox is a screen presentation mode
+    # clip.layout is a fixed enum; letterbox is a screen presentation mode
     # carried on presentation.screenExplainer, not on each clip.
     float_layout = (
         "float_centered"

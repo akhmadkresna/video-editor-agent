@@ -2,7 +2,7 @@
 
 When ``project.yaml`` has ``composite.enabled: true`` and only ``sources.cam``,
 the episode is treated as having a screen track for cover-suggest / overlays,
-but Remotion must **not** add a second ``pip_corner`` on top of the baked face.
+but compose must **not** add a second ``pip_corner`` on top of the baked face.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def is_baked_pip(composite: dict[str, Any]) -> bool:
 
 
 def is_composite_episode(project: dict[str, Any]) -> bool:
-    """True when ``composite.enabled`` — single-file OBS bake, not dual-source Remotion PIP."""
+    """True when ``composite.enabled`` — single-file OBS bake, not dual-source PIP."""
     return bool(load_composite(project).get("enabled"))
 
 

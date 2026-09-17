@@ -1,4 +1,4 @@
-"""Slice a Remotion timeline to the first N seconds for draft review.
+"""Slice a timeline.json to the first N seconds for draft review.
 
 Overlays / effects / clips all use output-time ``fromSec`` + ``durationSec``
 after ``ae cover``. Hand-rolled trims that look for ``start``/``end`` silently
