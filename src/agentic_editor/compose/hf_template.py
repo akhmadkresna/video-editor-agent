@@ -256,16 +256,16 @@ def _has_contrast_marker(text: str) -> bool:
     return any(marker in low for marker in _CONTRAST_MARKERS)
 
 
-def _choose_treatment(kind: str, raw_text: str, steps: list[str], code_seen: set[str]) -> str:
+def _choose_treatment(kind: str, raw_text: str, steps: list[str], code_history: list[str]) -> str:
     if kind == "code":
         norm = "\n".join(s.strip() for s in steps).strip()
         if not norm:
             return ""
         # Any earlier code beat in this episode means this one is a change to
         # code already on screen, not a fresh introduction -- even if the two
-        # snippets happen to differ completely; `code_seen` here just marks
-        # "has any code appeared yet", not an exact-text cache.
-        return "code-morph" if code_seen else "code-typing"
+        # snippets happen to differ completely; code_history[-1] (when
+        # present) becomes the code-morph "before" state.
+        return "code-morph" if code_history else "code-typing"
     if kind == "emphasis":
         wc = _word_count(raw_text)
         if wc <= 1:
@@ -688,8 +688,80 @@ def _kinetic_slam_subcomp(instance_id: str, raw_text: str, dur: float) -> str:
     return out.replace("caption-kinetic-slam", instance_id)
 
 
+def _code_state_js(code_text: str) -> str:
+    """One uniform-color token spanning the whole snippet. The real per-
+    token *syntax* coloring needs a JS tokenizer (Shiki) this Python
+    templater doesn't have -- but the typewriter/diff engines split
+    characters out of token *content* regardless of token boundaries, so a
+    single token still gets the real motion, just without syntax color."""
+    return (
+        "{\n"
+        f"              code: {_js_str(code_text)},\n"
+        "              tokens: [\n"
+        f'                {{ key: "t0", content: {_js_str(code_text)}, color: "#e1e4e8", fontStyle: 0 }},\n'
+        "              ],\n"
+        "            }"
+    )
+
+
+def _code_typing_subcomp(instance_id: str, code_text: str, dur: float) -> str:
+    # Rename the catalog's literal id ("code-typing") to our instance id
+    # FIRST, on the untouched source -- doing it last would also match the
+    # instance id's own text below (every instance id starts with
+    # "code-typing-", which contains "code-typing" as a substring), turning
+    # e.g. "code-typing-0" into the corrupted "code-typing-0-0".
+    out = _catalog_source("code-typing.html").replace("code-typing", instance_id)
+    replacement = (
+        "window.__TOKENS = {\n"
+        "        feature: {\n"
+        '          lang: "text",\n'
+        '          theme: "github-dark",\n'
+        '          bg: "#24292e",\n'
+        '          fg: "#e1e4e8",\n'
+        "          states: [\n"
+        f"            {_code_state_js(code_text)},\n"
+        "          ],\n"
+        "        },\n"
+        "      };\n"
+        f'      window.__BLOCK = {{ id: "{instance_id}", effect: "typing", seq: "feature", duration: {dur:.3f} }};'
+    )
+    out = _replace_block(out, "window.__TOKENS = {", 'duration: 5 };', replacement)
+    return out.replace('data-duration="5"', f'data-duration="{dur:.3f}"')
+
+
+def _code_morph_subcomp(instance_id: str, before_text: str, after_text: str, dur: float) -> str:
+    out = _catalog_source("code-morph.html").replace("code-morph", instance_id)  # see _code_typing_subcomp
+    replacement = (
+        "window.__TOKENS = {\n"
+        "        morph: {\n"
+        '          lang: "text",\n'
+        '          theme: "github-dark",\n'
+        '          bg: "#24292e",\n'
+        '          fg: "#e1e4e8",\n'
+        "          states: [\n"
+        f"            {_code_state_js(before_text)},\n"
+        f"            {_code_state_js(after_text)},\n"
+        "          ],\n"
+        "        },\n"
+        "      };\n"
+        f'      window.__BLOCK = {{ id: "{instance_id}", effect: "morph", seq: "morph", duration: {dur:.3f} }};'
+    )
+    out = _replace_block(out, "window.__TOKENS = {", 'duration: 7 };', replacement)
+    return out.replace('data-duration="7"', f'data-duration="{dur:.3f}"')
+
+
+_SUBCOMP_TREATMENTS = (
+    "camera-follow",
+    "editorial-emphasis",
+    "type-swap",
+    "kinetic-slam",
+    "code-typing",
+    "code-morph",
+)
+
+
 def _emit_overlay(
-    doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str], subcomps: dict[str, str]
+    doc: _Doc, ov: dict[str, Any], idx: int, code_history: list[str], subcomps: dict[str, str]
 ) -> None:
     start = _num(ov.get("fromSec"))
     dur = max(0.2, _num(ov.get("durationSec"), 1.5))
@@ -699,16 +771,17 @@ def _emit_overlay(
     raw_text = str(ov.get("text") or ov.get("title") or "")
     steps_raw = [str(s) for s in (ov.get("steps") or [])]
 
-    treatment = _choose_treatment(kind, raw_text, steps_raw, code_seen)
+    treatment = _choose_treatment(kind, raw_text, steps_raw, code_history)
+    code_norm = ""
+    previous_code = ""
     if kind == "code":
-        norm = "\n".join(s.strip() for s in steps_raw).strip()
-        if norm:
-            code_seen.add(norm)
+        code_norm = "\n".join(s.strip() for s in steps_raw).strip()
+        previous_code = code_history[-1] if code_history else code_norm
+        if code_norm:
+            code_history.append(code_norm)
 
-    if (
-        treatment in ("camera-follow", "editorial-emphasis", "type-swap", "kinetic-slam")
-        and raw_text.strip()
-    ):
+    content_ready = bool(code_norm) if kind == "code" else bool(raw_text.strip())
+    if treatment in _SUBCOMP_TREATMENTS and content_ready:
         instance_id = f"{treatment}-{idx}"
         rel_path = f"compositions/generated/{instance_id}.html"
         variable_values: dict[str, str] | None = None
@@ -718,8 +791,12 @@ def _emit_overlay(
             subcomps[rel_path] = _editorial_emphasis_subcomp(instance_id, raw_text, dur)
         elif treatment == "kinetic-slam":
             subcomps[rel_path] = _kinetic_slam_subcomp(instance_id, raw_text, dur)
-        else:
+        elif treatment == "type-swap":
             subcomps[rel_path], variable_values = _type_swap_subcomp(instance_id, raw_text, dur)
+        elif treatment == "code-typing":
+            subcomps[rel_path] = _code_typing_subcomp(instance_id, code_norm, dur)
+        else:  # code-morph
+            subcomps[rel_path] = _code_morph_subcomp(instance_id, previous_code, code_norm, dur)
         scrim_id = doc.uid(f"{instance_id}-scrim")
         var_values_attr = (
             f" data-variable-values='{_esc(json.dumps(variable_values))}'" if variable_values else ""
@@ -1077,9 +1154,9 @@ def render_timeline_html(
         _emit_mockup(doc, mock, i)
     for i, cut in enumerate(timeline.get("cutaways") or []):
         _emit_cutaway(doc, cut, i, asset_map)
-    code_seen: set[str] = set()
+    code_history: list[str] = []
     for i, ov in enumerate(timeline.get("overlays") or []):
-        _emit_overlay(doc, ov, i, code_seen, subcomps)
+        _emit_overlay(doc, ov, i, code_history, subcomps)
     for i, sfx in enumerate(timeline.get("sfx") or []):
         _emit_sfx(doc, sfx, i, asset_map)
     for i, priv in enumerate(timeline.get("privacy") or []):
