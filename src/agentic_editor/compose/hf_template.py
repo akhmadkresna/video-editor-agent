@@ -325,7 +325,10 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
         items = "".join(f'<li>{_esc(s)}</li>' for s in steps)
         return (f'<div class="ov-body">{title}</div><ul class="ov-illustration-list">{items}</ul>', "ov-illustration")
     if kind == "chapter":
-        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{title}</div>', "ov-chapter")
+        # overlay_suggest.py's chapter beats always carry kicker+text, never
+        # title (confirmed by rendering real footage: the hero was silently
+        # empty for every chapter overlay until this fallback was added).
+        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{title or text}</div>', "ov-chapter")
     if kind == "emphasis":
         if treatment == "kinetic-slam":
             return (f'<div class="ov-emphasis ov-emphasis-slam">{text}</div>', "ov-emphasis")
