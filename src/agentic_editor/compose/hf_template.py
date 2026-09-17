@@ -672,6 +672,22 @@ def _type_swap_subcomp(instance_id: str, raw_text: str, dur: float) -> tuple[str
     return html_out, variable_values
 
 
+def _kinetic_slam_subcomp(instance_id: str, raw_text: str, dur: float) -> str:
+    word = raw_text.strip() or "…"
+    js_word = f'{{ text: {_js_str(word)}, start: 0, end: {dur:.3f} }}'
+    out = _catalog_source("components", "caption-kinetic-slam.html")
+    out = _replace_block(out, "var WORDS = [", "];", f"var WORDS = [\n          {js_word}\n        ];")
+    # Single word, so it's the composition's whole message -- treat it as
+    # the real component's "keyword" (gold accent), matching the accent
+    # convention already used by camera-follow/editorial-emphasis.
+    out = out.replace(
+        "var KEYWORDS = new Set([8, 12, 15, 24, 27]); // HyperFrames, HTML, professional, code, cinema.",
+        "var KEYWORDS = new Set([0]);",
+    )
+    out = out.replace('data-duration="8"', f'data-duration="{dur:.3f}"')
+    return out.replace("caption-kinetic-slam", instance_id)
+
+
 def _emit_overlay(
     doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str], subcomps: dict[str, str]
 ) -> None:
@@ -689,7 +705,10 @@ def _emit_overlay(
         if norm:
             code_seen.add(norm)
 
-    if treatment in ("camera-follow", "editorial-emphasis", "type-swap") and raw_text.strip():
+    if (
+        treatment in ("camera-follow", "editorial-emphasis", "type-swap", "kinetic-slam")
+        and raw_text.strip()
+    ):
         instance_id = f"{treatment}-{idx}"
         rel_path = f"compositions/generated/{instance_id}.html"
         variable_values: dict[str, str] | None = None
@@ -697,6 +716,8 @@ def _emit_overlay(
             subcomps[rel_path] = _camera_follow_subcomp(instance_id, raw_text, dur)
         elif treatment == "editorial-emphasis":
             subcomps[rel_path] = _editorial_emphasis_subcomp(instance_id, raw_text, dur)
+        elif treatment == "kinetic-slam":
+            subcomps[rel_path] = _kinetic_slam_subcomp(instance_id, raw_text, dur)
         else:
             subcomps[rel_path], variable_values = _type_swap_subcomp(instance_id, raw_text, dur)
         scrim_id = doc.uid(f"{instance_id}-scrim")
