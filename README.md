@@ -2,7 +2,7 @@
 
 Local agentic pipeline for YouTube-style talking-head edits:
 
-**footage → ASR → radio-edit EDL → cover (cam/screen/punch-in) → Remotion**
+**footage → ASR → radio-edit EDL → cover (cam/screen/punch-in) → HyperFrames**
 
 This repo is the **framework**. Episodes live elsewhere as thin folders (`project.yaml` + `raw/` + `edit/`).
 
@@ -94,7 +94,7 @@ Default ASR language is **Indonesian** (`asr.language: id`); override per episod
 | `ae cover .` | EDL + cover → `timeline.json` |
 | `ae voice .` | DeepFilterNet cam VO → `edit/audio/cam.voice.wav` (raw untouched) |
 | `ae mezzanine .` | Deliverable proxies → `edit/mezzanine/` (muxes enhanced cam audio) |
-| `ae compose . [--studio]` | Remotion preview / render |
+| `ae compose . [--studio]` | HyperFrames preview / render |
 | `ae qa .` | Cut-boundary frames in `edit/verify/` |
 | `ae social . [--studio]` | Separate 1080×1920 karaoke cut from `edit/social/` |
 | `ae social . --qa` | Representative portrait frames in `edit/social/verify/` |
@@ -107,7 +107,7 @@ Default ASR language is **Indonesian** (`asr.language: id`); override per episod
 ```
 src/agentic_editor/    # Python CLI + ASR + editor + cover
 packages/schema/       # Zod contracts
-packages/remotion-kit/ # Remotion composition
+packages/hyperframes-kit/ # HyperFrames composition scaffold
 templates/project/     # ae new scaffold
 skills/agentic-editor/
 styles/tutorial/
