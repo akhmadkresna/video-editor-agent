@@ -368,9 +368,11 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
         # overlay_suggest.py's chapter beats always carry kicker+text, never
         # title (confirmed by rendering real footage: the hero was silently
         # empty for every chapter overlay until this fallback was added).
+        # Plain text, not _word_spans: background-emphasis (mkEmphasisIn)
+        # fades the whole block in as one texture unit, not word-by-word --
+        # individual .ov-word spans would never get revealed under it.
         hero_text = title or text
-        hero = _word_spans(hero_text, word_cls="ov-word ov-hero-word")
-        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{hero}</div>', "ov-chapter")
+        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{hero_text}</div>', "ov-chapter")
     if kind == "emphasis":
         if treatment == "kinetic-slam":
             return (f'<div class="ov-emphasis ov-emphasis-slam">{text}</div>', "ov-emphasis")
@@ -448,16 +450,15 @@ def _emit_treatment_motion(
         return
 
     if treatment == "background-emphasis":
-        doc.tl.append(f'tl.set("{sel}", {{ autoAlpha: 1 }}, {start:.3f});')
-        doc.tl.append(
-            f'tl.fromTo("{word_sel}", {{ autoAlpha: 0 }}, '
-            f'{{ autoAlpha: 1, duration: {fade * 1.4:.3f}, ease: "sine.out", stagger: 0.08 }}, {start:.3f});'
-        )
-        doc.tl.append(
-            f'tl.fromTo("{sel}", {{ x: -30 }}, '
-            f'{{ x: 30, duration: {max(0.1, dur):.3f}, ease: "none", immediateRender: false }}, {start:.3f});'
-        )
-        _exit_fade()
+        # Real mkEmphasisIn/mkEmphasisOut helpers (verbatim from the
+        # installed mk-emphasis-type component, injected once in the script
+        # preamble) -- one decorative block sliding as a unit, matching the
+        # catalog's actual "typography as texture" design, not a per-word
+        # cascade (that reveal treats it as content, this treats it as
+        # background texture, which is the whole point of the component).
+        hold = max(0.6, dur - 1.0)
+        doc.tl.append(f'window.mkEmphasisIn(tl, "{sel}", {start:.3f}, {{ drift: -90, hold: {hold:.3f} }});')
+        doc.tl.append(f'window.mkEmphasisOut(tl, "{sel}", {exit_at:.3f});')
         return
 
     if treatment == "badge-pop":
@@ -620,6 +621,57 @@ def _editorial_emphasis_subcomp(instance_id: str, raw_text: str, dur: float) -> 
     return out.replace("caption-editorial-emphasis", instance_id)
 
 
+def _split_type_swap(raw_text: str) -> tuple[str, list[str], str]:
+    """Best-effort split of a contrast-marker sentence into kinetic-type-
+    swap's (prefix, options, suffix) variable contract -- not a general NLU
+    parser, just enough to turn "Bukan X, tapi Y" into a two-option roll
+    that settles on Y (the correction), or a single-option roll (fade to the
+    remainder, no visible swap) when only one marker is found."""
+    low = f" {raw_text.lower()} "
+    for marker in _CONTRAST_MARKERS:
+        idx = low.find(marker)
+        if idx == -1:
+            continue
+        idx = max(0, idx - 1)  # low has a leading space pad
+        prefix = raw_text[:idx].strip()
+        rest = raw_text[idx + len(marker) :].strip()
+        rest_low = f" {rest.lower()} "
+        for marker2 in _CONTRAST_MARKERS:
+            idx2 = rest_low.find(marker2)
+            if idx2 > 1:
+                idx2 = max(0, idx2 - 1)
+                opt1 = rest[:idx2].strip().rstrip(",")
+                opt2 = rest[idx2 + len(marker2) :].strip()
+                if opt1 and opt2:
+                    return prefix, [opt1, opt2], ""
+        return prefix, [rest], ""
+    return "", [raw_text], ""
+
+
+def _type_swap_subcomp(instance_id: str, raw_text: str, dur: float) -> tuple[str, dict[str, str]]:
+    prefix, options, suffix = _split_type_swap(raw_text)
+    src = _catalog_source("components", "kinetic-type-swap.html")
+    body_start = src.index("-->")
+    tag_start = src.index("<template>", body_start)
+    inner = src[tag_start + len("<template>") : src.index("</template>", tag_start)]
+    # Only the root div's data-duration carries data-composition-id right
+    # next to it -- swap that occurrence first (adding data-width/height, per
+    # hyperframes lint's root_missing_dimensions), then the remaining generic
+    # data-duration="4" (the inner clip div) separately.
+    inner = inner.replace(
+        'data-composition-id="kinetic-type-swap" data-duration="4"',
+        f'data-composition-id="{instance_id}" data-duration="{dur:.3f}" data-width="1920" data-height="1080"',
+    )
+    inner = inner.replace('data-duration="4"', f'data-duration="{dur:.3f}"')
+    inner = inner.replace("kinetic-type-swap", instance_id)
+    html_out = (
+        '<!doctype html>\n<html lang="en"><head><meta charset="UTF-8" />'
+        f'<meta name="viewport" content="width=1920, height=1080" /></head><body>{inner}</body></html>\n'
+    )
+    variable_values = {"prefix": prefix, "options": ",".join(options), "suffix": suffix}
+    return html_out, variable_values
+
+
 def _emit_overlay(
     doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str], subcomps: dict[str, str]
 ) -> None:
@@ -637,21 +689,26 @@ def _emit_overlay(
         if norm:
             code_seen.add(norm)
 
-    if treatment in ("camera-follow", "editorial-emphasis") and raw_text.strip():
+    if treatment in ("camera-follow", "editorial-emphasis", "type-swap") and raw_text.strip():
         instance_id = f"{treatment}-{idx}"
         rel_path = f"compositions/generated/{instance_id}.html"
-        subcomps[rel_path] = (
-            _camera_follow_subcomp(instance_id, raw_text, dur)
-            if treatment == "camera-follow"
-            else _editorial_emphasis_subcomp(instance_id, raw_text, dur)
-        )
+        variable_values: dict[str, str] | None = None
+        if treatment == "camera-follow":
+            subcomps[rel_path] = _camera_follow_subcomp(instance_id, raw_text, dur)
+        elif treatment == "editorial-emphasis":
+            subcomps[rel_path] = _editorial_emphasis_subcomp(instance_id, raw_text, dur)
+        else:
+            subcomps[rel_path], variable_values = _type_swap_subcomp(instance_id, raw_text, dur)
         scrim_id = doc.uid(f"{instance_id}-scrim")
+        var_values_attr = (
+            f" data-variable-values='{_esc(json.dumps(variable_values))}'" if variable_values else ""
+        )
         doc.body.append(
             f'<div id="{scrim_id}" class="clip overlay-scrim-only {zone_cls}" data-start="{start:.3f}" '
             f'data-duration="{dur:.3f}" data-track-index="69"></div>'
             f'<div id="{instance_id}-mount" data-composition-id="{instance_id}" data-composition-src="{rel_path}" '
             f'data-start="{start:.3f}" data-duration="{dur:.3f}" data-track-index="70" '
-            f'data-width="1920" data-height="1080"></div>'
+            f'data-width="1920" data-height="1080"{var_values_attr}></div>'
         )
         return
 
@@ -922,7 +979,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
 /* mk-emphasis-type's real recipe: ~8% alpha (texture, not a headline),
    oversized, uppercase, drifting -- not a semi-opaque near-white block. */
 .tr-background-emphasis .ov-kicker { color: rgba(255,255,255,.55); }
-.tr-background-emphasis .ov-hero { font-size: 15cqh; font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; color: rgba(255,255,255,.09); text-shadow: none; }
+/* Verbatim mk-emphasis-type recipe: Inter 600, 24cqh (~260px @1080p), -.02em,
+   rgba(245,245,247,.08) -- texture, not a headline. */
+.tr-background-emphasis .ov-hero { font-family: "Inter", -apple-system, sans-serif; font-size: 24cqh; font-weight: 600; text-transform: uppercase; letter-spacing: -.02em; color: rgba(245,245,247,.08); text-shadow: none; }
 .ov-diagram-step { font-size: 3.4cqh; font-weight: 600; padding: .2em 0; opacity: 0; border-left: 2px solid rgba(255,255,255,.4); padding-left: .5em; margin-top: .3em; }
 .ov-callout-value { font-size: 8cqh; font-weight: 800; }
 
@@ -1032,6 +1091,21 @@ def render_timeline_html(
       {body}
     </div>
     <script>
+      // Verbatim from the installed mk-emphasis-type catalog component
+      // (packages/hyperframes-kit/compositions/components/mk-emphasis-type.html)
+      // -- copied per its own "copy these helpers into the host script" note.
+      window.mkEmphasisIn = function (tl, target, at, opts) {{
+        opts = opts || {{}};
+        var drift = opts.drift === undefined ? -100 : opts.drift;
+        var hold = opts.hold === undefined ? 5 : opts.hold;
+        gsap.set(target, {{ opacity: 0, x: 40 }});
+        tl.to(target, {{ opacity: 1, duration: 1.0, ease: "power2.out" }}, at);
+        tl.to(target, {{ x: 40 + drift, duration: hold, ease: "sine.inOut" }}, at);
+      }};
+      window.mkEmphasisOut = function (tl, target, at) {{
+        tl.to(target, {{ opacity: 0, duration: 0.5, ease: "power2.in" }}, at);
+      }};
+
       const tl = gsap.timeline({{ paused: true }});
       {tl_lines}
       window.__timelines["{cid}"] = tl;
