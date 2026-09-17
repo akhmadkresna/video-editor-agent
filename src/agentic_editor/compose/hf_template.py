@@ -21,8 +21,11 @@ repo root for the specific simplifications made per family.
 from __future__ import annotations
 
 import html as _html
+import json
 from pathlib import Path
 from typing import Any
+
+from agentic_editor.paths import framework_home
 
 # ─────────────────────────── small helpers ───────────────────────────
 
@@ -515,7 +518,111 @@ def _emit_treatment_motion(
     _exit_fade()
 
 
-def _emit_overlay(doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str]) -> None:
+# ─────────────── catalog-derived sub-compositions (framework dependencies) ───────────────
+#
+# caption-camera-follow and caption-editorial-emphasis are real hosted
+# HyperFrames catalog items (installed at packages/hyperframes-kit/
+# compositions/... via `npx hyperframes add`) with substantial standalone JS
+# engines -- camera-follow derives its whole shot (word-box growth, camera
+# pose, radial motion blur) from live DOM measurement of a WORDS list keyed
+# by word count and a per-word cadence, NOT per-word ASR timestamps; editorial-
+# emphasis lays out two-line "blocks" with real font-fit / scale-to-safe-width
+# logic. Rather than re-derive that logic in Python (the earlier pass's
+# mistake -- see git history), these functions read the ACTUAL installed
+# catalog file, substitute real transcript text into its data section, and
+# write a standalone sub-composition file wired in via data-composition-src
+# (HyperFrames' native child-composition pattern). The catalog component is
+# the render; hf_template.py is a compiler that feeds it real data.
+
+
+def _catalog_source(*parts: str) -> str:
+    path = framework_home() / "packages" / "hyperframes-kit" / "compositions" / Path(*parts)
+    return path.read_text(encoding="utf-8")
+
+
+def _replace_block(source: str, start_marker: str, end_marker: str, replacement: str) -> str:
+    """Replaces everything from `start_marker` through the next `end_marker`
+    (inclusive of both) with `replacement`. Raises if either marker is
+    missing -- silently keeping the catalog file's DEMO data would ship a
+    render with the wrong words in it, which is worse than a loud failure
+    (and a marker going missing means the installed catalog file changed
+    shape and this generator needs updating, not silent papering-over)."""
+    start = source.index(start_marker)
+    end = source.index(end_marker, start + len(start_marker)) + len(end_marker)
+    return source[:start] + replacement + source[end:]
+
+
+def _js_str(text: str) -> str:
+    return json.dumps(text)
+
+
+def _camera_follow_subcomp(instance_id: str, raw_text: str, dur: float) -> str:
+    words = [w for w in raw_text.split() if w] or ["…"]
+    accent_idx = max(range(len(words)), key=lambda i: len(words[i]))
+    # STEP is the fixed per-word cadence the real engine advances the camera
+    # on; DUR just needs to comfortably fit every word plus the closing
+    # pull-back (~1.6s) -- there is no per-word timing data to thread in.
+    step = max(0.32, min(0.62, (max(1.6, dur) - 1.6) / max(1, len(words) - 1)))
+
+    src = _catalog_source("components", "caption-camera-follow.html")
+    # Unwrap the <template> mount-contract wrapper: we're not cloning this
+    # into a live document, we ship it as its own standalone composition
+    # file, so it needs no template-clone runtime at all. Search after the
+    # header comment closes -- its prose literally contains the substring
+    # "<template>" describing the pattern, which is not the real tag.
+    body_start = src.index("-->")
+    tag_start = src.index("<template>", body_start)
+    inner = src[tag_start + len("<template>") : src.index("</template>", tag_start)]
+
+    js_words = ",\n              ".join(
+        f'{{ text: {_js_str(w)}{", accent: true" if i == accent_idx else ""} }}' for i, w in enumerate(words)
+    )
+    inner = _replace_block(inner, "var WORDS = [", "];", f"var WORDS = [\n              {js_words}\n            ];")
+    inner = inner.replace("var DUR = 9;", f"var DUR = {dur:.3f};")
+    inner = inner.replace("var STEP = 0.52;", f"var STEP = {step:.3f};")
+    inner = inner.replace('data-duration="9"', f'data-duration="{dur:.3f}" data-width="1920" data-height="1080"')
+    inner = inner.replace("caption-camera-follow", instance_id)
+
+    return (
+        '<!doctype html>\n<html lang="en"><head><meta charset="UTF-8" />'
+        f'<meta name="viewport" content="width=1920, height=1080" /></head><body>{inner}</body></html>\n'
+    )
+
+
+def _editorial_emphasis_subcomp(instance_id: str, raw_text: str, dur: float) -> str:
+    words = [w for w in raw_text.split() if w] or ["…"]
+    accent_idx = max(range(len(words)), key=lambda i: len(words[i]))
+    n = len(words)
+    # No per-word ASR timing threaded in here either -- evenly space words
+    # across the beat's duration (see MIGRATION_NOTES.md); a real fix is
+    # plumbing actual word timestamps from the transcript through
+    # timeline.json, not something this templater has today.
+    word_dur = max(0.18, dur / max(1, n))
+    gap = word_dur * 0.18
+    w_entries = []
+    for i, w in enumerate(words):
+        w_start = i * word_dur
+        w_end = w_start + max(0.05, word_dur - gap)
+        w_entries.append(f"{{ text: {_js_str(w)}, start: {w_start:.3f}, end: {w_end:.3f} }}")
+    js_w = ",\n        ".join(w_entries)
+
+    if n <= 1:
+        js_blocks = '{ line1: [[0, "e"]], line2: null }'
+    else:
+        line1_pairs = ", ".join(f'[{i}, "n"]' for i in range(n) if i != accent_idx)
+        js_blocks = f'{{ line1: [{line1_pairs}], line2: [[{accent_idx}, "e"]] }}'
+
+    out = _catalog_source("components", "caption-editorial-emphasis.html")
+    out = _replace_block(out, "var W = [", "];", f"var W = [\n        {js_w}\n      ];")
+    out = _replace_block(out, "var BLOCKS = [", "];", f"var BLOCKS = [\n        {js_blocks}\n      ];")
+    out = out.replace("var DURATION = 8;", f"var DURATION = {dur:.3f};")
+    out = out.replace('data-duration="8"', f'data-duration="{dur:.3f}"')
+    return out.replace("caption-editorial-emphasis", instance_id)
+
+
+def _emit_overlay(
+    doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str], subcomps: dict[str, str]
+) -> None:
     start = _num(ov.get("fromSec"))
     dur = max(0.2, _num(ov.get("durationSec"), 1.5))
     zone = str(ov.get("zone") or "")
@@ -529,6 +636,24 @@ def _emit_overlay(doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str]) 
         norm = "\n".join(s.strip() for s in steps_raw).strip()
         if norm:
             code_seen.add(norm)
+
+    if treatment in ("camera-follow", "editorial-emphasis") and raw_text.strip():
+        instance_id = f"{treatment}-{idx}"
+        rel_path = f"compositions/generated/{instance_id}.html"
+        subcomps[rel_path] = (
+            _camera_follow_subcomp(instance_id, raw_text, dur)
+            if treatment == "camera-follow"
+            else _editorial_emphasis_subcomp(instance_id, raw_text, dur)
+        )
+        scrim_id = doc.uid(f"{instance_id}-scrim")
+        doc.body.append(
+            f'<div id="{scrim_id}" class="clip overlay-scrim-only {zone_cls}" data-start="{start:.3f}" '
+            f'data-duration="{dur:.3f}" data-track-index="69"></div>'
+            f'<div id="{instance_id}-mount" data-composition-id="{instance_id}" data-composition-src="{rel_path}" '
+            f'data-start="{start:.3f}" data-duration="{dur:.3f}" data-track-index="70" '
+            f'data-width="1920" data-height="1080"></div>'
+        )
+        return
 
     inner, kind_cls = _overlay_body_html(ov, treatment)
     tr_cls = f"tr-{treatment}" if treatment else ""
@@ -752,6 +877,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
 
 .overlay-card { display: flex; pointer-events: none; }
 .overlay-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 100%); }
+.overlay-scrim-only { background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 100%); pointer-events: none; }
 .overlay-inner { position: relative; opacity: 0; color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.55); max-width: 48cqw; padding: 4.5% 4.5%; }
 .zone-left .overlay-inner { margin-right: auto; }
 .zone-right .overlay-inner { margin-left: auto; text-align: right; }
@@ -845,14 +971,21 @@ def render_timeline_html(
     *,
     composition_id: str = "episode",
     asset_map: dict[str, str] | None = None,
-) -> str:
-    """Materialize a timeline.json dict as a standalone HyperFrames index.html."""
+) -> tuple[str, dict[str, str]]:
+    """Materialize a timeline.json dict as a standalone HyperFrames index.html.
+
+    Returns (html, subcomps): `subcomps` maps a project-relative path (e.g.
+    "compositions/generated/camera-follow-3.html") to file content for any
+    catalog-derived sub-compositions the overlays needed -- the caller
+    (`write_hf_composition`) writes these alongside index.html.
+    """
     asset_map = asset_map or dict(timeline.get("sources") or {})
     width = int(timeline.get("width") or 1920)
     height = int(timeline.get("height") or 1080)
     duration_sec = _num(timeline.get("durationSec"), 1.0)
 
     doc = _Doc()
+    subcomps: dict[str, str] = {}
 
     clips = list(timeline.get("clips") or [])
     for clip in clips:
@@ -866,7 +999,7 @@ def render_timeline_html(
         _emit_cutaway(doc, cut, i, asset_map)
     code_seen: set[str] = set()
     for i, ov in enumerate(timeline.get("overlays") or []):
-        _emit_overlay(doc, ov, i, code_seen)
+        _emit_overlay(doc, ov, i, code_seen, subcomps)
     for i, sfx in enumerate(timeline.get("sfx") or []):
         _emit_sfx(doc, sfx, i, asset_map)
     for i, priv in enumerate(timeline.get("privacy") or []):
@@ -876,7 +1009,7 @@ def render_timeline_html(
     tl_lines = "\n      ".join(doc.tl)
     cid = _esc(composition_id)
 
-    return f"""<!doctype html>
+    html_out = f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -907,6 +1040,7 @@ def render_timeline_html(
   </body>
 </html>
 """
+    return html_out, subcomps
 
 
 def write_hf_composition(
@@ -916,10 +1050,22 @@ def write_hf_composition(
     composition_id: str = "episode",
     asset_map: dict[str, str] | None = None,
 ) -> Path:
-    """Render + write index.html for `project_dir` (a HyperFrames project)."""
+    """Render + write index.html (+ any generated sub-compositions) for
+    `project_dir` (a HyperFrames project)."""
     project_dir = Path(project_dir)
     project_dir.mkdir(parents=True, exist_ok=True)
-    html_out = render_timeline_html(timeline, composition_id=composition_id, asset_map=asset_map)
+    html_out, subcomps = render_timeline_html(timeline, composition_id=composition_id, asset_map=asset_map)
     index_path = project_dir / "index.html"
     index_path.write_text(html_out, encoding="utf-8")
+    generated_dir = project_dir / "compositions" / "generated"
+    if subcomps and generated_dir.is_dir():
+        # A previous compose left stale per-overlay sub-compositions behind
+        # (fewer overlays this time, or different treatments) -- don't let
+        # last episode's camera-follow-7.html linger unreferenced.
+        for stale in generated_dir.glob("*.html"):
+            stale.unlink()
+    for rel_path, content in subcomps.items():
+        out_path = project_dir / rel_path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(content, encoding="utf-8")
     return index_path
