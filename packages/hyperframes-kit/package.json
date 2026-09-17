@@ -1,0 +1,15 @@
+{
+  "name": "@agentic-editor/hyperframes-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npx --yes hyperframes@0.8.46 lint",
+    "studio": "npx --yes hyperframes@0.8.46 preview",
+    "dev": "npx --yes hyperframes@0.8.46 preview",
+    "lint": "npx --yes hyperframes@0.8.46 lint",
+    "check": "npx --yes hyperframes@0.8.46 check",
+    "render": "npx --yes hyperframes@0.8.46 render",
+    "publish": "npx --yes hyperframes@0.8.46 publish"
+  }
+}

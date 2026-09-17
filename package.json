@@ -2,12 +2,12 @@
   "name": "agentic-editor",
   "private": true,
   "version": "0.1.0",
-  "description": "Agentic local video editor framework (Remotion kit + schemas)",
+  "description": "Agentic local video editor framework (HyperFrames kit + schemas)",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm -r run build",
-    "studio": "pnpm --filter @agentic-editor/remotion-kit studio",
-    "render": "pnpm --filter @agentic-editor/remotion-kit render"
+    "studio": "pnpm --filter @agentic-editor/hyperframes-kit studio",
+    "render": "pnpm --filter @agentic-editor/hyperframes-kit render"
   },
   "engines": {
     "node": ">=20"
