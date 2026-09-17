@@ -213,8 +213,82 @@ _OVERLAY_ZONE_CLASS = {
     "top_sparse": "zone-top",
 }
 
+# ─── treatment classifier: transcript beat -> HF catalog motion language ───
+#
+# Each `kind` from the overlay classifier gets one of these named motion
+# treatments. Treatments are hand-rolled GSAP here (consistent with the rest
+# of this module -- see MIGRATION_NOTES.md), but each one is modeled on a
+# specific hosted HyperFrames catalog item so the *behavior* it approximates
+# is traceable (confirm/refresh via `npx hyperframes catalog --query "<name>"`):
+#
+#   kind="emphasis", 1 word              -> kinetic-slam         (caption-kinetic-slam:
+#                                            full-screen single word, alternating entrance)
+#   kind="emphasis", contrast marker     -> type-swap             (kinetic-type-swap:
+#                                            sentence holds, one word-slot swaps + settles)
+#   kind="emphasis", short phrase        -> editorial-emphasis    (caption-editorial-emphasis:
+#                                            dual-font size contrast on the heaviest word)
+#   kind in title/quote, >=6 words       -> camera-follow         (caption-camera-follow:
+#                                            sentence grows while camera slowly pulls back)
+#   kind="chapter"                       -> background-emphasis   (mk-emphasis-type:
+#                                            oversized low-contrast word, drifts as texture)
+#   kind="code", snippet not seen yet    -> code-typing           (code-typing: token-streamed
+#                                            reveal, first time this snippet appears)
+#   kind="code", snippet changed         -> code-morph            (code-morph: prior snippet's
+#                                            tokens glide/fade into the new one)
+#   everything else                      -> "" (the original generic fade-in/fade-out)
+#
+# Bilingual (ID + EN) since episode transcripts are Indonesian-language.
+_CONTRAST_MARKERS = (
+    "bukan ", "tapi ", "tetapi ", "padahal", "ternyata", "justru",
+    "instead of", "actually", "turns out", "not just", "not only", " but ",
+)
 
-def _overlay_body_html(ov: dict[str, Any]) -> tuple[str, str]:
+
+def _word_count(text: str) -> int:
+    return len([w for w in text.split() if w])
+
+
+def _has_contrast_marker(text: str) -> bool:
+    low = f" {text.lower()} "
+    return any(marker in low for marker in _CONTRAST_MARKERS)
+
+
+def _choose_treatment(kind: str, raw_text: str, steps: list[str], code_seen: set[str]) -> str:
+    if kind == "code":
+        norm = "\n".join(s.strip() for s in steps).strip()
+        if not norm:
+            return ""
+        # Any earlier code beat in this episode means this one is a change to
+        # code already on screen, not a fresh introduction -- even if the two
+        # snippets happen to differ completely; `code_seen` here just marks
+        # "has any code appeared yet", not an exact-text cache.
+        return "code-morph" if code_seen else "code-typing"
+    if kind == "emphasis":
+        wc = _word_count(raw_text)
+        if wc <= 1:
+            return "kinetic-slam"
+        if _has_contrast_marker(raw_text):
+            return "type-swap"
+        return "editorial-emphasis"
+    if kind in ("title", "quote") and _word_count(raw_text) >= 6:
+        return "camera-follow"
+    if kind == "chapter":
+        return "background-emphasis"
+    return ""
+
+
+def _highlight_longest_word(escaped_text: str, extra_cls: str = "") -> str:
+    """Wraps the visually heaviest word in an accent span (dual-font emphasis)."""
+    words = escaped_text.split(" ")
+    if not words:
+        return escaped_text
+    idx = max(range(len(words)), key=lambda i: len(words[i]))
+    cls = f"ov-emph-accent {extra_cls}".strip()
+    words[idx] = f'<span class="{cls}">{words[idx]}</span>'
+    return " ".join(words)
+
+
+def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, str]:
     """Returns (inner_html, css_kind_class) for one overlay kind."""
     kind = str(ov.get("kind") or "title")
     text = _esc(ov.get("text"))
@@ -253,7 +327,11 @@ def _overlay_body_html(ov: dict[str, Any]) -> tuple[str, str]:
     if kind == "chapter":
         return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{title}</div>', "ov-chapter")
     if kind == "emphasis":
-        return (f'<div class="ov-emphasis">{text}</div>', "ov-emphasis")
+        if treatment == "kinetic-slam":
+            return (f'<div class="ov-emphasis ov-emphasis-slam">{text}</div>', "ov-emphasis")
+        swap_cls = "ov-swap-target" if treatment == "type-swap" else ""
+        body = _highlight_longest_word(text, swap_cls)
+        return (f'<div class="ov-emphasis">{body}</div>', "ov-emphasis")
     if kind == "diagram":
         items = "".join(f'<div class="ov-diagram-step" data-step="{i}">{_esc(s)}</div>' for i, s in enumerate(steps))
         return (f'<div class="ov-body">{title}</div><div class="ov-diagram">{items}</div>', "ov-diagram")
@@ -268,29 +346,140 @@ def _overlay_body_html(ov: dict[str, Any]) -> tuple[str, str]:
     return (f'<div class="ov-body">{text or title}</div>', "ov-title")
 
 
-def _emit_overlay(doc: _Doc, ov: dict[str, Any], idx: int) -> None:
+def _emit_treatment_motion(
+    doc: _Doc, oid: str, treatment: str, start: float, dur: float, fade: float, exit_at: float
+) -> None:
+    sel = f"#{oid} .overlay-inner"
+    exit_at = max(start, exit_at)
+
+    if treatment == "kinetic-slam":
+        from_x = -60 if (hash(oid) % 2 == 0) else 60
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0, x: {from_x}, scale: 1.15 }}, '
+            f'{{ autoAlpha: 1, x: 0, scale: 1, duration: {min(fade, 0.22):.3f}, ease: "back.out(2.2)" }}, {start:.3f});'
+        )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
+        return
+
+    if treatment == "camera-follow":
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0, scale: 1.06 }}, '
+            f'{{ autoAlpha: 1, scale: 1, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
+        )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ scale: 0.94, duration: {max(0.1, dur - fade):.3f}, ease: "sine.inOut" }}, '
+            f'{start + fade:.3f});'
+        )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
+        return
+
+    if treatment == "type-swap":
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0, y: 14 }}, '
+            f'{{ autoAlpha: 1, y: 0, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
+        )
+        swap_at = start + max(fade, dur * 0.45)
+        # Both tweens target the same element after the timeline's start, so
+        # GSAP's immediateRender default would otherwise apply the later
+        # call's "from" values as the resting state for any pre-swap seek.
+        doc.tl.append(
+            f'tl.fromTo("#{oid} .ov-swap-target", {{ filter: "blur(0px)" }}, '
+            f'{{ filter: "blur(6px)", duration: 0.12, ease: "power1.in", immediateRender: false }}, {swap_at:.3f});'
+        )
+        doc.tl.append(
+            f'tl.fromTo("#{oid} .ov-swap-target", {{ filter: "blur(6px)", autoAlpha: .4 }}, '
+            f'{{ filter: "blur(0px)", autoAlpha: 1, duration: 0.22, ease: "power2.out", immediateRender: false }}, '
+            f'{swap_at + 0.12:.3f});'
+        )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
+        return
+
+    if treatment == "background-emphasis":
+        # Two fromTo() calls on the same element (alpha, then x) -- the second
+        # needs immediateRender: false or its "from" value becomes the
+        # element's resting state for any pre-entrance seek.
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0 }}, '
+            f'{{ autoAlpha: 1, duration: {fade * 1.4:.3f}, ease: "sine.out" }}, {start:.3f});'
+        )
+        # One continuous x tween for the whole hold (entrance drift included)
+        # rather than a separate entrance + drift tween on the same property
+        # -- two tweens on "x" starting at the same timestamp collide.
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ x: -20 }}, '
+            f'{{ x: 20, duration: {max(0.1, dur):.3f}, ease: "none", immediateRender: false }}, {start:.3f});'
+        )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
+        return
+
+    if treatment in ("code-typing", "code-morph"):
+        doc.tl.append(
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0, y: 8 }}, '
+            f'{{ autoAlpha: 1, y: 0, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
+        )
+        if treatment == "code-typing":
+            # token-streamed reveal: each line steps in in sequence, caret-like.
+            doc.tl.append(
+                f'tl.fromTo("#{oid} .ov-code-line", {{ autoAlpha: 0 }}, '
+                f'{{ autoAlpha: 1, duration: 0.05, stagger: 0.09, ease: "none" }}, {start + 0.05:.3f});'
+            )
+        else:
+            # code-morph: prior snippet's lines glide/fade into the new ones.
+            doc.tl.append(
+                f'tl.fromTo("#{oid} .ov-code-line", {{ autoAlpha: .3, x: -6 }}, '
+                f'{{ autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.05, ease: "power2.out" }}, {start + 0.05:.3f});'
+            )
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
+        return
+
+    # editorial-emphasis and default ("") keep the original generic fade.
+    doc.tl.append(
+        f'tl.fromTo("{sel}", {{ autoAlpha: 0, y: 14 }}, '
+        f'{{ autoAlpha: 1, y: 0, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
+    )
+    doc.tl.append(
+        f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+    )
+
+
+def _emit_overlay(doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str]) -> None:
     start = _num(ov.get("fromSec"))
     dur = max(0.2, _num(ov.get("durationSec"), 1.5))
     zone = str(ov.get("zone") or "")
     zone_cls = _OVERLAY_ZONE_CLASS.get(zone, "")
-    inner, kind_cls = _overlay_body_html(ov)
+    kind = str(ov.get("kind") or "title")
+    raw_text = str(ov.get("text") or ov.get("title") or "")
+    steps_raw = [str(s) for s in (ov.get("steps") or [])]
+
+    treatment = _choose_treatment(kind, raw_text, steps_raw, code_seen)
+    if kind == "code":
+        norm = "\n".join(s.strip() for s in steps_raw).strip()
+        if norm:
+            code_seen.add(norm)
+
+    inner, kind_cls = _overlay_body_html(ov, treatment)
+    tr_cls = f"tr-{treatment}" if treatment else ""
     oid = doc.uid(f"overlay-{idx}")
     doc.body.append(
-        f'<div id="{oid}" class="clip overlay-card {kind_cls} {zone_cls}" '
+        f'<div id="{oid}" class="clip overlay-card {kind_cls} {zone_cls} {tr_cls}" '
         f'data-start="{start:.3f}" data-duration="{dur:.3f}" data-track-index="70">'
         f'<div class="overlay-scrim"></div><div class="overlay-inner">{inner}</div></div>'
     )
     fade = min(0.3, dur / 4)
     exit_start_sec = ov.get("exitStartSec")
     exit_at = start + (_num(exit_start_sec) if exit_start_sec is not None else max(0.0, dur - fade))
-    doc.tl.append(
-        f'tl.fromTo("#{oid} .overlay-inner", {{ autoAlpha: 0, y: 14 }}, '
-        f'{{ autoAlpha: 1, y: 0, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
-    )
-    doc.tl.append(
-        f'tl.to("#{oid} .overlay-inner", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, '
-        f'{max(start, exit_at):.3f});'
-    )
+    _emit_treatment_motion(doc, oid, treatment, start, dur, fade, exit_at)
+
     steps = ov.get("steps") or []
     step_at = ov.get("stepAtSec") or []
     if steps and step_at:
@@ -521,6 +710,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
 .ov-illustration-list li, .ov-list-cycle li { font-size: 3.6cqh; font-weight: 600; padding: .15em 0; opacity: 0; }
 .ov-list-cycle li { opacity: 1; }
 .ov-emphasis { font-size: 7cqh; font-weight: 800; border-bottom: 3px solid rgba(255,255,255,.5); padding-bottom: .1em; }
+.ov-emphasis-slam { font-size: 13cqh; text-align: center; }
+.ov-emph-accent { font-size: 1.35em; display: inline-block; }
+.ov-swap-target { display: inline-block; }
+.tr-background-emphasis .ov-kicker, .tr-background-emphasis .ov-hero { color: rgba(255,255,255,.42); letter-spacing: .04em; }
+.tr-background-emphasis .ov-hero { font-size: 11cqh; font-weight: 900; }
 .ov-diagram-step { font-size: 3.4cqh; font-weight: 600; padding: .2em 0; opacity: 0; border-left: 2px solid rgba(255,255,255,.4); padding-left: .5em; margin-top: .3em; }
 .ov-callout-value { font-size: 8cqh; font-weight: 800; }
 .ov-chip-kind { position: absolute; top: 8%; left: 4.5%; }
@@ -589,8 +783,9 @@ def render_timeline_html(
         _emit_mockup(doc, mock, i)
     for i, cut in enumerate(timeline.get("cutaways") or []):
         _emit_cutaway(doc, cut, i, asset_map)
+    code_seen: set[str] = set()
     for i, ov in enumerate(timeline.get("overlays") or []):
-        _emit_overlay(doc, ov, i)
+        _emit_overlay(doc, ov, i, code_seen)
     for i, sfx in enumerate(timeline.get("sfx") or []):
         _emit_sfx(doc, sfx, i, asset_map)
     for i, priv in enumerate(timeline.get("privacy") or []):
