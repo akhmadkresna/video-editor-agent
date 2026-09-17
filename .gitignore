@@ -32,5 +32,4 @@ coverage/
 *.log
 .ae-cache/
 .artifacts/
-packages/remotion-kit/public/ae-media/
 .claude/worktrees/
