@@ -270,22 +270,53 @@ def _choose_treatment(kind: str, raw_text: str, steps: list[str], code_seen: set
         if _has_contrast_marker(raw_text):
             return "type-swap"
         return "editorial-emphasis"
-    if kind in ("title", "quote") and _word_count(raw_text) >= 6:
-        return "camera-follow"
+    if kind in ("title", "quote"):
+        # Every quote/title gets real per-word motion; long ones additionally
+        # get the slow pull-back. A flat single-block fade was the single
+        # biggest source of "nothing is moving" -- most spoken quotes are
+        # short, so gating any motion behind a >=6-word threshold meant most
+        # overlays in a typical episode got no distinct treatment at all.
+        return "camera-follow" if _word_count(raw_text) >= 6 else "word-cascade"
     if kind == "chapter":
         return "background-emphasis"
+    if kind in ("chip", "tag"):
+        return "badge-pop"
     return ""
 
 
-def _highlight_longest_word(escaped_text: str, extra_cls: str = "") -> str:
-    """Wraps the visually heaviest word in an accent span (dual-font emphasis)."""
-    words = escaped_text.split(" ")
+def _word_spans(
+    escaped_text: str, *, word_cls: str = "ov-word", accent_idx: int | None = None, accent_extra_cls: str = ""
+) -> str:
+    """Wraps every word in its own span so GSAP's `stagger` can cascade them in
+    one word at a time, the way the hosted caption-* catalog components read
+    (a static text block, however faded, is what real motion is not)."""
+    words = [w for w in escaped_text.split(" ") if w]
+    out = []
+    for i, w in enumerate(words):
+        cls = word_cls
+        if i == accent_idx:
+            cls = f"{word_cls} ov-word-accent {accent_extra_cls}".strip()
+        out.append(f'<span class="{cls}">{w}</span>')
+    return " ".join(out)
+
+
+def _longest_word_idx(escaped_text: str) -> int | None:
+    words = [w for w in escaped_text.split(" ") if w]
     if not words:
-        return escaped_text
-    idx = max(range(len(words)), key=lambda i: len(words[i]))
-    cls = f"ov-emph-accent {extra_cls}".strip()
-    words[idx] = f'<span class="{cls}">{words[idx]}</span>'
-    return " ".join(words)
+        return None
+    return max(range(len(words)), key=lambda i: len(words[i]))
+
+
+def _emit_word_stagger(
+    doc: _Doc, oid: str, selector: str, *, start: float, fade: float, stagger: float = 0.05
+) -> None:
+    """Cascades `selector`'s children in word-by-word (GSAP `stagger`), instead
+    of the whole block fading in as one static unit."""
+    doc.tl.append(
+        f'tl.fromTo("{selector}", {{ autoAlpha: 0, y: 22 }}, '
+        f'{{ autoAlpha: 1, y: 0, duration: {max(0.16, fade):.3f}, ease: "power2.out", '
+        f'stagger: {stagger:.3f} }}, {start:.3f});'
+    )
 
 
 def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, str]:
@@ -301,7 +332,8 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
 
     if kind == "title":
         second = f'<div class="ov-accent">{accent}</div>' if accent else ""
-        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{text}</div>{second}', "ov-title")
+        hero = _word_spans(text, word_cls="ov-word ov-hero-word", accent_idx=_longest_word_idx(text))
+        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{hero}</div>{second}', "ov-title")
     if kind == "stat":
         desc = f'<div class="ov-body">{title}</div>' if title else ""
         src = f'<div class="ov-meta">{source_label}</div>' if source_label else ""
@@ -313,11 +345,16 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
             "ov-lower-third",
         )
     if kind == "tag":
-        return (f'<span class="ov-chip">{text}</span>', "ov-tag")
+        return (f'<span class="ov-badge"><span class="ov-badge-dot"></span>{text}</span>', "ov-tag")
     if kind == "divider":
         return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{title}</div>', "ov-divider")
     if kind == "quote":
-        return (f'<div class="ov-quote-mark">&ldquo;</div><div class="ov-body ov-quote">{text}</div><div class="ov-meta">{kicker}</div>', "ov-quote")
+        body = _word_spans(text, word_cls="ov-word ov-quote-word")
+        markup = (
+            f'<div class="ov-quote-mark">&ldquo;</div><div class="ov-body ov-quote">{body}</div>'
+            f'<div class="ov-meta">{kicker}</div>'
+        )
+        return (markup, "ov-quote")
     if kind == "code":
         lines = "".join(f'<div class="ov-code-line">{_esc(s)}</div>' for s in steps)
         return (f'<div class="ov-meta">{kicker}</div><div class="ov-code">{lines}</div>', "ov-code")
@@ -328,12 +365,16 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
         # overlay_suggest.py's chapter beats always carry kicker+text, never
         # title (confirmed by rendering real footage: the hero was silently
         # empty for every chapter overlay until this fallback was added).
-        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{title or text}</div>', "ov-chapter")
+        hero_text = title or text
+        hero = _word_spans(hero_text, word_cls="ov-word ov-hero-word")
+        return (f'<div class="ov-kicker">{kicker}</div><div class="ov-hero">{hero}</div>', "ov-chapter")
     if kind == "emphasis":
         if treatment == "kinetic-slam":
             return (f'<div class="ov-emphasis ov-emphasis-slam">{text}</div>', "ov-emphasis")
-        swap_cls = "ov-swap-target" if treatment == "type-swap" else ""
-        body = _highlight_longest_word(text, swap_cls)
+        accent_cls = "ov-swap-target" if treatment == "type-swap" else ""
+        body = _word_spans(
+            text, word_cls="ov-word ov-emphasis-word", accent_idx=_longest_word_idx(text), accent_extra_cls=accent_cls
+        )
         return (f'<div class="ov-emphasis">{body}</div>', "ov-emphasis")
     if kind == "diagram":
         items = "".join(f'<div class="ov-diagram-step" data-step="{i}">{_esc(s)}</div>' for i, s in enumerate(steps))
@@ -341,7 +382,7 @@ def _overlay_body_html(ov: dict[str, Any], treatment: str = "") -> tuple[str, st
     if kind == "callout":
         return (f'<div class="ov-callout-value">{value}</div><div class="ov-meta">{source_label}</div>', "ov-callout")
     if kind == "chip":
-        return (f'<span class="ov-chip ov-chip-float">{text}</span>', "ov-chip-kind")
+        return (f'<span class="ov-badge ov-badge-float"><span class="ov-badge-dot"></span>{text}</span>', "")
     if kind == "list_cycle":
         items = "".join(f'<li class="ov-list-item" data-step="{i}">{_esc(s)}</li>' for i, s in enumerate(steps))
         return (f'<div class="ov-body">{text}</div><ul class="ov-list-cycle">{items}</ul>', "ov-list")
@@ -353,7 +394,13 @@ def _emit_treatment_motion(
     doc: _Doc, oid: str, treatment: str, start: float, dur: float, fade: float, exit_at: float
 ) -> None:
     sel = f"#{oid} .overlay-inner"
+    word_sel = f"#{oid} .ov-word"
     exit_at = max(start, exit_at)
+
+    def _exit_fade() -> None:
+        doc.tl.append(
+            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+        )
 
     if treatment == "kinetic-slam":
         from_x = -60 if (hash(oid) % 2 == 0) else 60
@@ -361,23 +408,61 @@ def _emit_treatment_motion(
             f'tl.fromTo("{sel}", {{ autoAlpha: 0, x: {from_x}, scale: 1.15 }}, '
             f'{{ autoAlpha: 1, x: 0, scale: 1, duration: {min(fade, 0.22):.3f}, ease: "back.out(2.2)" }}, {start:.3f});'
         )
-        doc.tl.append(
-            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
-        )
+        _exit_fade()
         return
 
-    if treatment == "camera-follow":
+    if treatment in ("camera-follow", "word-cascade"):
+        # Real per-word motion (GSAP `stagger`), not one static block fading
+        # in -- the container itself just becomes available; each `.ov-word`
+        # span carries its own entrance, cascading like the hosted
+        # caption-camera-follow / caption-editorial-emphasis catalog items.
+        doc.tl.append(f'tl.set("{sel}", {{ autoAlpha: 1 }}, {start:.3f});')
+        stagger_dur = 0.34 if treatment == "camera-follow" else 0.26
         doc.tl.append(
-            f'tl.fromTo("{sel}", {{ autoAlpha: 0, scale: 1.06 }}, '
-            f'{{ autoAlpha: 1, scale: 1, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
+            f'tl.fromTo("{word_sel}", {{ autoAlpha: 0, y: 22 }}, '
+            f'{{ autoAlpha: 1, y: 0, duration: {stagger_dur:.3f}, ease: "power2.out", stagger: 0.055 }}, {start:.3f});'
+        )
+        if treatment == "camera-follow":
+            # The slow pull-back: real footage push-in/pull-back convention,
+            # not the full radial-blur camera-follow engine (see
+            # MIGRATION_NOTES.md) -- but a genuine continuous camera move
+            # over the whole hold, not a one-shot fade.
+            doc.tl.append(
+                f'tl.fromTo("{sel}", {{ scale: 1.05 }}, '
+                f'{{ scale: 0.94, duration: {max(0.1, dur):.3f}, ease: "sine.inOut", immediateRender: false }}, '
+                f'{start:.3f});'
+            )
+        _exit_fade()
+        return
+
+    if treatment == "editorial-emphasis":
+        doc.tl.append(f'tl.set("{sel}", {{ autoAlpha: 1 }}, {start:.3f});')
+        doc.tl.append(
+            f'tl.fromTo("{word_sel}", {{ autoAlpha: 0, scale: 1.12, transformOrigin: "0% 100%" }}, '
+            f'{{ autoAlpha: 1, scale: 1, duration: 0.26, ease: "power2.out", stagger: 0.06 }}, {start:.3f});'
+        )
+        _exit_fade()
+        return
+
+    if treatment == "background-emphasis":
+        doc.tl.append(f'tl.set("{sel}", {{ autoAlpha: 1 }}, {start:.3f});')
+        doc.tl.append(
+            f'tl.fromTo("{word_sel}", {{ autoAlpha: 0 }}, '
+            f'{{ autoAlpha: 1, duration: {fade * 1.4:.3f}, ease: "sine.out", stagger: 0.08 }}, {start:.3f});'
         )
         doc.tl.append(
-            f'tl.to("{sel}", {{ scale: 0.94, duration: {max(0.1, dur - fade):.3f}, ease: "sine.inOut" }}, '
-            f'{start + fade:.3f});'
+            f'tl.fromTo("{sel}", {{ x: -30 }}, '
+            f'{{ x: 30, duration: {max(0.1, dur):.3f}, ease: "none", immediateRender: false }}, {start:.3f});'
         )
+        _exit_fade()
+        return
+
+    if treatment == "badge-pop":
         doc.tl.append(
-            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
+            f'tl.fromTo("{sel}", {{ autoAlpha: 0, scale: 0.7, y: -12 }}, '
+            f'{{ autoAlpha: 1, scale: 1, y: 0, duration: {min(fade, 0.28):.3f}, ease: "back.out(2.4)" }}, {start:.3f});'
         )
+        _exit_fade()
         return
 
     if treatment == "type-swap":
@@ -398,29 +483,7 @@ def _emit_treatment_motion(
             f'{{ filter: "blur(0px)", autoAlpha: 1, duration: 0.22, ease: "power2.out", immediateRender: false }}, '
             f'{swap_at + 0.12:.3f});'
         )
-        doc.tl.append(
-            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
-        )
-        return
-
-    if treatment == "background-emphasis":
-        # Two fromTo() calls on the same element (alpha, then x) -- the second
-        # needs immediateRender: false or its "from" value becomes the
-        # element's resting state for any pre-entrance seek.
-        doc.tl.append(
-            f'tl.fromTo("{sel}", {{ autoAlpha: 0 }}, '
-            f'{{ autoAlpha: 1, duration: {fade * 1.4:.3f}, ease: "sine.out" }}, {start:.3f});'
-        )
-        # One continuous x tween for the whole hold (entrance drift included)
-        # rather than a separate entrance + drift tween on the same property
-        # -- two tweens on "x" starting at the same timestamp collide.
-        doc.tl.append(
-            f'tl.fromTo("{sel}", {{ x: -20 }}, '
-            f'{{ x: 20, duration: {max(0.1, dur):.3f}, ease: "none", immediateRender: false }}, {start:.3f});'
-        )
-        doc.tl.append(
-            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
-        )
+        _exit_fade()
         return
 
     if treatment in ("code-typing", "code-morph"):
@@ -440,19 +503,16 @@ def _emit_treatment_motion(
                 f'tl.fromTo("#{oid} .ov-code-line", {{ autoAlpha: .3, x: -6 }}, '
                 f'{{ autoAlpha: 1, x: 0, duration: 0.28, stagger: 0.05, ease: "power2.out" }}, {start + 0.05:.3f});'
             )
-        doc.tl.append(
-            f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
-        )
+        _exit_fade()
         return
 
-    # editorial-emphasis and default ("") keep the original generic fade.
+    # default ("") -- kinds with their own reveal mechanic (diagram/list_cycle
+    # step-ins) or not yet given a distinct treatment keep the generic fade.
     doc.tl.append(
         f'tl.fromTo("{sel}", {{ autoAlpha: 0, y: 14 }}, '
         f'{{ autoAlpha: 1, y: 0, duration: {fade:.3f}, ease: "power2.out" }}, {start:.3f});'
     )
-    doc.tl.append(
-        f'tl.to("{sel}", {{ autoAlpha: 0, duration: {fade:.3f}, ease: "power1.in" }}, {exit_at:.3f});'
-    )
+    _exit_fade()
 
 
 def _emit_overlay(doc: _Doc, ov: dict[str, Any], idx: int, code_seen: set[str]) -> None:
@@ -705,22 +765,40 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; }
 .ov-stat-value { font-size: 9cqh; font-weight: 800; }
 .ov-chips { display: flex; gap: .4em; margin-top: .5em; flex-wrap: wrap; }
 .ov-chip { display: inline-block; border: 2px solid rgba(255,255,255,.28); border-radius: 999px; padding: .2em .9em; font-size: 2.2cqh; }
-.ov-quote-mark { font-size: 8cqh; opacity: .5; line-height: .5; }
-.ov-quote { font-style: italic; }
+
+/* Catalog-modeled "chip"/"tag" badge (caption-camera-follow's accent
+   language: a filled glass pill with a soft dot, not a bare outline). */
+.ov-badge { display: inline-flex; align-items: center; gap: .5em; background: rgba(20,20,26,.55); backdrop-filter: blur(6px); border-radius: 999px; padding: .32em .95em .32em .7em; font-size: 2.2cqh; font-weight: 700; letter-spacing: .01em; box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.12); }
+.ov-badge-dot { width: .55em; height: .55em; border-radius: 50%; background: #ffd84d; box-shadow: 0 0 10px rgba(255,216,77,.8); flex: none; }
+.ov-badge-float { position: absolute; top: 8%; left: 4.5%; }
+
+.ov-quote-mark { font-family: "Playfair Display", serif; font-size: 8cqh; opacity: .5; line-height: .5; }
+.ov-quote { font-family: "Playfair Display", serif; font-style: italic; font-weight: 800; }
 .ov-code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 2.6cqh; background: rgba(0,0,0,.4); border-radius: 10px; padding: .8em 1em; }
 .ov-code-line { white-space: pre; }
 .ov-illustration-list, .ov-list-cycle { list-style: none; margin-top: .3em; }
 .ov-illustration-list li, .ov-list-cycle li { font-size: 3.6cqh; font-weight: 600; padding: .15em 0; opacity: 0; }
 .ov-list-cycle li { opacity: 1; }
-.ov-emphasis { font-size: 7cqh; font-weight: 800; border-bottom: 3px solid rgba(255,255,255,.5); padding-bottom: .1em; }
-.ov-emphasis-slam { font-size: 13cqh; text-align: center; }
-.ov-emph-accent { font-size: 1.35em; display: inline-block; }
+
+/* Word-by-word cascade: every span starts hidden independent of its parent
+   (the parent just becomes available; GSAP `stagger` reveals each word). */
+.ov-word { display: inline-block; opacity: 0; }
+.ov-hero-word, .ov-quote-word { will-change: transform, opacity; }
+
+.ov-emphasis { font-size: 7cqh; font-weight: 800; }
+.ov-emphasis-slam { font-family: "Anton", sans-serif; text-transform: uppercase; letter-spacing: .01em; font-size: 15cqh; text-align: center; color: #fff; }
+/* editorial-emphasis's real dual-font contrast: Inter body vs. a much
+   larger italic Playfair Display display word -- not a same-font 1.35x. */
+.ov-emphasis-word.ov-word-accent { font-family: "Playfair Display", serif; font-style: italic; font-weight: 800; font-size: 1.7em; display: block; line-height: .95; color: #f5f0d0; text-shadow: 0 2px 18px rgba(0,0,0,.6), 0 4px 30px rgba(0,0,0,.35); }
+.ov-word-accent { color: #ffd84d; }
 .ov-swap-target { display: inline-block; }
-.tr-background-emphasis .ov-kicker, .tr-background-emphasis .ov-hero { color: rgba(255,255,255,.42); letter-spacing: .04em; }
-.tr-background-emphasis .ov-hero { font-size: 11cqh; font-weight: 900; }
+
+/* mk-emphasis-type's real recipe: ~8% alpha (texture, not a headline),
+   oversized, uppercase, drifting -- not a semi-opaque near-white block. */
+.tr-background-emphasis .ov-kicker { color: rgba(255,255,255,.55); }
+.tr-background-emphasis .ov-hero { font-size: 15cqh; font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; color: rgba(255,255,255,.09); text-shadow: none; }
 .ov-diagram-step { font-size: 3.4cqh; font-weight: 600; padding: .2em 0; opacity: 0; border-left: 2px solid rgba(255,255,255,.4); padding-left: .5em; margin-top: .3em; }
 .ov-callout-value { font-size: 8cqh; font-weight: 800; }
-.ov-chip-kind { position: absolute; top: 8%; left: 4.5%; }
 
 .cutaway-card { background: #05070a; display: flex; align-items: center; justify-content: center; }
 .cutaway-inner { opacity: 0; width: 82%; max-width: 1400px; color: #f2efe9; }
@@ -803,7 +881,7 @@ def render_timeline_html(
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width={width}, height={height}" />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=IBM+Plex+Mono:wght@500&family=Anton&family=Playfair+Display:ital,wght@1,800&family=Inter:wght@400;600;900&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
 {_CSS}

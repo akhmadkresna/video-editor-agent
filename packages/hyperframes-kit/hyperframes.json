@@ -8,5 +8,42 @@
   },
   "media": {
     "autoProxy": true
-  }
+  },
+  "registryItems": [
+    {
+      "name": "caption-camera-follow",
+      "type": "hyperframes:component",
+      "target": "compositions/components/caption-camera-follow.html"
+    },
+    {
+      "name": "caption-editorial-emphasis",
+      "type": "hyperframes:component",
+      "target": "compositions/components/caption-editorial-emphasis.html"
+    },
+    {
+      "name": "caption-kinetic-slam",
+      "type": "hyperframes:component",
+      "target": "compositions/components/caption-kinetic-slam.html"
+    },
+    {
+      "name": "kinetic-type-swap",
+      "type": "hyperframes:component",
+      "target": "compositions/components/kinetic-type-swap.html"
+    },
+    {
+      "name": "mk-emphasis-type",
+      "type": "hyperframes:component",
+      "target": "compositions/components/mk-emphasis-type.html"
+    },
+    {
+      "name": "code-morph",
+      "type": "hyperframes:block",
+      "target": "compositions/code-morph.html"
+    },
+    {
+      "name": "code-typing",
+      "type": "hyperframes:block",
+      "target": "compositions/code-typing.html"
+    }
+  ]
 }
